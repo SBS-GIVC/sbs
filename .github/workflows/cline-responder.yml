@@ -7,6 +7,9 @@ on:
 
 jobs:
   analyze-issue:
+    permissions:
+      contents: read
+      issues: write
     runs-on: ubuntu-latest
     if: github.event.issue.state != 'closed' && (github.event_name == 'issues' || contains(github.event.comment.body, '/analyze'))
     
