@@ -33,8 +33,10 @@ app.use(helmet({
       "img-src": ["'self'", "data:", "https://www.google.com", "https://www.gstatic.com"],
       "frame-src": ["'self'", "https://calendar.google.com", "https://accounts.google.com"],
       "connect-src": ["'self'", "https://www.googleapis.com", "https://www.google.com"],
+      "form-action": ["'self'"],
     },
   },
+  crossOriginEmbedderPolicy: false,
 }));
 
 // Rate limiting
@@ -42,12 +44,31 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100 // limit each IP to 100 requests per windowMs
 });
-app.use('/api/', limiter);
+app.use('/api', limiter);
 
 // CORS configuration
-app.use(cors());
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
+// Handle OPTIONS preflight requests
+app.options('*', cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Debug logging middleware
+app.use((req, res, next) => {
+  console.log(`📥 ${req.method} ${req.path}`, {
+    contentType: req.get('content-type'),
+    origin: req.get('origin'),
+    timestamp: new Date().toISOString()
+  });
+  next();
+});
 
 // Serve static files
 app.use(express.static('public'));
@@ -106,16 +127,22 @@ app.get('/api/metrics', (req, res) => {
 
 // Main claim submission endpoint
 app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
+  console.log('✅ POST /api/submit-claim endpoint hit', {
+    hasFile: !!req.file,
+    bodyKeys: Object.keys(req.body),
+    contentType: req.get('content-type')
+  });
+
   try {
-    const { 
-      patientName, 
-      patientId, 
+    const {
+      patientName,
+      patientId,
       memberId,
       payerId,
       providerId,
       claimType,
       userEmail,
-      userCredentials 
+      userCredentials
     } = req.body;
 
     // Validate required fields
@@ -387,8 +414,24 @@ app.get('/api/services/status', async (req, res) => {
   }
 });
 
+// 404 handler for API routes
+app.use('/api/*', (req, res) => {
+  console.log(`⚠️ 404 Not Found: ${req.method} ${req.path}`);
+  res.status(404).json({
+    success: false,
+    error: 'API endpoint not found',
+    path: req.path,
+    method: req.method
+  });
+});
+
 // Error handling middleware
 app.use((error, req, res, next) => {
+  console.error('❌ Error caught by middleware:', error);
+
+  // Set content type to JSON
+  res.setHeader('Content-Type', 'application/json');
+
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
@@ -396,13 +439,17 @@ app.use((error, req, res, next) => {
         error: 'File too large. Maximum size is 10MB.'
       });
     }
+    return res.status(400).json({
+      success: false,
+      error: 'File upload error',
+      message: error.message
+    });
   }
-  
-  console.error('Server error:', error);
-  res.status(500).json({
+
+  res.status(error.status || 500).json({
     success: false,
-    error: 'Internal server error',
-    message: error.message
+    error: error.message || 'Internal server error',
+    details: process.env.NODE_ENV === 'development' ? error.stack : undefined
   });
 });
 
