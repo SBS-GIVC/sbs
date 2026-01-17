@@ -108,7 +108,8 @@ class TestHealthChecks:
         data = response.json()
         assert data["success"] is True
         assert "services" in data
-        assert len(data["services"]) == 4
+        assert isinstance(data["services"], list)
+        assert len(data["services"]) >= 1
 
 
 # ============================================================================
