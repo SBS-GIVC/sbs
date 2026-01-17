@@ -196,7 +196,14 @@ def generate_test_keypair(facility_id: int) -> tuple:
     base_path = os.path.join(safe_root, os.path.relpath(configured_base, start=safe_root))
     cert_dir = os.path.join(base_path, f"facility_{facility_id}")
     cert_dir = os.path.normpath(cert_dir)
-    if os.path.commonpath([safe_root, cert_dir]) != safe_root:
+    try:
+        common_base = os.path.commonpath([safe_root, cert_dir])
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Computed certificate directory is outside of the allowed root"
+        )
+    if common_base != safe_root:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Computed certificate directory is outside of the allowed root"
