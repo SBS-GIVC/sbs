@@ -1,0 +1,49 @@
+{
+  "name": "SBS Integration Engine",
+  "dockerComposeFile": [
+    "../docker-compose.yml",
+    "docker-compose.devcontainer.yml"
+  ],
+  "service": "devcontainer",
+  "workspaceFolder": "/workspace",
+  "runServices": [
+    "postgres",
+    "normalizer-service",
+    "financial-rules-engine",
+    "signer-service",
+    "nphies-bridge",
+    "n8n",
+    "sbs-landing"
+  ],
+  "shutdownAction": "stopCompose",
+  "forwardPorts": [
+    3000,
+    5678,
+    8000,
+    8001,
+    8002,
+    8003
+  ],
+  "portsAttributes": {
+    "3000": { "label": "SBS Landing API" },
+    "5678": { "label": "n8n Orchestrator" },
+    "8000": { "label": "Normalizer Service" },
+    "8001": { "label": "Signer Service" },
+    "8002": { "label": "Financial Rules Engine" },
+    "8003": { "label": "NPHIES Bridge" }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/node:1": { "version": "20" },
+    "ghcr.io/devcontainers/features/python:1": { "version": "3.11" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "ms-python.python",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  }
+}

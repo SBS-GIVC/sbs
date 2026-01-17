@@ -1,0 +1,35 @@
+version: "3.8"
+
+services:
+  devcontainer:
+    image: mcr.microsoft.com/devcontainers/base:ubuntu-22.04
+    command: sleep infinity
+    volumes:
+      - ..:/workspace:cached
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - sbs-network
+
+  sbs-landing:
+    build:
+      context: ../sbs-landing
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/sbs-claim-submission
+      - ENABLE_DIRECT_SBS=true
+      - SBS_NORMALIZER_URL=http://normalizer-service:8000
+      - SBS_SIGNER_URL=http://signer-service:8001
+      - SBS_FINANCIAL_RULES_URL=http://financial-rules-engine:8002
+      - SBS_NPHIES_BRIDGE_URL=http://nphies-bridge:8003
+    ports:
+      - "3000:3000"
+    depends_on:
+      - normalizer-service
+      - signer-service
+      - financial-rules-engine
+      - nphies-bridge
+      - n8n
+    networks:
+      - sbs-network

@@ -15,6 +15,10 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SBS_NORMALIZER_URL = process.env.SBS_NORMALIZER_URL || 'http://localhost:8000';
+const SBS_SIGNER_URL = process.env.SBS_SIGNER_URL || 'http://localhost:8001';
+const SBS_FINANCIAL_RULES_URL = process.env.SBS_FINANCIAL_RULES_URL || 'http://localhost:8002';
+const SBS_NPHIES_BRIDGE_URL = process.env.SBS_NPHIES_BRIDGE_URL || 'http://localhost:8003';
 
 // Security middleware
 app.use(helmet({
@@ -250,22 +254,22 @@ async function triggerDirectSBS(claimData) {
     console.log('🔄 Fallback: Calling SBS services directly...');
     
     // Step 1: Normalize
-    const normalizeResponse = await axios.post('http://localhost:8000/normalize', {
+    const normalizeResponse = await axios.post(`${SBS_NORMALIZER_URL}/normalize`, {
       data: claimData
     });
     
     // Step 2: Apply Financial Rules
-    const rulesResponse = await axios.post('http://localhost:8002/apply-rules', {
+    const rulesResponse = await axios.post(`${SBS_FINANCIAL_RULES_URL}/apply-rules`, {
       data: normalizeResponse.data
     });
     
     // Step 3: Sign
-    const signResponse = await axios.post('http://localhost:8001/sign', {
+    const signResponse = await axios.post(`${SBS_SIGNER_URL}/sign`, {
       data: rulesResponse.data
     });
     
     // Step 4: Submit to NPHIES
-    const nphiesResponse = await axios.post('http://localhost:8003/submit', {
+    const nphiesResponse = await axios.post(`${SBS_NPHIES_BRIDGE_URL}/submit`, {
       data: signResponse.data,
       credentials: claimData.credentials
     });
@@ -318,10 +322,10 @@ app.get('/api/claim-status/:claimId', async (req, res) => {
 app.get('/api/services/status', async (req, res) => {
   try {
     const services = [
-      { name: 'normalizer', url: 'http://localhost:8000/health' },
-      { name: 'signer', url: 'http://localhost:8001/health' },
-      { name: 'financial-rules', url: 'http://localhost:8002/health' },
-      { name: 'nphies-bridge', url: 'http://localhost:8003/health' }
+      { name: 'normalizer', url: `${SBS_NORMALIZER_URL}/health` },
+      { name: 'signer', url: `${SBS_SIGNER_URL}/health` },
+      { name: 'financial-rules', url: `${SBS_FINANCIAL_RULES_URL}/health` },
+      { name: 'nphies-bridge', url: `${SBS_NPHIES_BRIDGE_URL}/health` }
     ];
 
     const statusChecks = await Promise.allSettled(
