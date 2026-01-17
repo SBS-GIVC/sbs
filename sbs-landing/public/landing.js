@@ -428,7 +428,10 @@ class SBSLandingPage {
     } catch (error) {
       console.error('Error fetching claim status:', error);
       // Stop polling after multiple consecutive failures
-      this.statusPollFailures = (this.statusPollFailures || 0) + 1;
+      if (typeof this.statusPollFailures !== 'number') {
+        this.statusPollFailures = 0;
+      }
+      this.statusPollFailures += 1;
       if (this.statusPollFailures >= 3) {
         this.stopStatusPolling();
         this.showError('Unable to fetch claim status. Please refresh the page.');
