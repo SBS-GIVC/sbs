@@ -25,8 +25,17 @@ from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 from collections import deque
 from threading import Lock
+import logging
 
 load_dotenv()
+
+# Configure logger for proper exception logging
+if not logging.getLogger().hasHandlers():
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="SBS Normalizer Service - Enhanced",
@@ -213,13 +222,15 @@ async def health_check():
             "version": "2.0.0",
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception as e:
+    except Exception:
+        # Log detailed exception information on the server side only
+        logger.exception("Health check failed")
         return JSONResponse(
             status_code=503,
             content={
                 "status": "unhealthy",
                 "database": "disconnected",
-                "error": str(e)
+                "error": "An internal error has occurred while checking health."
             }
         )
 
