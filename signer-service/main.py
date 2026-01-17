@@ -184,24 +184,44 @@ def generate_test_keypair(facility_id: int) -> tuple:
     Generate a test RSA keypair for development/sandbox
     WARNING: Only use in non-production environments
     """
+    # Ensure facility_id is a non-negative integer
+    try:
+        facility_id_int = int(facility_id)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="facility_id must be an integer"
+        )
+    if facility_id_int < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="facility_id must be non-negative"
+        )
+
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048,
         backend=default_backend()
     )
-    
+
     # Create certificates directory if it doesn't exist, ensuring it stays under CERT_BASE_PATH
     env_cert_base = os.getenv("CERT_BASE_PATH")
-    if env_cert_base is None or not env_cert_base.strip():
-        base_cert_path = os.path.abspath("/certs")
-    else:
-        base_cert_path = os.path.abspath(env_cert_base)
-    cert_dir = os.path.join(base_cert_path, f"facility_{facility_id}")
-    cert_dir = os.path.abspath(os.path.normpath(cert_dir))
-    if not cert_dir.startswith(base_cert_path + os.sep):
+    base_cert_dir = os.path.abspath(env_cert_base.strip() if env_cert_base and env_cert_base.strip() else "/certs")
+    cert_dir = os.path.abspath(os.path.normpath(os.path.join(base_cert_dir, f"facility_{facility_id_int}")))
+
+    # Verify that the constructed directory is within the base certificate directory
+    try:
+        common_prefix = os.path.commonpath([base_cert_dir, cert_dir])
+    except ValueError:
+        # Handle edge cases where paths cannot be compared (e.g., different drives on Windows)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid facility_id resulting in unsafe certificate path"
+            detail="Invalid certificate path configuration"
+        )
+    if common_prefix != base_cert_dir:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid facility_id resulting in unsafe certificate directory"
         )
     os.makedirs(cert_dir, exist_ok=True)
     
