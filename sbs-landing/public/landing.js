@@ -128,7 +128,19 @@ class SBSLandingPage {
     if (!rawBaseUrl) {
       return '';
     }
-    return rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+    
+    // Validate URL format and protocol
+    try {
+      const url = new URL(rawBaseUrl);
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        console.error('Invalid protocol in API base URL');
+        return '';
+      }
+      return url.origin;
+    } catch (error) {
+      console.error('Invalid API base URL format');
+      return '';
+    }
   }
 
   init() {
