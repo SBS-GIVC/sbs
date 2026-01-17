@@ -219,6 +219,7 @@ async def health_check():
         }
         }
     except Exception as e:
+        logger.exception("Health check failed")
         return JSONResponse(
             status_code=503,
             content={
