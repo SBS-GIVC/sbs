@@ -6,7 +6,6 @@ services:
     command: sleep infinity
     volumes:
       - ..:/workspace:cached
-      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - sbs-network
 
