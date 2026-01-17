@@ -219,7 +219,12 @@ class SBSLandingPage {
     this.render();
   }
 
-  openTrackingModal(claimId) {
+  openTrackingModal(claimIdOrEvent) {
+    // Handle both direct call and event-based call
+    const claimId = typeof claimIdOrEvent === 'string' 
+      ? claimIdOrEvent 
+      : claimIdOrEvent.target.dataset.claimId;
+    
     this.currentClaimId = claimId;
     this.showTrackingModal = true;
     this.showSuccessModal = false;
