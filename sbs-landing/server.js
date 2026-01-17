@@ -260,8 +260,11 @@ app.get('/api/metrics', (req, res) => {
 
 // Main claim submission endpoint with comprehensive workflow tracking
 app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
-  const startTime = Date.now();
-  const claimId = generateClaimId();
+  let claimId = null;
+  
+  try {
+    claimId = generateClaimId();
+    const startTime = Date.now();
 
   console.log('✅ POST /api/submit-claim endpoint hit', {
     claimId,
