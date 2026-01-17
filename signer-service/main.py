@@ -190,8 +190,17 @@ def generate_test_keypair(facility_id: int) -> tuple:
         backend=default_backend()
     )
     
-    # Create certificates directory if it doesn't exist
-    cert_dir = os.path.join(os.getenv("CERT_BASE_PATH", "/certs"), f"facility_{facility_id}")
+    # Create certificates directory if it doesn't exist, under a validated root
+    safe_root = "/certs"
+    configured_base = os.getenv("CERT_BASE_PATH", safe_root)
+    base_path = os.path.join(safe_root, os.path.relpath(configured_base, start=safe_root))
+    cert_dir = os.path.join(base_path, f"facility_{facility_id}")
+    cert_dir = os.path.normpath(cert_dir)
+    if os.path.commonpath([safe_root, cert_dir]) != safe_root:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Computed certificate directory is outside of the allowed root"
+        )
     os.makedirs(cert_dir, exist_ok=True)
     
     # Save private key
