@@ -168,7 +168,7 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
     if (req.file) {
       try {
         const absolutePath = path.resolve(req.file.path);
-        if (!absolutePath.startsWith(UPLOAD_ROOT + path.sep) && absolutePath !== UPLOAD_ROOT) {
+        if (!absolutePath.startsWith(UPLOAD_ROOT + path.sep)) {
           console.error('Attempt to read file outside of upload root:', absolutePath);
         } else {
           const fileContent = await fs.readFile(absolutePath);
