@@ -304,21 +304,36 @@ class SBSLandingPage {
     const TOAST_AUTO_DISMISS_DELAY = 5000;
     const FADE_OUT_DURATION = 300;
     
+    // Helper to render the main toast icon based on type (e.g., 'error', 'success', 'info')
+    function getToastTypeIcon(type) {
+      // Currently only an error-style icon is used; additional types can be added here later.
+      return `
+      <svg class="w-6 h-6 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      `;
+    }
+    
+    // Helper to render the close ("X") icon for the toast
+    function getToastCloseIcon() {
+      return `
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      `;
+    }
+    
     const toast = document.createElement('div');
     toast.className = 'pointer-events-auto bg-red-600 text-white px-6 py-4 rounded-lg shadow-lg flex items-start gap-3 transform translate-x-0 transition-all duration-300 ease-out';
     
     toast.innerHTML = `
-      <svg class="w-6 h-6 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-      </svg>
+      ${getToastTypeIcon('error')}
       <div class="flex-1">
-        <div class="font-semibold">${this.escapeHtml(t.claim.error)}</div>
+        <div class="font-semibold">${t.claim.error}</div>
         <div class="text-sm mt-1 opacity-90">${this.escapeHtml(message)}</div>
       </div>
       <button class="toast-close-btn ml-2 text-white hover:text-gray-200 transition-colors">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
+        ${getToastCloseIcon()}
       </button>
     `;
     
