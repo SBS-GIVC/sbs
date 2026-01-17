@@ -413,6 +413,7 @@ class SBSLandingPage {
 
       if (result.success) {
         this.claimStatus = result;
+        this.statusPollFailures = 0; // Reset failure counter on success
         this.render();
       } else {
         console.error('Claim status fetch failed:', result.error);
