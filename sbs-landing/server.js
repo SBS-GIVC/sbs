@@ -327,7 +327,14 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       submissionDate: new Date().toISOString(),
 
       // User Credentials (for NPHIES authentication)
-      credentials: userCredentials ? JSON.parse(userCredentials) : null,
+      credentials: userCredentials ? (() => {
+        try {
+          return JSON.parse(userCredentials);
+        } catch (error) {
+          console.error('Invalid JSON in userCredentials:', error);
+          return null;
+        }
+      })() : null,
 
       // File information
       attachment: req.file ? {
