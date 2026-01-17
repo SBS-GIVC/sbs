@@ -21,6 +21,152 @@ const SBS_SIGNER_URL = process.env.SBS_SIGNER_URL || 'http://localhost:8001';
 const SBS_FINANCIAL_RULES_URL = process.env.SBS_FINANCIAL_RULES_URL || 'http://localhost:8002';
 const SBS_NPHIES_BRIDGE_URL = process.env.SBS_NPHIES_BRIDGE_URL || 'http://localhost:8003';
 
+// ============================================================================
+// CLAIM WORKFLOW TRACKING SYSTEM
+// ============================================================================
+
+// Workflow stages for claim processing
+const WORKFLOW_STAGES = {
+  RECEIVED: 'received',
+  VALIDATING: 'validating',
+  VALIDATED: 'validated',
+  NORMALIZING: 'normalizing',
+  NORMALIZED: 'normalized',
+  APPLYING_RULES: 'applying_rules',
+  RULES_APPLIED: 'rules_applied',
+  SIGNING: 'signing',
+  SIGNED: 'signed',
+  SUBMITTING: 'submitting',
+  SUBMITTED: 'submitted',
+  ACCEPTED: 'accepted',
+  REJECTED: 'rejected',
+  ERROR: 'error'
+};
+
+// In-memory claim store for tracking workflow state.
+// IMPORTANT:
+// - This storage is NOT persistent and all data will be lost on server restart.
+// - It is NOT suitable for production or distributed/load-balanced deployments,
+//   because each process will have its own isolated Map.
+// - In production, configure and use a durable shared backend (for example,
+//   Redis or a database) and set SBS_CLAIM_STORE_BACKEND accordingly.
+const claimStore = new Map();
+
+// Warn if we are running in production with only the in-memory claim store.
+if (process.env.NODE_ENV === 'production' && !process.env.SBS_CLAIM_STORE_BACKEND) {
+  // This warning is intentionally loud to prevent accidental production use
+  // of the in-memory claim tracking store.
+  // eslint-disable-next-line no-console
+  console.warn(
+    '[SBS CLAIM TRACKER] WARNING: Using in-memory claimStore in PRODUCTION. ' +
+    'Claim tracking data will be lost on restart and will not be shared ' +
+    'across multiple instances. Configure a persistent backend and set ' +
+    'SBS_CLAIM_STORE_BACKEND to disable this warning.'
+  );
+}
+// Claim tracking class
+class ClaimTracker {
+  constructor(claimId, data) {
+    this.claimId = claimId;
+    this.data = data;
+    this.status = WORKFLOW_STAGES.RECEIVED;
+    this.stages = {
+      received: { status: 'completed', timestamp: new Date().toISOString(), message: 'Claim received' },
+      validation: { status: 'pending', timestamp: null, message: null },
+      normalization: { status: 'pending', timestamp: null, message: null },
+      financialRules: { status: 'pending', timestamp: null, message: null },
+      signing: { status: 'pending', timestamp: null, message: null },
+      nphiesSubmission: { status: 'pending', timestamp: null, message: null }
+    };
+    this.errors = [];
+    this.createdAt = new Date().toISOString();
+    this.updatedAt = new Date().toISOString();
+    this.nphiesResponse = null;
+    this.processingTimeMs = 0;
+  }
+
+  updateStage(stageName, status, message = null, data = null) {
+    if (this.stages[stageName]) {
+      this.stages[stageName] = {
+        status,
+        timestamp: new Date().toISOString(),
+        message,
+        data
+      };
+      this.updatedAt = new Date().toISOString();
+    }
+    return this;
+  }
+
+  setStatus(status) {
+    this.status = status;
+    this.updatedAt = new Date().toISOString();
+    return this;
+  }
+
+  addError(stage, error) {
+    this.errors.push({
+      stage,
+      error: error.message || error,
+      timestamp: new Date().toISOString()
+    });
+    this.updatedAt = new Date().toISOString();
+    return this;
+  }
+
+  setNphiesResponse(response) {
+    this.nphiesResponse = response;
+    this.updatedAt = new Date().toISOString();
+    return this;
+  }
+
+  toJSON() {
+    return {
+      claimId: this.claimId,
+      status: this.status,
+      stages: this.stages,
+      errors: this.errors,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
+      nphiesResponse: this.nphiesResponse,
+      processingTimeMs: this.processingTimeMs,
+      patientId: this.data?.patient?.id,
+      claimType: this.data?.claimType
+    };
+  }
+}
+
+// Generate unique claim ID
+function generateClaimId() {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `CLM-${timestamp}-${random}`;
+}
+
+// Get claim from store
+function getClaim(claimId) {
+  return claimStore.get(claimId);
+}
+
+// Save claim to store
+function saveClaim(claim) {
+  claimStore.set(claim.claimId, claim);
+  return claim;
+}
+
+// Cleanup old claims (older than 24 hours)
+function cleanupOldClaims() {
+  const cutoff = Date.now() - (24 * 60 * 60 * 1000);
+  for (const [claimId, claim] of claimStore.entries()) {
+    if (new Date(claim.createdAt).getTime() < cutoff) {
+      claimStore.delete(claimId);
+    }
+  }
+}
+
+// Run cleanup every hour
+setInterval(cleanupOldClaims, 60 * 60 * 1000);
+
 // Security middleware
 app.use(helmet({
   contentSecurityPolicy: {
@@ -130,9 +276,16 @@ app.get('/api/metrics', (req, res) => {
   });
 });
 
-// Main claim submission endpoint
+// Main claim submission endpoint with comprehensive workflow tracking
 app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
+  let claimId = null;
+  
+  try {
+    claimId = generateClaimId();
+    const startTime = Date.now();
+
   console.log('✅ POST /api/submit-claim endpoint hit', {
+    claimId,
     hasFile: !!req.file,
     bodyKeys: Object.keys(req.body),
     contentType: req.get('content-type')
@@ -151,10 +304,29 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (!patientName || !patientId || !claimType || !userEmail) {
+    const validationErrors = [];
+    if (!patientName) validationErrors.push('patientName is required');
+    if (!patientId) validationErrors.push('patientId is required');
+    if (!claimType) validationErrors.push('claimType is required');
+    if (!userEmail) validationErrors.push('userEmail is required');
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (userEmail && !emailRegex.test(userEmail)) {
+      validationErrors.push('Invalid email format');
+    }
+
+    // Validate claim type
+    const validClaimTypes = ['professional', 'institutional', 'pharmacy', 'vision'];
+    if (claimType && !validClaimTypes.includes(claimType.toLowerCase())) {
+      validationErrors.push(`Invalid claim type. Must be one of: ${validClaimTypes.join(', ')}`);
+    }
+
+    if (validationErrors.length > 0) {
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields',
+        error: 'Validation failed',
+        validationErrors,
         required: ['patientName', 'patientId', 'claimType', 'userEmail']
       });
     }
@@ -166,18 +338,25 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
         id: patientId,
         memberId: memberId || patientId
       },
-      
+
       // Payer & Provider
       payerId: payerId || 'DEFAULT_PAYER',
       providerId: providerId || 'DEFAULT_PROVIDER',
-      
+
       // Claim Details
-      claimType: claimType,
+      claimType: claimType.toLowerCase(),
       submissionDate: new Date().toISOString(),
-      
+
       // User Credentials (for NPHIES authentication)
-      credentials: userCredentials ? JSON.parse(userCredentials) : null,
-      
+      credentials: userCredentials ? (() => {
+        try {
+          return JSON.parse(userCredentials);
+        } catch (error) {
+          console.error('Invalid JSON in userCredentials:', error);
+          return null;
+        }
+      })() : null,
+
       // File information
       attachment: req.file ? {
         filename: req.file.filename,
@@ -186,15 +365,21 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
         size: req.file.size,
         mimetype: req.file.mimetype
       } : null,
-      
+
       // Metadata
       metadata: {
         submittedBy: userEmail,
         submittedAt: new Date().toISOString(),
         source: 'brainsait.cloud-landing',
-        version: '1.0.0'
+        version: '1.0.0',
+        claimId
       }
     };
+
+    // Create claim tracker
+    const claim = new ClaimTracker(claimId, claimData);
+    claim.updateStage('validation', 'in_progress', 'Validating claim data');
+    saveClaim(claim);
 
     // Read file content if exists
     if (req.file) {
@@ -207,18 +392,30 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
         claimData.attachment.base64Content = fileContent.toString('base64');
       } catch (error) {
         console.error('Error reading file:', error);
+        claim.addError('validation', `File read error: ${error.message}`);
       }
     }
 
+    // Update validation stage
+    claim.updateStage('validation', 'completed', 'Claim data validated successfully');
+    claim.setStatus(WORKFLOW_STAGES.VALIDATED);
+    saveClaim(claim);
+
     console.log('📋 Claim submission received:', {
+      claimId,
       patientId,
       claimType,
       hasFile: !!req.file,
       timestamp: new Date().toISOString()
     });
 
-    // Trigger n8n workflow
-    const n8nResponse = await triggerN8nWorkflow(claimData);
+    // Trigger workflow processing asynchronously
+    processClaimWorkflow(claim, claimData).catch(error => {
+      console.error(`❌ Error processing claim ${claimId}:`, error);
+      claim.addError('workflow', error.message);
+      claim.setStatus(WORKFLOW_STAGES.ERROR);
+      saveClaim(claim);
+    });
 
     // Cleanup uploaded file after processing
     if (req.file) {
@@ -236,24 +433,37 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       }, 60000); // Delete after 1 minute
     }
 
+    // Return immediately with claim ID for tracking
     res.json({
       success: true,
       message: 'Claim submitted successfully',
-      claimId: n8nResponse.claimId || `CLAIM-${Date.now()}`,
+      claimId,
       status: 'processing',
       data: {
         patientId,
-        submissionId: n8nResponse.submissionId,
+        patientName,
+        claimType,
+        submittedAt: claimData.submissionDate,
         estimatedProcessingTime: '2-5 minutes',
-        trackingUrl: n8nResponse.trackingUrl
+        trackingUrl: `/api/claim-status/${claimId}`,
+        statusCheckInterval: 3000 // Recommend polling every 3 seconds
       }
     });
 
   } catch (error) {
     console.error('❌ Error processing claim:', error);
-    
+
+    // Update claim if it exists
+    const claim = getClaim(claimId);
+    if (claim) {
+      claim.addError('submission', error.message);
+      claim.setStatus(WORKFLOW_STAGES.ERROR);
+      saveClaim(claim);
+    }
+
     res.status(500).json({
       success: false,
+      claimId,
       error: 'Failed to process claim submission',
       message: error.message,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
@@ -261,107 +471,384 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
   }
 });
 
-// Trigger n8n workflow
-async function triggerN8nWorkflow(claimData) {
+// Async workflow processing function
+async function processClaimWorkflow(claim, claimData) {
+  const startTime = Date.now();
+
   try {
-    // n8n webhook URL - Update this with your actual webhook URL
-    const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 
+    // Stage 1: Normalization
+    claim.updateStage('normalization', 'in_progress', 'Normalizing claim codes');
+    claim.setStatus(WORKFLOW_STAGES.NORMALIZING);
+    saveClaim(claim);
+
+    // Try n8n first, fallback to direct services
+    const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL ||
       'https://n8n.srv791040.hstgr.cloud/webhook/sbs-claim-submission';
 
-    console.log('🚀 Triggering n8n workflow...');
+    let workflowResult;
+    try {
+      workflowResult = await axios.post(N8N_WEBHOOK_URL, claimData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'SBS-Landing-API/1.0',
+          'X-Claim-ID': claim.claimId
+        },
+        timeout: 60000 // 60 second timeout for full workflow
+      });
 
-    const response = await axios.post(N8N_WEBHOOK_URL, claimData, {
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'SBS-Landing-API/1.0'
-      },
-      timeout: 30000 // 30 second timeout
-    });
+      // Update all stages as completed (n8n handles them)
+      claim.updateStage('normalization', 'completed', 'Code normalization completed');
+      claim.updateStage('financialRules', 'completed', 'Financial rules applied');
+      claim.updateStage('signing', 'completed', 'Claim signed');
+      claim.updateStage('nphiesSubmission', 'completed', 'Submitted to NPHIES');
+      claim.setStatus(WORKFLOW_STAGES.SUBMITTED);
+      claim.setNphiesResponse(workflowResult.data);
 
-    console.log('✅ n8n workflow triggered successfully');
+    } catch (n8nError) {
+      console.warn('⚠️ n8n workflow failed, trying direct SBS services:', n8nError.message);
 
-    return {
-      success: true,
-      claimId: response.data.claimId || `CLAIM-${Date.now()}`,
-      submissionId: response.data.submissionId || response.data.executionId,
-      trackingUrl: response.data.trackingUrl || null,
-      status: response.data.status || 'processing'
-    };
-
-  } catch (error) {
-    console.error('❌ Error triggering n8n workflow:', error.message);
-    
-    // Fallback: Direct call to SBS services
-    if (process.env.ENABLE_DIRECT_SBS === 'true') {
-      return await triggerDirectSBS(claimData);
+      // Fallback to direct SBS services
+      if (process.env.ENABLE_DIRECT_SBS === 'true') {
+        workflowResult = await processDirectSBS(claim, claimData);
+      } else {
+        throw n8nError;
+      }
     }
-    
-    throw new Error(`n8n workflow trigger failed: ${error.message}`);
-  }
-}
 
-// Fallback: Direct call to SBS microservices
-async function triggerDirectSBS(claimData) {
-  try {
-    console.log('🔄 Fallback: Calling SBS services directly...');
-    
-    // Step 1: Normalize
-    const normalizeResponse = await axios.post(`${SBS_NORMALIZER_URL}/normalize`, {
-      data: claimData
-    });
-    
-    // Step 2: Apply Financial Rules
-    const rulesResponse = await axios.post(`${SBS_FINANCIAL_RULES_URL}/apply-rules`, {
-      data: normalizeResponse.data
-    });
-    
-    // Step 3: Sign
-    const signResponse = await axios.post(`${SBS_SIGNER_URL}/sign`, {
-      data: rulesResponse.data
-    });
-    
-    // Step 4: Submit to NPHIES
-    const nphiesResponse = await axios.post(`${SBS_NPHIES_BRIDGE_URL}/submit`, {
-      data: signResponse.data,
-      credentials: claimData.credentials
-    });
-    
-    return {
-      success: true,
-      claimId: nphiesResponse.data.claimId,
-      submissionId: nphiesResponse.data.submissionId,
-      status: 'submitted',
-      trackingUrl: null
-    };
-    
+    claim.processingTimeMs = Date.now() - startTime;
+    saveClaim(claim);
+
+    console.log(`✅ Claim ${claim.claimId} processed successfully in ${claim.processingTimeMs}ms`);
+    return workflowResult;
+
   } catch (error) {
-    console.error('❌ Direct SBS call failed:', error.message);
+    claim.processingTimeMs = Date.now() - startTime;
+    claim.addError('workflow', error.message);
+    claim.setStatus(WORKFLOW_STAGES.ERROR);
+    saveClaim(claim);
     throw error;
   }
 }
 
-// Check claim status endpoint
+// Direct SBS services processing with stage tracking
+async function processDirectSBS(claim, claimData) {
+  try {
+    // Stage 1: Normalize
+    claim.updateStage('normalization', 'in_progress', 'Calling normalizer service');
+    saveClaim(claim);
+
+    const normalizeResponse = await axios.post(`${SBS_NORMALIZER_URL}/normalize`, {
+      facility_id: 1,
+      internal_code: claimData.claimType,
+      description: `${claimData.claimType} claim for ${claimData.patient.name}`
+    }, { timeout: 30000 });
+
+    claim.updateStage('normalization', 'completed', 'Code normalization completed', {
+      sbsCode: normalizeResponse.data.sbs_mapped_code,
+      confidence: normalizeResponse.data.confidence
+    });
+    claim.setStatus(WORKFLOW_STAGES.NORMALIZED);
+    saveClaim(claim);
+
+    // Stage 2: Apply Financial Rules
+    claim.updateStage('financialRules', 'in_progress', 'Applying CHI financial rules');
+    saveClaim(claim);
+
+    const fhirClaim = buildFHIRClaim(claimData, normalizeResponse.data);
+    const rulesResponse = await axios.post(`${SBS_FINANCIAL_RULES_URL}/validate`, fhirClaim, { timeout: 30000 });
+
+    claim.updateStage('financialRules', 'completed', 'Financial rules applied', {
+      total: rulesResponse.data.total?.value,
+      currency: rulesResponse.data.total?.currency
+    });
+    claim.setStatus(WORKFLOW_STAGES.RULES_APPLIED);
+    saveClaim(claim);
+
+    // Stage 3: Sign
+    claim.updateStage('signing', 'in_progress', 'Signing claim with facility certificate');
+    saveClaim(claim);
+
+    const signResponse = await axios.post(`${SBS_SIGNER_URL}/sign`, {
+      payload: rulesResponse.data,
+      facility_id: 1
+    }, { timeout: 30000 });
+
+    claim.updateStage('signing', 'completed', 'Claim signed successfully', {
+      algorithm: signResponse.data.algorithm
+    });
+    claim.setStatus(WORKFLOW_STAGES.SIGNED);
+    saveClaim(claim);
+
+    // Stage 4: Submit to NPHIES
+    claim.updateStage('nphiesSubmission', 'in_progress', 'Submitting to NPHIES');
+    saveClaim(claim);
+
+    const nphiesResponse = await axios.post(`${SBS_NPHIES_BRIDGE_URL}/submit`, {
+      payload: rulesResponse.data,
+      signature: signResponse.data.signature,
+      facility_id: 1
+    }, { timeout: 60000 });
+
+    claim.updateStage('nphiesSubmission', 'completed', 'Successfully submitted to NPHIES', {
+      transactionId: nphiesResponse.data.transaction_uuid
+    });
+
+    if (nphiesResponse.data.status === 'accepted') {
+      claim.setStatus(WORKFLOW_STAGES.ACCEPTED);
+    } else if (nphiesResponse.data.status === 'rejected') {
+      claim.setStatus(WORKFLOW_STAGES.REJECTED);
+    } else {
+      claim.setStatus(WORKFLOW_STAGES.SUBMITTED);
+    }
+
+    claim.setNphiesResponse(nphiesResponse.data);
+    saveClaim(claim);
+
+    return {
+      success: true,
+      claimId: claim.claimId,
+      submissionId: nphiesResponse.data.transaction_uuid,
+      status: claim.status
+    };
+
+  } catch (error) {
+    // Determine which stage failed
+    const stages = ['normalization', 'financialRules', 'signing', 'nphiesSubmission'];
+    for (const stage of stages) {
+      if (claim.stages[stage].status === 'in_progress') {
+        claim.updateStage(stage, 'failed', error.message);
+        claim.addError(stage, error);
+        break;
+      }
+    }
+    throw error;
+  }
+}
+
+// Build FHIR Claim resource
+function buildFHIRClaim(claimData, normalizedData) {
+  return {
+    resourceType: 'Claim',
+    status: 'active',
+    type: {
+      coding: [{
+        system: 'http://terminology.hl7.org/CodeSystem/claim-type',
+        code: claimData.claimType
+      }]
+    },
+    patient: {
+      reference: `Patient/${claimData.patient.id}`
+    },
+    created: claimData.submissionDate,
+    provider: {
+      reference: `Organization/${claimData.providerId}`
+    },
+    insurer: {
+      reference: `Organization/${claimData.payerId}`
+    },
+    priority: {
+      coding: [{
+        code: 'normal'
+      }]
+    },
+    item: [{
+      sequence: 1,
+      productOrService: {
+        coding: [{
+          system: '',
+          code: normalizedData.sbs_mapped_code || 'UNKNOWN',
+          display: normalizedData.official_description || claimData.claimType
+        }]
+      },
+      quantity: { value: claimData.quantity || 1 },
+      unitPrice: { 
+        value: claimData.unitPrice || normalizedData.unitPrice || 0, 
+        currency: claimData.currency || 'SAR' 
+      }
+    }]
+  };
+}
+
+// Check claim status endpoint - real-time workflow tracking
 app.get('/api/claim-status/:claimId', async (req, res) => {
   try {
     const { claimId } = req.params;
-    
-    // Query n8n or SBS services for status
-    // This would typically query your database or n8n executions API
-    
+
+    // Validate claim ID format
+    // Validate claim ID format
+    const claimIdRegex = /^CLM-[A-Z0-9]+-[A-Z0-9]+$/;
+    if (!claimId || !claimIdRegex.test(claimId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid claim ID format',
+        expectedFormat: 'CLM-XXXXXXXX-XXXXXX'
+      });
+    }
+
+    // Get claim from store
+    const claim = getClaim(claimId);
+
+    if (!claim) {
+      return res.status(404).json({
+        success: false,
+        error: 'Claim not found',
+        claimId,
+        message: 'The claim may have expired (claims are retained for 24 hours) or the ID is invalid.'
+      });
+    }
+
+    // Calculate progress percentage
+    const stageOrder = ['received', 'validation', 'normalization', 'financialRules', 'signing', 'nphiesSubmission'];
+    let completedStages = 0;
+    for (const stage of stageOrder) {
+      if (claim.stages[stage]?.status === 'completed') {
+        completedStages++;
+      }
+    }
+    const progressPercentage = Math.round((completedStages / stageOrder.length) * 100);
+
+    // Determine if workflow is complete
+    const isComplete = ['submitted', 'accepted', 'rejected', 'error'].includes(claim.status);
+    const isSuccess = ['submitted', 'accepted'].includes(claim.status);
+    const isFailed = ['rejected', 'error'].includes(claim.status);
+
     res.json({
       success: true,
       claimId,
-      status: 'processing', // Would be fetched from database
-      lastUpdate: new Date().toISOString(),
-      stages: {
-        validation: 'completed',
-        normalization: 'completed',
-        financialRules: 'completed',
-        signing: 'completed',
-        nphiesSubmission: 'in-progress'
+      status: claim.status,
+      statusLabel: getStatusLabel(claim.status),
+      progress: {
+        percentage: progressPercentage,
+        completedStages,
+        totalStages: stageOrder.length
+      },
+      stages: claim.stages,
+      isComplete,
+      isSuccess,
+      isFailed,
+      errors: claim.errors,
+      nphiesResponse: claim.nphiesResponse,
+      processingTimeMs: claim.processingTimeMs,
+      timestamps: {
+        created: claim.createdAt,
+        lastUpdate: claim.updatedAt
+      },
+      patient: {
+        id: claim.data?.patient?.id,
+        name: claim.data?.patient?.name
+      },
+      claimType: claim.data?.claimType
+    });
+
+  } catch (error) {
+    console.error('Error fetching claim status:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get human-readable status label
+function getStatusLabel(status) {
+  const labels = {
+    received: 'Claim Received',
+    validating: 'Validating Data',
+    validated: 'Data Validated',
+    normalizing: 'Normalizing Codes',
+    normalized: 'Codes Normalized',
+    applying_rules: 'Applying Financial Rules',
+    rules_applied: 'Financial Rules Applied',
+    signing: 'Signing Claim',
+    signed: 'Claim Signed',
+    submitting: 'Submitting to NPHIES',
+    submitted: 'Submitted to NPHIES',
+    accepted: 'Accepted by NPHIES',
+    rejected: 'Rejected by NPHIES',
+    error: 'Processing Error'
+  };
+  return labels[status] || status;
+}
+
+// List all claims (for admin/debugging)
+app.get('/api/claims', (req, res) => {
+  try {
+    const claims = Array.from(claimStore.values()).map(claim => claim.toJSON());
+
+    // Sort by creation date (newest first)
+    claims.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    // Apply pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const start = (page - 1) * limit;
+    const paginatedClaims = claims.slice(start, start + limit);
+
+    res.json({
+      success: true,
+      total: claims.length,
+      page,
+      limit,
+      totalPages: Math.ceil(claims.length / limit),
+      claims: paginatedClaims
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Retry failed claim
+app.post('/api/claims/:claimId/retry', async (req, res) => {
+  try {
+    const { claimId } = req.params;
+    const claim = getClaim(claimId);
+
+    if (!claim) {
+      return res.status(404).json({
+        success: false,
+        error: 'Claim not found'
+      });
+    }
+
+    if (!['error', 'rejected'].includes(claim.status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Only failed or rejected claims can be retried',
+        currentStatus: claim.status
+      });
+    }
+
+    // Reset stages and status for retry
+    claim.setStatus(WORKFLOW_STAGES.RECEIVED);
+    claim.errors = [];
+    Object.keys(claim.stages).forEach(stage => {
+      if (stage !== 'received') {
+        claim.stages[stage] = { status: 'pending', timestamp: null, message: null };
       }
     });
-    
+    claim.stages.received = { status: 'completed', timestamp: new Date().toISOString(), message: 'Claim retry initiated' };
+    saveClaim(claim);
+
+    // Re-process the claim
+    processClaimWorkflow(claim, claim.data).catch(error => {
+      console.error('❌ Error retrying claim %s:', claimId, error);
+      claim.addError('retry', error.message);
+      claim.setStatus(WORKFLOW_STAGES.ERROR);
+      saveClaim(claim);
+    });
+
+    res.json({
+      success: true,
+      message: 'Claim retry initiated',
+      claimId,
+      status: claim.status,
+      trackingUrl: `/api/claim-status/${claimId}`
+    });
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -455,7 +942,6 @@ app.use((error, req, res, next) => {
     success: false,
     error: error.message || 'Internal server error'
   });
-});
 });
 
 // Start server

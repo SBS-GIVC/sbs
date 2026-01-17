@@ -37,7 +37,29 @@ const translations = {
       success: "Success!",
       successMsg: "Your claim has been submitted and is being processed through our workflow.",
       error: "Error",
-      close: "Close"
+      close: "Close",
+      trackStatus: "Track Status",
+      trackingTitle: "Claim Tracking",
+      trackingSubtitle: "Real-time workflow progress",
+      claimIdLabel: "Claim ID",
+      stages: {
+        received: "Received",
+        validation: "Validation",
+        normalization: "Normalization",
+        financialRules: "Financial Rules",
+        signing: "Digital Signing",
+        nphiesSubmission: "NPHIES Submission"
+      },
+      stageStatus: {
+        pending: "Pending",
+        in_progress: "In Progress",
+        completed: "Completed",
+        failed: "Failed"
+      },
+      retry: "Retry Claim",
+      processing: "Processing",
+      complete: "Complete",
+      failed: "Failed"
     },
     services: {
       title: "Core Microservices",
@@ -91,7 +113,29 @@ const translations = {
       success: "نجح!",
       successMsg: "تم تقديم مطالبتك وهي قيد المعالجة عبر نظامنا.",
       error: "خطأ",
-      close: "إغلاق"
+      close: "إغلاق",
+      trackStatus: "تتبع الحالة",
+      trackingTitle: "تتبع المطالبة",
+      trackingSubtitle: "متابعة سير العمل في الوقت الفعلي",
+      claimIdLabel: "رقم المطالبة",
+      stages: {
+        received: "تم الاستلام",
+        validation: "التحقق",
+        normalization: "المعايرة",
+        financialRules: "القواعد المالية",
+        signing: "التوقيع الرقمي",
+        nphiesSubmission: "الإرسال لنفيس"
+      },
+      stageStatus: {
+        pending: "قيد الانتظار",
+        in_progress: "جاري التنفيذ",
+        completed: "مكتمل",
+        failed: "فشل"
+      },
+      retry: "إعادة المحاولة",
+      processing: "جاري المعالجة",
+      complete: "مكتمل",
+      failed: "فشل"
     },
     services: {
       title: "الخدمات الأساسية",
@@ -117,9 +161,14 @@ class SBSLandingPage {
     this.lang = 'en';
     this.showClaimModal = false;
     this.showSuccessModal = false;
+    this.showTrackingModal = false;
     this.isSubmitting = false;
     this.selectedFile = null;
     this.formData = {};
+    this.currentClaimId = null;
+    this.claimStatus = null;
+    this.statusPollingInterval = null;
+    this.validationErrors = {};
     this.init();
   }
 
@@ -166,32 +215,182 @@ class SBSLandingPage {
     this.showClaimModal = false;
     this.selectedFile = null;
     this.formData = {};
+    this.validationErrors = {};
+    this.render();
+  }
+
+  openTrackingModal(claimId) {
+    this.currentClaimId = claimId;
+    this.showTrackingModal = true;
+    this.showSuccessModal = false;
+    this.startStatusPolling();
+    this.render();
+  }
+
+  closeTrackingModal() {
+    this.showTrackingModal = false;
+    this.stopStatusPolling();
+    this.claimStatus = null;
     this.render();
   }
 
   handleFileSelect(event) {
     const file = event.target.files[0];
     if (file) {
+      // Validate file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        this.showError('File size exceeds 10MB limit');
+        return;
+      }
       this.selectedFile = file;
-      document.getElementById('file-name').textContent = file.name;
+      const fileNameEl = document.getElementById('file-name');
+      if (fileNameEl) {
+        fileNameEl.textContent = `${file.name} (${this.formatFileSize(file.size)})`;
+      }
+    }
+  }
+
+  formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  validateForm(formElements) {
+    const errors = {};
+
+    // Required fields
+    if (!formElements.patientName.value.trim()) {
+      errors.patientName = 'Patient name is required';
+    }
+    if (!formElements.patientId.value.trim()) {
+      errors.patientId = 'Patient ID is required';
+    }
+    if (!formElements.claimType.value) {
+      errors.claimType = 'Claim type is required';
+    }
+
+    // Email validation
+    const email = formElements.userEmail.value.trim();
+    if (!email) {
+      errors.userEmail = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.userEmail = 'Invalid email format';
+    }
+
+    this.validationErrors = errors;
+    return Object.keys(errors).length === 0;
+  }
+
+  showError(message) {
+    const t = translations[this.lang];
+    alert(`${t.claim.error}: ${message}`);
+  }
+
+  async startStatusPolling() {
+    // Fetch immediately
+    await this.fetchClaimStatus();
+
+    // Then poll every 3 seconds
+    this.statusPollingInterval = setInterval(async () => {
+      await this.fetchClaimStatus();
+
+      // Stop polling if complete
+      if (this.claimStatus?.isComplete) {
+        this.stopStatusPolling();
+      }
+    }, 3000);
+  }
+
+  stopStatusPolling() {
+    if (this.statusPollingInterval) {
+      clearInterval(this.statusPollingInterval);
+      this.statusPollingInterval = null;
+    }
+  }
+
+  async fetchClaimStatus() {
+    if (!this.currentClaimId) return;
+
+    try {
+      const apiBaseUrl = this.getApiBaseUrl();
+      const statusUrl = apiBaseUrl
+        ? `${apiBaseUrl}/api/claim-status/${this.currentClaimId}`
+        : `/api/claim-status/${this.currentClaimId}`;
+
+      const response = await fetch(statusUrl);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+
+      if (result.success) {
+        this.claimStatus = result;
+        this.render();
+      } else {
+        console.error('Claim status fetch failed:', result.error);
+        // Stop polling on persistent errors
+        this.stopStatusPolling();
+      }
+    } catch (error) {
+      console.error('Error fetching claim status:', error);
+      // Stop polling after multiple consecutive failures
+      this.statusPollFailures = (this.statusPollFailures || 0) + 1;
+      if (this.statusPollFailures >= 3) {
+        this.stopStatusPolling();
+        this.showError('Unable to fetch claim status. Please refresh the page.');
+      }
+    }
+  }
+
+  async retryClaim() {
+    if (!this.currentClaimId) return;
+
+    try {
+      const apiBaseUrl = this.getApiBaseUrl();
+      const retryUrl = apiBaseUrl
+        ? `${apiBaseUrl}/api/claims/${this.currentClaimId}/retry`
+        : `/api/claims/${this.currentClaimId}/retry`;
+
+      const response = await fetch(retryUrl, { method: 'POST' });
+      const result = await response.json();
+
+      if (result.success) {
+        this.claimStatus = null;
+        this.startStatusPolling();
+      } else {
+        this.showError(result.error || 'Retry failed');
+      }
+    } catch (error) {
+      this.showError('Failed to retry claim: ' + error.message);
     }
   }
 
   async submitClaim(event) {
     event.preventDefault();
+
+    const formElements = event.target.elements;
+
+    // Validate form before submission
+    if (!this.validateForm(formElements)) {
+      this.render();
+      return;
+    }
+
     this.isSubmitting = true;
     this.render();
 
     const formDataToSend = new FormData();
-    const formElements = event.target.elements;
-    
-    formDataToSend.append('patientName', formElements.patientName.value);
-    formDataToSend.append('patientId', formElements.patientId.value);
-    formDataToSend.append('memberId', formElements.memberId.value);
-    formDataToSend.append('payerId', formElements.payerId.value);
+
+    formDataToSend.append('patientName', formElements.patientName.value.trim());
+    formDataToSend.append('patientId', formElements.patientId.value.trim());
+    formDataToSend.append('memberId', formElements.memberId.value.trim());
+    formDataToSend.append('payerId', formElements.payerId.value.trim());
     formDataToSend.append('claimType', formElements.claimType.value);
-    formDataToSend.append('userEmail', formElements.userEmail.value);
-    
+    formDataToSend.append('userEmail', formElements.userEmail.value.trim());
+
     if (this.selectedFile) {
       formDataToSend.append('claimFile', this.selectedFile);
     }
@@ -209,15 +408,38 @@ class SBSLandingPage {
 
       if (result.success) {
         this.showClaimModal = false;
-        this.showSuccessModal = true;
         this.selectedFile = null;
         this.formData = {};
+        this.validationErrors = {};
+
+        // Store claim info and open tracking modal
+        this.currentClaimId = result.claimId;
+        this.lastSubmission = {
+          claimId: result.claimId,
+          patientName: formElements.patientName.value,
+          patientId: formElements.patientId.value,
+          claimType: formElements.claimType.value,
+          submittedAt: result.data?.submittedAt || new Date().toISOString()
+        };
+
+        // Show success modal first, then allow tracking
+        this.showSuccessModal = true;
+        this.isSubmitting = false;
+        this.render();
+
       } else {
-        alert('Error: ' + result.error);
+        // Handle validation errors from server
+        if (result.validationErrors) {
+          this.showError(result.validationErrors.join(', '));
+        } else {
+          this.showError(result.error || 'Unknown error occurred');
+        }
+        this.isSubmitting = false;
+        this.render();
       }
     } catch (error) {
-      alert('Submission failed: ' + error.message);
-    } finally {
+      console.error('Submission error:', error);
+      this.showError('Submission failed: ' + error.message);
       this.isSubmitting = false;
       this.render();
     }
@@ -429,16 +651,180 @@ class SBSLandingPage {
               </svg>
             </div>
             <h3 class="text-2xl font-bold text-white mb-2">${t.claim.success}</h3>
-            <p class="text-slate-400 mb-6">${t.claim.successMsg}</p>
-            <button onclick="app.showSuccessModal = false; app.render();" class="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-lg font-bold transition-all">
-              ${t.claim.close}
-            </button>
+            <p class="text-slate-400 mb-4">${t.claim.successMsg}</p>
+            ${this.currentClaimId ? `
+              <div class="bg-slate-800/50 rounded-lg p-3 mb-6">
+                <p class="text-slate-500 text-xs mb-1">${t.claim.claimIdLabel}</p>
+                <p class="text-emerald-400 font-mono font-bold">${this.currentClaimId}</p>
+              </div>
+            ` : ''}
+            <div class="flex gap-3 justify-center">
+              <button onclick="app.showSuccessModal = false; app.render();" class="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-bold transition-all">
+                ${t.claim.close}
+              </button>
+              ${this.currentClaimId ? `
+                <button onclick="app.openTrackingModal('${this.currentClaimId.replace(/'/g, '&#39;')}')" class="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-lg font-bold transition-all flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                  </svg>
+                  ${t.claim.trackStatus}
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Tracking Modal -->
+      ${this.showTrackingModal ? `
+        <div class="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onclick="app.closeTrackingModal()"></div>
+          <div class="relative w-full max-w-2xl bg-slate-900 rounded-2xl shadow-2xl overflow-hidden z-10 border border-slate-700">
+            <div class="p-6 border-b border-slate-800 flex justify-between items-center">
+              <div>
+                <h2 class="text-2xl font-bold text-white">${t.claim.trackingTitle}</h2>
+                <p class="text-slate-400 text-sm mt-1">${t.claim.trackingSubtitle}</p>
+              </div>
+              <button onclick="app.closeTrackingModal()" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-400 transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+              </button>
+            </div>
+
+            <div class="p-6">
+              <!-- Claim ID and Status Header -->
+              <div class="flex justify-between items-center mb-6">
+                <div class="bg-slate-800/50 rounded-lg px-4 py-2">
+                  <p class="text-slate-500 text-xs">${t.claim.claimIdLabel}</p>
+                  <p class="text-emerald-400 font-mono font-bold">${this.currentClaimId}</p>
+                </div>
+                ${this.claimStatus ? `
+                  <div class="flex items-center gap-2">
+                    ${this.claimStatus.isComplete ?
+                      (this.claimStatus.isSuccess ?
+                        `<span class="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-sm font-medium flex items-center gap-1">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                          ${t.claim.complete}
+                        </span>` :
+                        `<span class="px-3 py-1 rounded-full bg-red-500/20 text-red-400 text-sm font-medium flex items-center gap-1">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                          ${t.claim.failed}
+                        </span>`)
+                      : `<span class="px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 text-sm font-medium flex items-center gap-1">
+                          <svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                          ${t.claim.processing}
+                        </span>`
+                    }
+                  </div>
+                ` : ''}
+              </div>
+
+              <!-- Progress Bar -->
+              ${this.claimStatus ? `
+                <div class="mb-6">
+                  <div class="flex justify-between text-sm mb-2">
+                    <span class="text-slate-400">${t.claim.processing}</span>
+                    <span class="text-emerald-400 font-bold">${this.claimStatus.progress?.percentage || 0}%</span>
+                  </div>
+                  <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div class="h-full bg-gradient-to-r from-emerald-500 to-cyan-500 transition-all duration-500 ease-out" style="width: ${this.claimStatus.progress?.percentage || 0}%"></div>
+                  </div>
+                </div>
+              ` : `
+                <div class="flex justify-center py-8">
+                  <svg class="w-8 h-8 text-emerald-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                  </svg>
+                </div>
+              `}
+
+              <!-- Workflow Stages -->
+              ${this.claimStatus ? `
+                <div class="space-y-3">
+                  ${this.renderWorkflowStages(t)}
+                </div>
+
+                <!-- Errors -->
+                ${this.claimStatus.errors && this.claimStatus.errors.length > 0 ? `
+                  <div class="mt-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <h4 class="text-red-400 font-bold mb-2 flex items-center gap-2">
+                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                      Errors
+                    </h4>
+                    <ul class="text-slate-400 text-sm space-y-1">
+                      ${this.claimStatus.errors.map(err => `<li>- ${err.stage}: ${err.error}</li>`).join('')}
+                    </ul>
+                  </div>
+                ` : ''}
+
+                <!-- Retry Button for Failed Claims -->
+                ${this.claimStatus.isFailed ? `
+                  <div class="mt-6 flex justify-center">
+                    <button onclick="app.retryClaim()" class="px-6 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg font-bold transition-all flex items-center gap-2">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                      ${t.claim.retry}
+                    </button>
+                  </div>
+                ` : ''}
+              ` : ''}
+            </div>
           </div>
         </div>
       ` : ''}
     `;
 
     document.getElementById('app').innerHTML = html;
+  }
+
+  renderWorkflowStages(t) {
+    if (!this.claimStatus?.stages) return '';
+
+    const stageOrder = [
+      { key: 'received', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
+      { key: 'validation', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+      { key: 'normalization', icon: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4' },
+      { key: 'financialRules', icon: 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
+      { key: 'signing', icon: 'M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z' },
+      { key: 'nphiesSubmission', icon: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12' }
+    ];
+
+    return stageOrder.map((stage, idx) => {
+      const stageData = this.claimStatus.stages[stage.key];
+      if (!stageData) return '';
+
+      const status = stageData.status;
+      const isCompleted = status === 'completed';
+      const isInProgress = status === 'in_progress';
+      const isFailed = status === 'failed';
+
+      const statusColor = isCompleted ? 'emerald' : isFailed ? 'red' : isInProgress ? 'blue' : 'slate';
+      const bgColor = isCompleted ? 'bg-emerald-500/20' : isFailed ? 'bg-red-500/20' : isInProgress ? 'bg-blue-500/20' : 'bg-slate-800';
+      const borderColor = isCompleted ? 'border-emerald-500/50' : isFailed ? 'border-red-500/50' : isInProgress ? 'border-blue-500/50' : 'border-slate-700';
+      const iconColor = isCompleted ? 'text-emerald-400' : isFailed ? 'text-red-400' : isInProgress ? 'text-blue-400' : 'text-slate-500';
+
+      const stageName = t.claim.stages[stage.key] || stage.key;
+      const stageStatusText = t.claim.stageStatus[status] || status;
+
+      return `
+        <div class="flex items-center gap-4 p-3 rounded-lg ${bgColor} border ${borderColor} transition-all">
+          <div class="w-10 h-10 rounded-full ${bgColor} flex items-center justify-center ${iconColor}">
+            ${isInProgress ?
+              `<svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>` :
+              `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${stage.icon}"></path></svg>`
+            }
+          </div>
+          <div class="flex-1">
+            <div class="flex justify-between items-center">
+              <span class="font-medium text-white">${stageName}</span>
+              <span class="text-xs px-2 py-1 rounded-full ${bgColor} text-${statusColor}-400">${stageStatusText}</span>
+            </div>
+            ${stageData.message ? `<p class="text-slate-400 text-sm mt-1">${stageData.message}</p>` : ''}
+            ${stageData.timestamp ? `<p class="text-slate-500 text-xs mt-1">${new Date(stageData.timestamp).toLocaleTimeString()}</p>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
   }
 
   attachEventListeners() {
