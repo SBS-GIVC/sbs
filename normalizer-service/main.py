@@ -210,11 +210,13 @@ async def health_check():
             
         return {
             "status": "healthy",
+        return {
+            "status": "healthy",
             "database": "connected",
             "pool_available": db_pool is not None,
             "version": "2.0.0",
-        logger.exception("Health check failed")
             "timestamp": datetime.utcnow().isoformat()
+        }
         }
     except Exception as e:
         return JSONResponse(
