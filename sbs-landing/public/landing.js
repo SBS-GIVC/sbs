@@ -123,6 +123,14 @@ class SBSLandingPage {
     this.init();
   }
 
+  getApiBaseUrl() {
+    const rawBaseUrl = (window.SBS_API_BASE_URL || '').trim();
+    if (!rawBaseUrl) {
+      return '';
+    }
+    return rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+  }
+
   init() {
     document.documentElement.lang = this.lang;
     document.documentElement.dir = this.lang === 'ar' ? 'rtl' : 'ltr';
@@ -177,7 +185,10 @@ class SBSLandingPage {
     }
 
     try {
-      const response = await fetch('/api/submit-claim', {
+      const apiBaseUrl = this.getApiBaseUrl();
+      const submitUrl = apiBaseUrl ? `${apiBaseUrl}/api/submit-claim` : '/api/submit-claim';
+
+      const response = await fetch(submitUrl, {
         method: 'POST',
         body: formDataToSend
       });

@@ -67,6 +67,34 @@ docker-compose up -d
 docker-compose ps
 ```
 
+## 🧩 Devcontainer (Local Development)
+
+This repository includes a devcontainer configuration that boots the core SBS
+services and the landing API for a unified local environment.
+
+1. Open the repo in VS Code.
+2. Select "Reopen in Container".
+3. Services will be available on:
+   - `http://localhost:3000` (Landing API + static UI)
+   - `http://localhost:8000` (Normalizer)
+   - `http://localhost:8001` (Signer)
+   - `http://localhost:8002` (Financial Rules)
+   - `http://localhost:8003` (NPHIES Bridge)
+   - `http://localhost:5678` (n8n)
+
+## 🌐 GitHub Pages Frontend
+
+The landing UI can be deployed as a static site using GitHub Pages.
+The workflow publishes `sbs-landing/public`.
+
+1. Enable GitHub Pages for the repository.
+2. Set a repository variable `PAGES_API_BASE_URL` to the backend API base URL
+   (example: `https://brainsait.cloud`).
+3. Push changes to `main` to trigger deployment.
+
+The frontend reads `window.SBS_API_BASE_URL` from `sbs-landing/public/config.js`.
+If the variable is empty, it will default to the same origin.
+
 ## 📊 Database Schema
 
 - `sbs_master_catalogue`: Official CHI SBS codes
