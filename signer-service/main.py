@@ -184,6 +184,20 @@ def generate_test_keypair(facility_id: int) -> tuple:
     Generate a test RSA keypair for development/sandbox
     WARNING: Only use in non-production environments
     """
+    # Ensure facility_id is a non-negative integer
+    try:
+        facility_id_int = int(facility_id)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="facility_id must be an integer"
+        )
+    if facility_id_int < 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="facility_id must be non-negative"
+        )
+
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048,
@@ -191,7 +205,18 @@ def generate_test_keypair(facility_id: int) -> tuple:
     )
     
     # Create certificates directory if it doesn't exist
-    cert_dir = os.path.join(os.getenv("CERT_BASE_PATH", "/certs"), f"facility_{facility_id}")
+    base_cert_dir = os.path.abspath(os.getenv("CERT_BASE_PATH", "/certs"))
+    cert_dir = os.path.join(base_cert_dir, f"facility_{facility_id_int}")
+    cert_dir = os.path.abspath(cert_dir)
+
+    # Verify that the constructed directory is within the base certificate directory
+    common_prefix = os.path.commonpath([base_cert_dir, cert_dir])
+    if common_prefix != base_cert_dir:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid facility_id resulting in unsafe certificate directory"
+        )
+
     os.makedirs(cert_dir, exist_ok=True)
     
     # Save private key
