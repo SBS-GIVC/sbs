@@ -210,7 +210,14 @@ def generate_test_keypair(facility_id: int) -> tuple:
     cert_dir = os.path.abspath(cert_dir)
 
     # Verify that the constructed directory is within the base certificate directory
-    common_prefix = os.path.commonpath([base_cert_dir, cert_dir])
+    try:
+        common_prefix = os.path.commonpath([base_cert_dir, cert_dir])
+    except ValueError:
+        # Handle edge cases where paths cannot be compared (e.g., different drives on Windows)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid certificate path configuration"
+        )
     if common_prefix != base_cert_dir:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
