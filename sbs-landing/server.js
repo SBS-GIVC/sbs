@@ -16,7 +16,7 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SBS_NORMALIZER_URL = process.env.SBS_NORMALIZER_URL || 'http://localhost:8000';
-const UPLOAD_ROOT = path.resolve(process.env.UPLOAD_DIR || 'uploads');
+const UPLOAD_ROOT = path.resolve(process.env.UPLOAD_DIR || '/tmp/sbs-uploads');
 const SBS_SIGNER_URL = process.env.SBS_SIGNER_URL || 'http://localhost:8001';
 const SBS_FINANCIAL_RULES_URL = process.env.SBS_FINANCIAL_RULES_URL || 'http://localhost:8002';
 const SBS_NPHIES_BRIDGE_URL = process.env.SBS_NPHIES_BRIDGE_URL || 'http://localhost:8003';
