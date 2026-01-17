@@ -25,9 +25,12 @@ from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 from collections import deque
 from threading import Lock
+import logging
 
 load_dotenv()
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 app = FastAPI(
     title="SBS Normalizer Service - Enhanced",
     description="AI-Powered code normalization with rate limiting and monitoring",
@@ -208,18 +211,22 @@ async def health_check():
             
         return {
             "status": "healthy",
+        return {
+            "status": "healthy",
             "database": "connected",
             "pool_available": db_pool is not None,
             "version": "2.0.0",
             "timestamp": datetime.utcnow().isoformat()
         }
+        }
     except Exception as e:
+        logger.exception("Health check failed")
         return JSONResponse(
             status_code=503,
             content={
                 "status": "unhealthy",
                 "database": "disconnected",
-                "error": str(e)
+                "error": "Internal error during health check"
             }
         )
 
