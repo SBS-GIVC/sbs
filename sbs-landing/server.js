@@ -637,13 +637,16 @@ function buildFHIRClaim(claimData, normalizedData) {
       sequence: 1,
       productOrService: {
         coding: [{
-          system: 'http://sbs.chi.gov.sa/CodeSystem',
+          system: '',
           code: normalizedData.sbs_mapped_code || 'UNKNOWN',
           display: normalizedData.official_description || claimData.claimType
         }]
       },
-      quantity: { value: 1 },
-      unitPrice: { value: 100, currency: 'SAR' }
+      quantity: { value: claimData.quantity || 1 },
+      unitPrice: { 
+        value: claimData.unitPrice || normalizedData.unitPrice || 0, 
+        currency: claimData.currency || 'SAR' 
+      }
     }]
   };
 }
