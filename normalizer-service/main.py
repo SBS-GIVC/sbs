@@ -29,6 +29,7 @@ import logging
 
 load_dotenv()
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 app = FastAPI(
     title="SBS Normalizer Service - Enhanced",
