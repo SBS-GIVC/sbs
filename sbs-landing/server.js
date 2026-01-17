@@ -46,16 +46,17 @@ const limiter = rateLimit({
 });
 app.use('/api/*', limiter);
 
-// CORS configuration
+// CORS configuration with explicit origin whitelist
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:3001', 'http://localhost:3000'];
+
 app.use(cors({
-  origin: ['https://your-frontend-domain.com', 'http://localhost:3001'], // Replace with your actual frontend domains
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
-
-// Handle OPTIONS preflight requests
-app.options('*', cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -63,7 +64,9 @@ app.use(express.urlencoded({ extended: true }));
 // Debug logging middleware (only in development)
 if (process.env.NODE_ENV === 'development') {
   app.use((req, res, next) => {
-    console.log(`📥 ${req.method} ${req.path}`, {
+    console.log('📥 Request received', {
+      method: req.method,
+      path: req.path,
       contentType: req.get('content-type'),
       timestamp: new Date().toISOString()
     });
@@ -155,6 +158,19 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       });
     }
 
+    // Parse user credentials safely
+    let parsedCredentials = null;
+    if (userCredentials) {
+      try {
+        parsedCredentials = JSON.parse(userCredentials);
+      } catch (parseError) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid JSON format in userCredentials'
+        });
+      }
+    }
+
     const claimData = {
       // Patient Information
       patient: {
@@ -172,7 +188,7 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       submissionDate: new Date().toISOString(),
       
       // User Credentials (for NPHIES authentication)
-      credentials: userCredentials ? JSON.parse(userCredentials) : null,
+      credentials: parsedCredentials,
       
       // File information
       attachment: req.file ? {
@@ -417,7 +433,10 @@ app.get('/api/services/status', async (req, res) => {
 
 // 404 handler for API routes
 app.use('/api/*', (req, res) => {
-  console.log(`⚠️ 404 Not Found: ${req.method} ${req.path}`);
+  console.log('⚠️ 404 Not Found', {
+    method: req.method,
+    path: req.path
+  });
   res.status(404).json({
     success: false,
     error: 'API endpoint not found',
@@ -451,7 +470,6 @@ app.use((error, req, res, next) => {
     success: false,
     error: error.message || 'Internal server error'
   });
-});
 });
 
 // Start server
