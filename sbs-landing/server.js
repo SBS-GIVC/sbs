@@ -60,15 +60,16 @@ app.options('*', cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Debug logging middleware
-app.use((req, res, next) => {
-  console.log(`📥 ${req.method} ${req.path}`, {
-    contentType: req.get('content-type'),
-    origin: req.get('origin'),
-    timestamp: new Date().toISOString()
+// Debug logging middleware (only in development)
+if (process.env.NODE_ENV === 'development') {
+  app.use((req, res, next) => {
+    console.log(`📥 ${req.method} ${req.path}`, {
+      contentType: req.get('content-type'),
+      timestamp: new Date().toISOString()
+    });
+    next();
   });
-  next();
-});
+}
 
 // Serve static files
 app.use(express.static('public'));
