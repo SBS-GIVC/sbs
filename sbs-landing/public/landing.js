@@ -312,7 +312,7 @@ class SBSLandingPage {
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
       </svg>
       <div class="flex-1">
-        <div class="font-semibold">${t.claim.error}</div>
+        <div class="font-semibold">${this.escapeHtml(t.claim.error)}</div>
         <div class="text-sm mt-1 opacity-90">${this.escapeHtml(message)}</div>
       </div>
       <button class="toast-close-btn ml-2 text-white hover:text-gray-200 transition-colors">
