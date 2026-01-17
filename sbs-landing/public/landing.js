@@ -282,9 +282,65 @@ class SBSLandingPage {
     return Object.keys(errors).length === 0;
   }
 
+  ensureToastContainer() {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.className = 'fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none';
+      container.style.cssText = 'max-width: 400px;';
+      document.body.appendChild(container);
+    }
+    return container;
+  }
+
   showError(message) {
     const t = translations[this.lang];
-    alert(`${t.claim.error}: ${message}`);
+    const container = this.ensureToastContainer();
+    
+    const toast = document.createElement('div');
+    toast.className = 'pointer-events-auto bg-red-600 text-white px-6 py-4 rounded-lg shadow-lg flex items-start gap-3 transform translate-x-0 transition-all duration-300 ease-out';
+    
+    toast.innerHTML = `
+      <svg class="w-6 h-6 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <div class="flex-1">
+        <div class="font-semibold">${t.claim.error}</div>
+        <div class="text-sm mt-1 opacity-90">${this.escapeHtml(message)}</div>
+      </div>
+      <button class="ml-2 text-white hover:text-gray-200 transition-colors" onclick="this.parentElement.remove()">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    `;
+    
+    // Add toast with slide-in animation
+    toast.style.transform = 'translateX(400px)';
+    container.appendChild(toast);
+    
+    // Trigger slide-in animation
+    setTimeout(() => {
+      toast.style.transform = 'translateX(0)';
+    }, 10);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+      toast.style.transform = 'translateX(400px)';
+      toast.style.opacity = '0';
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.remove();
+        }
+      }, 300);
+    }, 5000);
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   async startStatusPolling() {
