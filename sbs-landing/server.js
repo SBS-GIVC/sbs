@@ -16,6 +16,7 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SBS_NORMALIZER_URL = process.env.SBS_NORMALIZER_URL || 'http://localhost:8000';
+const UPLOAD_DIR = path.resolve(__dirname, 'uploads');
 const SBS_SIGNER_URL = process.env.SBS_SIGNER_URL || 'http://localhost:8001';
 const SBS_FINANCIAL_RULES_URL = process.env.SBS_FINANCIAL_RULES_URL || 'http://localhost:8002';
 const SBS_NPHIES_BRIDGE_URL = process.env.SBS_NPHIES_BRIDGE_URL || 'http://localhost:8003';
@@ -166,7 +167,11 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
     // Read file content if exists
     if (req.file) {
       try {
-        const fileContent = await fs.readFile(req.file.path);
+        const resolvedPath = path.resolve(req.file.path);
+        if (!resolvedPath.startsWith(UPLOAD_DIR + path.sep)) {
+          throw new Error('Invalid file path for uploaded file');
+        }
+        const fileContent = await fs.readFile(resolvedPath);
         claimData.attachment.base64Content = fileContent.toString('base64');
       } catch (error) {
         console.error('Error reading file:', error);
@@ -187,7 +192,11 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
     if (req.file) {
       setTimeout(async () => {
         try {
-          await fs.unlink(req.file.path);
+          const resolvedPath = path.resolve(req.file.path);
+          if (!resolvedPath.startsWith(UPLOAD_DIR + path.sep)) {
+            throw new Error('Invalid file path for uploaded file');
+          }
+          await fs.unlink(resolvedPath);
           console.log('🗑️ Cleaned up temporary file:', req.file.filename);
         } catch (error) {
           console.error('Error cleaning up file:', error);
