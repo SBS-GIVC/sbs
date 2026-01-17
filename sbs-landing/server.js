@@ -48,7 +48,7 @@ app.use('/api/*', limiter);
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['', ''],
+  origin: ['https://your-frontend-domain.com', 'http://localhost:3001'], // Replace with your actual frontend domains
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
