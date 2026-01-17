@@ -802,7 +802,7 @@ app.post('/api/claims/:claimId/retry', async (req, res) => {
 
     // Re-process the claim
     processClaimWorkflow(claim, claim.data).catch(error => {
-      console.error(`❌ Error retrying claim ${claimId}:`, error);
+      console.error('❌ Error retrying claim %s:', claimId, error);
       claim.addError('retry', error.message);
       claim.setStatus(WORKFLOW_STAGES.ERROR);
       saveClaim(claim);
