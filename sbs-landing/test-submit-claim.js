@@ -15,7 +15,7 @@ const ENDPOINT = `${API_BASE_URL}/api/submit-claim`;
 
 async function testSubmitClaim() {
   console.log('\n🧪 Testing Claim Submission Endpoint');
-  console.log('=' .repeat(60));
+  console.log('='.repeat(60));
   console.log(`Endpoint: ${ENDPOINT}\n`);
 
   // Test 1: OPTIONS request (CORS preflight)
