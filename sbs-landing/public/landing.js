@@ -219,7 +219,12 @@ class SBSLandingPage {
     this.render();
   }
 
-  openTrackingModal(claimId) {
+  openTrackingModal(claimIdOrEvent) {
+    // Handle both direct call and event-based call
+    const claimId = typeof claimIdOrEvent === 'string' 
+      ? claimIdOrEvent 
+      : claimIdOrEvent.target.dataset.claimId;
+    
     this.currentClaimId = claimId;
     this.showTrackingModal = true;
     this.showSuccessModal = false;
@@ -282,9 +287,94 @@ class SBSLandingPage {
     return Object.keys(errors).length === 0;
   }
 
+  ensureToastContainer() {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.className = 'fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none';
+      container.style.cssText = 'max-width: 400px;';
+      document.body.appendChild(container);
+    }
+    return container;
+  }
+
   showError(message) {
     const t = translations[this.lang];
-    alert(`${t.claim.error}: ${message}`);
+    const container = this.ensureToastContainer();
+    
+    // Animation timing constants
+    const TOAST_SLIDE_OFFSET = '400px';
+    const ANIMATION_START_DELAY = 10;
+    const TOAST_AUTO_DISMISS_DELAY = 5000;
+    const FADE_OUT_DURATION = 300;
+    
+    // Helper to render the main toast icon based on type (e.g., 'error', 'success', 'info')
+    function getToastTypeIcon(type) {
+      // Currently only an error-style icon is used; additional types can be added here later.
+      return `
+      <svg class="w-6 h-6 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      `;
+    }
+    
+    // Helper to render the close ("X") icon for the toast
+    function getToastCloseIcon() {
+      return `
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      `;
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = 'pointer-events-auto bg-red-600 text-white px-6 py-4 rounded-lg shadow-lg flex items-start gap-3 transform translate-x-0 transition-all duration-300 ease-out';
+    
+    toast.innerHTML = `
+      ${getToastTypeIcon('error')}
+      <div class="flex-1">
+        <div class="font-semibold">${t.claim.error}</div>
+        <div class="text-sm mt-1 opacity-90">${this.escapeHtml(message)}</div>
+      </div>
+      <button class="toast-close-btn ml-2 text-white hover:text-gray-200 transition-colors">
+        ${getToastCloseIcon()}
+      </button>
+    `;
+    
+    // Attach close button event listener programmatically (CSP compliant)
+    const closeBtn = toast.querySelector('.toast-close-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        toast.remove();
+      });
+    }
+    
+    // Add toast with slide-in animation
+    toast.style.transform = `translateX(${TOAST_SLIDE_OFFSET})`;
+    container.appendChild(toast);
+    
+    // Trigger slide-in animation
+    setTimeout(() => {
+      toast.style.transform = 'translateX(0)';
+    }, ANIMATION_START_DELAY);
+    
+    // Auto-dismiss after specified delay
+    setTimeout(() => {
+      toast.style.transform = `translateX(${TOAST_SLIDE_OFFSET})`;
+      toast.style.opacity = '0';
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.remove();
+        }
+      }, FADE_OUT_DURATION);
+    }, TOAST_AUTO_DISMISS_DELAY);
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   async startStatusPolling() {
@@ -328,6 +418,7 @@ class SBSLandingPage {
 
       if (result.success) {
         this.claimStatus = result;
+        this.statusPollFailures = 0; // Reset failure counter on success
         this.render();
       } else {
         console.error('Claim status fetch failed:', result.error);
@@ -337,7 +428,10 @@ class SBSLandingPage {
     } catch (error) {
       console.error('Error fetching claim status:', error);
       // Stop polling after multiple consecutive failures
-      this.statusPollFailures = (this.statusPollFailures || 0) + 1;
+      if (typeof this.statusPollFailures !== 'number') {
+        this.statusPollFailures = 0;
+      }
+      this.statusPollFailures += 1;
       if (this.statusPollFailures >= 3) {
         this.stopStatusPolling();
         this.showError('Unable to fetch claim status. Please refresh the page.');
@@ -663,7 +757,7 @@ class SBSLandingPage {
                 ${t.claim.close}
               </button>
               ${this.currentClaimId ? `
-                <button onclick="app.openTrackingModal('${this.currentClaimId.replace(/'/g, '&#39;')}')" class="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-lg font-bold transition-all flex items-center gap-2">
+                <button onclick="app.openTrackingModal(this.dataset.claimId)" data-claim-id="${this.escapeHtml(this.currentClaimId)}" class="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-lg font-bold transition-all flex items-center gap-2">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
                   </svg>
