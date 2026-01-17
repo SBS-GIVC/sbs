@@ -282,9 +282,94 @@ class SBSLandingPage {
     return Object.keys(errors).length === 0;
   }
 
+  ensureToastContainer() {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      container.className = 'fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none';
+      container.style.cssText = 'max-width: 400px;';
+      document.body.appendChild(container);
+    }
+    return container;
+  }
+
   showError(message) {
     const t = translations[this.lang];
-    alert(`${t.claim.error}: ${message}`);
+    const container = this.ensureToastContainer();
+    
+    // Animation timing constants
+    const TOAST_SLIDE_OFFSET = '400px';
+    const ANIMATION_START_DELAY = 10;
+    const TOAST_AUTO_DISMISS_DELAY = 5000;
+    const FADE_OUT_DURATION = 300;
+    
+    // Helper to render the main toast icon based on type (e.g., 'error', 'success', 'info')
+    function getToastTypeIcon(type) {
+      // Currently only an error-style icon is used; additional types can be added here later.
+      return `
+      <svg class="w-6 h-6 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      `;
+    }
+    
+    // Helper to render the close ("X") icon for the toast
+    function getToastCloseIcon() {
+      return `
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      `;
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = 'pointer-events-auto bg-red-600 text-white px-6 py-4 rounded-lg shadow-lg flex items-start gap-3 transform translate-x-0 transition-all duration-300 ease-out';
+    
+    toast.innerHTML = `
+      ${getToastTypeIcon('error')}
+      <div class="flex-1">
+        <div class="font-semibold">${t.claim.error}</div>
+        <div class="text-sm mt-1 opacity-90">${this.escapeHtml(message)}</div>
+      </div>
+      <button class="toast-close-btn ml-2 text-white hover:text-gray-200 transition-colors">
+        ${getToastCloseIcon()}
+      </button>
+    `;
+    
+    // Attach close button event listener programmatically (CSP compliant)
+    const closeBtn = toast.querySelector('.toast-close-btn');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        toast.remove();
+      });
+    }
+    
+    // Add toast with slide-in animation
+    toast.style.transform = `translateX(${TOAST_SLIDE_OFFSET})`;
+    container.appendChild(toast);
+    
+    // Trigger slide-in animation
+    setTimeout(() => {
+      toast.style.transform = 'translateX(0)';
+    }, ANIMATION_START_DELAY);
+    
+    // Auto-dismiss after specified delay
+    setTimeout(() => {
+      toast.style.transform = `translateX(${TOAST_SLIDE_OFFSET})`;
+      toast.style.opacity = '0';
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.remove();
+        }
+      }, FADE_OUT_DURATION);
+    }, TOAST_AUTO_DISMISS_DELAY);
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   async startStatusPolling() {
