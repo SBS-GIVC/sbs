@@ -1226,7 +1226,7 @@ async function processClaimWorkflowEnhanced(claim, claimData) {
           standardPrice: normalizeResponse.data.standard_price || service.unitPrice
         });
       } catch (error) {
-        console.error(`Failed to normalize service ${service.internalCode}:`, error.message);
+        console.error('Failed to normalize service %s:', service.internalCode, error.message);
         normalizedServices.push({
           ...service,
           sbsCode: `SBS-UNKNOWN-${service.internalCode}`,
