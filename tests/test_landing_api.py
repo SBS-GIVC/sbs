@@ -101,7 +101,8 @@ class TestClaimTypes:
         "professional",
         "institutional",
         "pharmacy",
-        "vision"
+        "vision",
+        "PROFESSIONAL"
     ])
     def test_valid_claim_types(self, claim_type):
         """Test submission with each valid claim type"""
@@ -123,7 +124,6 @@ class TestClaimTypes:
         "optical",
         "mental_health",
         "invalid",
-        "PROFESSIONAL",  # Case sensitivity
         "Prof"
     ])
     def test_invalid_claim_types(self, claim_type):
@@ -250,6 +250,25 @@ class TestFileUpload:
         )
         assert response.status_code == 200
 
+    def test_submission_with_invalid_file_type(self):
+        """Test rejection of unsupported file types"""
+        txt_content = b"invalid claim content"
+        files = {
+            "claimFile": ("claim.txt", io.BytesIO(txt_content), "text/plain")
+        }
+        data = {
+            "patientName": "Test Patient",
+            "patientId": "1234567890",
+            "claimType": "professional",
+            "userEmail": "test@example.com"
+        }
+        response = requests.post(
+            f"{BASE_URL}/api/submit-claim",
+            data=data,
+            files=files
+        )
+        assert response.status_code == 400
+
 
 class TestClaimStatus:
     """Test claim status endpoints"""
@@ -313,6 +332,17 @@ class TestClaimStatus:
         assert "timestamps" in data
         assert "created" in data["timestamps"]
         assert "lastUpdate" in data["timestamps"]
+
+        # Check timeline
+        assert "timeline" in data
+        assert isinstance(data["timeline"], list)
+
+    def test_invalid_claim_id_format(self):
+        """Test invalid claim ID format handling"""
+        response = requests.get(f"{BASE_URL}/api/claim-status/INVALID-123")
+        assert response.status_code == 400
+        data = response.json()
+        assert data["success"] is False
 
 
 class TestServicesStatus:

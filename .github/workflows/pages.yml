@@ -24,10 +24,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure API base URL
+      - name: Configure API URL if provided
         if: ${{ vars.PAGES_API_BASE_URL != '' }}
         run: |
-          printf 'window.SBS_API_BASE_URL = "%s";' "${{ vars.PAGES_API_BASE_URL }}" > sbs-landing/public/config.js
+          # Inject the API URL into config.js without overwriting the whole file
+          # This adds a script tag at the beginning of index.html
+          sed -i 's|</head>|<script>window.SBS_API_URL = "${{ vars.PAGES_API_BASE_URL }}";</script></head>|' sbs-landing/public/index.html
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

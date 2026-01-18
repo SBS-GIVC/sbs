@@ -1,6 +1,6 @@
 /**
  * SBS Integration Engine - Backend API Server
- * Handles claim submission and triggers n8n workflow
+ * Handles claim submission and orchestrates microservices directly
  */
 
 const express = require('express');
@@ -11,15 +11,20 @@ const fs = require('fs').promises;
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const PDFDocument = require('pdfkit');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SBS_NORMALIZER_URL = process.env.SBS_NORMALIZER_URL || 'http://localhost:8000';
 const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || '/tmp/sbs-uploads');
+const MAX_FILE_SIZE = Number.parseInt(process.env.MAX_FILE_SIZE || '10485760', 10);
 const SBS_SIGNER_URL = process.env.SBS_SIGNER_URL || 'http://localhost:8001';
 const SBS_FINANCIAL_RULES_URL = process.env.SBS_FINANCIAL_RULES_URL || 'http://localhost:8002';
 const SBS_NPHIES_BRIDGE_URL = process.env.SBS_NPHIES_BRIDGE_URL || 'http://localhost:8003';
+const ENABLE_STAGE_HOOKS = process.env.ENABLE_STAGE_HOOKS === 'true';
+const SBS_STAGE_HOOK_URL = process.env.SBS_STAGE_HOOK_URL || '';
+const ENABLE_MOCK_PROCESSING = process.env.ENABLE_MOCK_PROCESSING === 'true';
 
 // ============================================================================
 // CLAIM WORKFLOW TRACKING SYSTEM
@@ -52,6 +57,42 @@ const WORKFLOW_STAGES = {
 //   Redis or a database) and set SBS_CLAIM_STORE_BACKEND accordingly.
 const claimStore = new Map();
 
+const WORKFLOW_PROGRESS_STAGES = ['received', 'validation', 'normalization', 'financialRules', 'signing', 'nphiesSubmission'];
+
+function getClaimProgress(claim) {
+  const completedStages = WORKFLOW_PROGRESS_STAGES.filter(stage => claim.stages[stage]?.status === 'completed').length;
+  return {
+    percentage: Math.round((completedStages / WORKFLOW_PROGRESS_STAGES.length) * 100),
+    completedStages,
+    totalStages: WORKFLOW_PROGRESS_STAGES.length
+  };
+}
+
+async function emitWorkflowHook(eventType, claim, metadata = {}) {
+  if (!ENABLE_STAGE_HOOKS || !SBS_STAGE_HOOK_URL) {
+    return;
+  }
+
+  const payload = {
+    eventType,
+    claimId: claim.claimId,
+    status: claim.status,
+    stage: metadata.stage || null,
+    stageStatus: metadata.stageStatus || null,
+    timestamp: new Date().toISOString(),
+    patientId: claim.data?.patient?.id,
+    claimType: claim.data?.claimType,
+    progress: getClaimProgress(claim),
+    metadata
+  };
+
+  try {
+    await axios.post(SBS_STAGE_HOOK_URL, payload, { timeout: 5000 });
+  } catch (error) {
+    console.warn('[SBS HOOKS] Hook delivery failed:', error.message);
+  }
+}
+
 // Warn if we are running in production with only the in-memory claim store.
 if (process.env.NODE_ENV === 'production' && !process.env.SBS_CLAIM_STORE_BACKEND) {
   // This warning is intentionally loud to prevent accidental production use
@@ -79,6 +120,13 @@ class ClaimTracker {
       nphiesSubmission: { status: 'pending', timestamp: null, message: null }
     };
     this.errors = [];
+    this.timeline = [
+      {
+        event: 'claim_received',
+        message: 'Claim received and queued for processing',
+        timestamp: new Date().toISOString()
+      }
+    ];
     this.createdAt = new Date().toISOString();
     this.updatedAt = new Date().toISOString();
     this.nphiesResponse = null;
@@ -94,6 +142,13 @@ class ClaimTracker {
         data
       };
       this.updatedAt = new Date().toISOString();
+      this.timeline.push({
+        event: `stage_${stageName}`,
+        message: message || `${stageName} ${status}`,
+        status,
+        timestamp: new Date().toISOString()
+      });
+      void emitWorkflowHook('stage_updated', this, { stage: stageName, stageStatus: status, message });
     }
     return this;
   }
@@ -101,6 +156,13 @@ class ClaimTracker {
   setStatus(status) {
     this.status = status;
     this.updatedAt = new Date().toISOString();
+    this.timeline.push({
+      event: 'status_changed',
+      message: `Status updated to ${status}`,
+      status,
+      timestamp: new Date().toISOString()
+    });
+    void emitWorkflowHook('status_changed', this, { status });
     return this;
   }
 
@@ -111,6 +173,13 @@ class ClaimTracker {
       timestamp: new Date().toISOString()
     });
     this.updatedAt = new Date().toISOString();
+    this.timeline.push({
+      event: 'error',
+      message: error.message || error,
+      stage,
+      timestamp: new Date().toISOString()
+    });
+    void emitWorkflowHook('error', this, { stage, error: error.message || error });
     return this;
   }
 
@@ -126,6 +195,7 @@ class ClaimTracker {
       status: this.status,
       stages: this.stages,
       errors: this.errors,
+      timeline: this.timeline,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
       nphiesResponse: this.nphiesResponse,
@@ -142,6 +212,8 @@ function generateClaimId() {
   const random = Math.random().toString(36).substring(2, 8).toUpperCase();
   return `CLM-${timestamp}-${random}`;
 }
+
+const claimIdRegex = /^CLM-[A-Z0-9]+-[A-Z0-9]+$/;
 
 // Get claim from store
 function getClaim(claimId) {
@@ -192,13 +264,41 @@ const limiter = rateLimit({
 });
 app.use('/api/*', limiter);
 
-// CORS configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
-  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-  : ['http://localhost:3001', 'http://localhost:3000'];
+// CORS configuration - Support GitHub Pages frontend and Codespaces
+const allowedOriginsEnv = process.env.ALLOWED_ORIGINS || process.env.CORS_ORIGIN;
+const defaultOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:5000',
+  'https://fadil369.github.io', // GitHub Pages
+  /\.app\.github\.dev$/,        // GitHub Codespaces
+  /\.github\.io$/               // Any GitHub Pages
+];
+
+const allowedOrigins = allowedOriginsEnv
+  ? allowedOriginsEnv.split(',').map(origin => origin.trim()).filter(Boolean)
+  : defaultOrigins;
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check against allowed origins (strings and regexes)
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (allowed instanceof RegExp) {
+        return allowed.test(origin);
+      }
+      return allowed === origin;
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS: Blocked origin ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -227,9 +327,8 @@ app.use(express.static('public'));
 // File upload configuration
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
-    const uploadDir = '/tmp/sbs-uploads';
-    await fs.mkdir(uploadDir, { recursive: true });
-    cb(null, uploadDir);
+    await fs.mkdir(UPLOAD_DIR, { recursive: true });
+    cb(null, UPLOAD_DIR);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -240,7 +339,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: MAX_FILE_SIZE,
   },
   fileFilter: (req, file, cb) => {
     // Accept common file types for medical claims
@@ -251,7 +350,9 @@ const upload = multer({
     if (mimetype && extname) {
       return cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Allowed: PDF, DOC, XLS, JSON, XML, Images'));
+      const error = new Error('Invalid file type. Allowed: PDF, DOC, XLS, JSON, XML, Images');
+      error.status = 400;
+      cb(error);
     }
   }
 });
@@ -282,16 +383,13 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
   
   try {
     claimId = generateClaimId();
-    const startTime = Date.now();
+    console.log('✅ POST /api/submit-claim endpoint hit', {
+      claimId,
+      hasFile: !!req.file,
+      bodyKeys: Object.keys(req.body),
+      contentType: req.get('content-type')
+    });
 
-  console.log('✅ POST /api/submit-claim endpoint hit', {
-    claimId,
-    hasFile: !!req.file,
-    bodyKeys: Object.keys(req.body),
-    contentType: req.get('content-type')
-  });
-
-  try {
     const {
       patientName,
       patientId,
@@ -481,39 +579,27 @@ async function processClaimWorkflow(claim, claimData) {
     claim.setStatus(WORKFLOW_STAGES.NORMALIZING);
     saveClaim(claim);
 
-    // Try n8n first, fallback to direct services
-    const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL ||
-      'https://n8n.srv791040.hstgr.cloud/webhook/sbs-claim-submission';
-
-    let workflowResult;
-    try {
-      workflowResult = await axios.post(N8N_WEBHOOK_URL, claimData, {
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'SBS-Landing-API/1.0',
-          'X-Claim-ID': claim.claimId
-        },
-        timeout: 60000 // 60 second timeout for full workflow
-      });
-
-      // Update all stages as completed (n8n handles them)
-      claim.updateStage('normalization', 'completed', 'Code normalization completed');
-      claim.updateStage('financialRules', 'completed', 'Financial rules applied');
-      claim.updateStage('signing', 'completed', 'Claim signed');
-      claim.updateStage('nphiesSubmission', 'completed', 'Submitted to NPHIES');
+    if (ENABLE_MOCK_PROCESSING) {
+      claim.updateStage('normalization', 'completed', 'Mock normalization completed');
+      claim.updateStage('financialRules', 'completed', 'Mock financial rules applied');
+      claim.updateStage('signing', 'completed', 'Mock signing completed');
+      claim.updateStage('nphiesSubmission', 'completed', 'Mock submission completed');
       claim.setStatus(WORKFLOW_STAGES.SUBMITTED);
-      claim.setNphiesResponse(workflowResult.data);
-
-    } catch (n8nError) {
-      console.warn('⚠️ n8n workflow failed, trying direct SBS services:', n8nError.message);
-
-      // Fallback to direct SBS services
-      if (process.env.ENABLE_DIRECT_SBS === 'true') {
-        workflowResult = await processDirectSBS(claim, claimData);
-      } else {
-        throw n8nError;
-      }
+      claim.setNphiesResponse({
+        status: 'mock_submitted',
+        transaction_uuid: `MOCK-${claim.claimId}`
+      });
+      claim.processingTimeMs = Date.now() - startTime;
+      saveClaim(claim);
+      return {
+        success: true,
+        claimId: claim.claimId,
+        status: claim.status,
+        mock: true
+      };
     }
+
+    const workflowResult = await processDirectSBS(claim, claimData);
 
     claim.processingTimeMs = Date.now() - startTime;
     saveClaim(claim);
@@ -696,14 +782,7 @@ app.get('/api/claim-status/:claimId', async (req, res) => {
     }
 
     // Calculate progress percentage
-    const stageOrder = ['received', 'validation', 'normalization', 'financialRules', 'signing', 'nphiesSubmission'];
-    let completedStages = 0;
-    for (const stage of stageOrder) {
-      if (claim.stages[stage]?.status === 'completed') {
-        completedStages++;
-      }
-    }
-    const progressPercentage = Math.round((completedStages / stageOrder.length) * 100);
+    const progressInfo = getClaimProgress(claim);
 
     // Determine if workflow is complete
     const isComplete = ['submitted', 'accepted', 'rejected', 'error'].includes(claim.status);
@@ -715,16 +794,13 @@ app.get('/api/claim-status/:claimId', async (req, res) => {
       claimId,
       status: claim.status,
       statusLabel: getStatusLabel(claim.status),
-      progress: {
-        percentage: progressPercentage,
-        completedStages,
-        totalStages: stageOrder.length
-      },
+      progress: progressInfo,
       stages: claim.stages,
       isComplete,
       isSuccess,
       isFailed,
       errors: claim.errors,
+      timeline: claim.timeline,
       nphiesResponse: claim.nphiesResponse,
       processingTimeMs: claim.processingTimeMs,
       timestamps: {
@@ -745,6 +821,65 @@ app.get('/api/claim-status/:claimId', async (req, res) => {
       error: error.message
     });
   }
+});
+
+// Download claim receipt as PDF
+app.get('/api/claim-receipt/:claimId', (req, res) => {
+  const { claimId } = req.params;
+
+  if (!claimId || !claimIdRegex.test(claimId)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid claim ID format',
+      expectedFormat: 'CLM-XXXXXXXX-XXXXXX'
+    });
+  }
+
+  const claim = getClaim(claimId);
+  if (!claim) {
+    return res.status(404).json({
+      success: false,
+      error: 'Claim not found',
+      claimId
+    });
+  }
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="claim-receipt-${claimId}.pdf"`);
+
+  const doc = new PDFDocument({ size: 'A4', margin: 50 });
+  doc.pipe(res);
+
+  doc.fontSize(18).text('SBS Claim Receipt', { align: 'center' });
+  doc.moveDown();
+  doc.fontSize(12).text(`Claim ID: ${claim.claimId}`);
+  doc.text(`Status: ${getStatusLabel(claim.status)}`);
+  doc.text(`Submitted At: ${claim.createdAt}`);
+  doc.text(`Patient Name: ${claim.data?.patient?.name || 'N/A'}`);
+  doc.text(`Patient ID: ${claim.data?.patient?.id || 'N/A'}`);
+  doc.text(`Claim Type: ${claim.data?.claimType || 'N/A'}`);
+  doc.moveDown();
+
+  doc.fontSize(14).text('Workflow Stages');
+  doc.moveDown(0.5);
+  WORKFLOW_PROGRESS_STAGES.forEach((stage) => {
+    const stageInfo = claim.stages[stage];
+    if (!stageInfo) return;
+    const stageLabel = stage.replace(/([A-Z])/g, ' $1');
+    doc.fontSize(11).text(
+      `- ${stageLabel}: ${stageInfo.status} ${stageInfo.timestamp ? `(${stageInfo.timestamp})` : ''}`
+    );
+  });
+
+  if (claim.errors?.length) {
+    doc.moveDown();
+    doc.fontSize(14).text('Errors');
+    claim.errors.forEach((err) => {
+      doc.fontSize(11).text(`- ${err.stage}: ${err.error}`);
+    });
+  }
+
+  doc.end();
 });
 
 // Get human-readable status label
@@ -956,7 +1091,6 @@ app.listen(PORT, '0.0.0.0', () => {
 ✅ API endpoint: http://localhost:${PORT}/api/submit-claim
 ✅ Services status: http://localhost:${PORT}/api/services/status
 
-🔗 n8n webhook: ${process.env.N8N_WEBHOOK_URL || 'Not configured'}
 🌍 Environment: ${process.env.NODE_ENV || 'development'}
 
 Ready to process claims! 📋

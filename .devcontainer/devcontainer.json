@@ -12,13 +12,11 @@
     "financial-rules-engine",
     "signer-service",
     "nphies-bridge",
-    "n8n",
     "sbs-landing"
   ],
   "shutdownAction": "stopCompose",
   "forwardPorts": [
     3000,
-    5678,
     8000,
     8001,
     8002,
@@ -26,7 +24,6 @@
   ],
   "portsAttributes": {
     "3000": { "label": "SBS Landing API" },
-    "5678": { "label": "n8n Orchestrator" },
     "8000": { "label": "Normalizer Service" },
     "8001": { "label": "Signer Service" },
     "8002": { "label": "Financial Rules Engine" },

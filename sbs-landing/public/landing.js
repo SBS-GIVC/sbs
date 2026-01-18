@@ -42,6 +42,16 @@ const translations = {
       trackingTitle: "Claim Tracking",
       trackingSubtitle: "Real-time workflow progress",
       claimIdLabel: "Claim ID",
+      trackExisting: "Track Existing Claim",
+      enterClaimId: "Enter Claim ID",
+      startTracking: "Start Tracking",
+      invalidClaimId: "Invalid claim ID format",
+      timeline: "Timeline",
+      expectedTime: "Expected time",
+      nextStep: "Next step",
+      shareTracking: "Share Tracking Link",
+      downloadReceipt: "Download Receipt",
+      slaWarning: "This stage is taking longer than expected",
       stages: {
         received: "Received",
         validation: "Validation",
@@ -118,6 +128,16 @@ const translations = {
       trackingTitle: "تتبع المطالبة",
       trackingSubtitle: "متابعة سير العمل في الوقت الفعلي",
       claimIdLabel: "رقم المطالبة",
+      trackExisting: "تتبع مطالبة موجودة",
+      enterClaimId: "أدخل رقم المطالبة",
+      startTracking: "ابدأ التتبع",
+      invalidClaimId: "صيغة رقم المطالبة غير صحيحة",
+      timeline: "الخط الزمني",
+      expectedTime: "المدة المتوقعة",
+      nextStep: "الخطوة التالية",
+      shareTracking: "مشاركة رابط التتبع",
+      downloadReceipt: "تحميل الإيصال",
+      slaWarning: "هذه المرحلة تستغرق وقتًا أطول من المتوقع",
       stages: {
         received: "تم الاستلام",
         validation: "التحقق",
@@ -192,6 +212,57 @@ class SBSLandingPage {
     }
   }
 
+  getApiClient() {
+    if (window.sbsApiClient) {
+      return window.sbsApiClient;
+    }
+
+    if (window.SBSAPIClient) {
+      return new window.SBSAPIClient();
+    }
+
+    return null;
+  }
+
+  getTrackingUrl() {
+    if (!this.currentClaimId) return '';
+    const apiBaseUrl = this.getApiBaseUrl();
+    return apiBaseUrl
+      ? `${apiBaseUrl}/api/claim-status/${this.currentClaimId}`
+      : `${window.location.origin}/api/claim-status/${this.currentClaimId}`;
+  }
+
+  getReceiptUrl() {
+    if (!this.currentClaimId) return '';
+    const apiBaseUrl = this.getApiBaseUrl();
+    return apiBaseUrl
+      ? `${apiBaseUrl}/api/claim-receipt/${this.currentClaimId}`
+      : `${window.location.origin}/api/claim-receipt/${this.currentClaimId}`;
+  }
+
+  getStageSlaSeconds(stageKey) {
+    const slaMap = {
+      validation: 30,
+      normalization: 45,
+      financialRules: 45,
+      signing: 30,
+      nphiesSubmission: 60
+    };
+    return slaMap[stageKey] || 60;
+  }
+
+  getStageGuidance(stageKey) {
+    const guidance = {
+      received: { expectedTime: '5s', nextStep: 'Validation will start shortly' },
+      validation: { expectedTime: '30s', nextStep: 'We will normalize codes next' },
+      normalization: { expectedTime: '45s', nextStep: 'Financial rules will be applied' },
+      financialRules: { expectedTime: '45s', nextStep: 'Claim will be digitally signed' },
+      signing: { expectedTime: '30s', nextStep: 'Submission to NPHIES is next' },
+      nphiesSubmission: { expectedTime: '60s', nextStep: 'Await final response' }
+    };
+    return guidance[stageKey] || { expectedTime: '60s', nextStep: 'Processing continues' };
+  }
+
   init() {
     document.documentElement.lang = this.lang;
     document.documentElement.dir = this.lang === 'ar' ? 'rtl' : 'ltr';
@@ -223,12 +294,14 @@ class SBSLandingPage {
     // Handle both direct call and event-based call
     const claimId = typeof claimIdOrEvent === 'string' 
       ? claimIdOrEvent 
-      : claimIdOrEvent.target.dataset.claimId;
+      : claimIdOrEvent?.target?.dataset?.claimId;
     
-    this.currentClaimId = claimId;
+    this.currentClaimId = claimId || this.currentClaimId;
     this.showTrackingModal = true;
     this.showSuccessModal = false;
-    this.startStatusPolling();
+    if (this.currentClaimId) {
+      this.startStatusPolling();
+    }
     this.render();
   }
 
@@ -236,6 +309,29 @@ class SBSLandingPage {
     this.showTrackingModal = false;
     this.stopStatusPolling();
     this.claimStatus = null;
+    this.render();
+  }
+
+  startTrackingFromInput() {
+    const input = document.getElementById('tracking-claim-id');
+    const claimId = input?.value?.trim();
+    const t = translations[this.lang];
+
+    if (!claimId) {
+      this.showError(t.claim.invalidClaimId);
+      return;
+    }
+
+    const claimIdRegex = /^CLM-[A-Z0-9]+-[A-Z0-9]+$/;
+    if (!claimIdRegex.test(claimId)) {
+      this.showError(t.claim.invalidClaimId);
+      return;
+    }
+
+    this.currentClaimId = claimId;
+    this.claimStatus = null;
+    this.stopStatusPolling();
+    this.startStatusPolling();
     this.render();
   }
 
@@ -403,27 +499,41 @@ class SBSLandingPage {
     if (!this.currentClaimId) return;
 
     try {
-      const apiBaseUrl = this.getApiBaseUrl();
-      const statusUrl = apiBaseUrl
-        ? `${apiBaseUrl}/api/claim-status/${this.currentClaimId}`
-        : `/api/claim-status/${this.currentClaimId}`;
+      const apiClient = this.getApiClient();
+      if (apiClient) {
+        apiClient.setBaseUrl(this.getApiBaseUrl());
+        const result = await apiClient.getClaimStatus(this.currentClaimId);
 
-      const response = await fetch(statusUrl);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-
-      if (result.success) {
-        this.claimStatus = result;
-        this.statusPollFailures = 0; // Reset failure counter on success
-        this.render();
+        if (result.success) {
+          this.claimStatus = result.data;
+          this.statusPollFailures = 0; // Reset failure counter on success
+          this.render();
+        } else {
+          console.error('Claim status fetch failed:', result.error);
+          this.stopStatusPolling();
+        }
       } else {
-        console.error('Claim status fetch failed:', result.error);
-        // Stop polling on persistent errors
-        this.stopStatusPolling();
+        const apiBaseUrl = this.getApiBaseUrl();
+        const statusUrl = apiBaseUrl
+          ? `${apiBaseUrl}/api/claim-status/${this.currentClaimId}`
+          : `/api/claim-status/${this.currentClaimId}`;
+
+        const response = await fetch(statusUrl);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+
+        if (result.success) {
+          this.claimStatus = result;
+          this.statusPollFailures = 0; // Reset failure counter on success
+          this.render();
+        } else {
+          console.error('Claim status fetch failed:', result.error);
+          this.stopStatusPolling();
+        }
       }
     } catch (error) {
       console.error('Error fetching claim status:', error);
@@ -443,19 +553,33 @@ class SBSLandingPage {
     if (!this.currentClaimId) return;
 
     try {
-      const apiBaseUrl = this.getApiBaseUrl();
-      const retryUrl = apiBaseUrl
-        ? `${apiBaseUrl}/api/claims/${this.currentClaimId}/retry`
-        : `/api/claims/${this.currentClaimId}/retry`;
+      const apiClient = this.getApiClient();
+      if (apiClient) {
+        apiClient.setBaseUrl(this.getApiBaseUrl());
+        const result = await apiClient.retryClaim(this.currentClaimId);
+        const payload = result.success ? result.data : null;
 
-      const response = await fetch(retryUrl, { method: 'POST' });
-      const result = await response.json();
-
-      if (result.success) {
-        this.claimStatus = null;
-        this.startStatusPolling();
+        if (result.success && payload?.success !== false) {
+          this.claimStatus = null;
+          this.startStatusPolling();
+        } else {
+          this.showError(payload?.error || result.error?.message || 'Retry failed');
+        }
       } else {
-        this.showError(result.error || 'Retry failed');
+        const apiBaseUrl = this.getApiBaseUrl();
+        const retryUrl = apiBaseUrl
+          ? `${apiBaseUrl}/api/claims/${this.currentClaimId}/retry`
+          : `/api/claims/${this.currentClaimId}/retry`;
+
+        const response = await fetch(retryUrl, { method: 'POST' });
+        const result = await response.json();
+
+        if (result.success) {
+          this.claimStatus = null;
+          this.startStatusPolling();
+        } else {
+          this.showError(result.error || 'Retry failed');
+        }
       }
     } catch (error) {
       this.showError('Failed to retry claim: ' + error.message);
@@ -490,30 +614,41 @@ class SBSLandingPage {
     }
 
     try {
-      const apiBaseUrl = this.getApiBaseUrl();
-      const submitUrl = apiBaseUrl ? `${apiBaseUrl}/api/submit-claim` : '/api/submit-claim';
+      const apiClient = this.getApiClient();
+      const useApiClient = Boolean(apiClient);
+      let result = null;
 
-      const response = await fetch(submitUrl, {
-        method: 'POST',
-        body: formDataToSend
-      });
+      if (useApiClient) {
+        apiClient.setBaseUrl(this.getApiBaseUrl());
+        result = await apiClient.submitClaim(formDataToSend);
+      } else {
+        const apiBaseUrl = this.getApiBaseUrl();
+        const submitUrl = apiBaseUrl ? `${apiBaseUrl}/api/submit-claim` : '/api/submit-claim';
 
-      const result = await response.json();
+        const response = await fetch(submitUrl, {
+          method: 'POST',
+          body: formDataToSend
+        });
 
-      if (result.success) {
+        result = await response.json();
+      }
+
+      const payload = useApiClient && result?.success ? result.data : result;
+
+      if (payload?.success) {
         this.showClaimModal = false;
         this.selectedFile = null;
         this.formData = {};
         this.validationErrors = {};
 
         // Store claim info and open tracking modal
-        this.currentClaimId = result.claimId;
+        this.currentClaimId = payload.claimId;
         this.lastSubmission = {
-          claimId: result.claimId,
+          claimId: payload.claimId,
           patientName: formElements.patientName.value,
           patientId: formElements.patientId.value,
           claimType: formElements.claimType.value,
-          submittedAt: result.data?.submittedAt || new Date().toISOString()
+          submittedAt: payload.data?.submittedAt || new Date().toISOString()
         };
 
         // Show success modal first, then allow tracking
@@ -523,10 +658,10 @@ class SBSLandingPage {
 
       } else {
         // Handle validation errors from server
-        if (result.validationErrors) {
-          this.showError(result.validationErrors.join(', '));
+        if (payload?.validationErrors) {
+          this.showError(payload.validationErrors.join(', '));
         } else {
-          this.showError(result.error || 'Unknown error occurred');
+          this.showError(payload?.error || result?.error?.message || 'Unknown error occurred');
         }
         this.isSubmitting = false;
         this.render();
@@ -560,6 +695,9 @@ class SBSLandingPage {
             
             <div class="flex items-center gap-4">
               <a href="#features" class="text-slate-300 hover:text-white transition-colors text-sm font-medium hidden md:block">${t.nav.features}</a>
+              <button onclick="app.openTrackingModal()" class="text-slate-300 hover:text-white transition-colors text-sm font-medium hidden md:block">
+                ${t.claim.trackExisting}
+              </button>
               <button onclick="app.openClaimModal()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-900 px-5 py-2 rounded-full font-bold text-sm transition-all shadow-lg shadow-emerald-500/20">
                 ${t.nav.submitClaim}
               </button>
@@ -763,6 +901,12 @@ class SBSLandingPage {
                   </svg>
                   ${t.claim.trackStatus}
                 </button>
+                <button onclick="navigator.clipboard?.writeText(app.getTrackingUrl()); app.showSuccessModal = false; app.render();" class="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold transition-all">
+                  ${t.claim.shareTracking}
+                </button>
+                <a href="${this.getReceiptUrl()}" target="_blank" class="px-6 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 rounded-lg font-bold transition-all">
+                  ${t.claim.downloadReceipt}
+                </a>
               ` : ''}
             </div>
           </div>
@@ -791,7 +935,15 @@ class SBSLandingPage {
               <div class="flex justify-between items-center mb-6">
                 <div class="bg-slate-800/50 rounded-lg px-4 py-2">
                   <p class="text-slate-500 text-xs">${t.claim.claimIdLabel}</p>
-                  <p class="text-emerald-400 font-mono font-bold">${this.currentClaimId}</p>
+                  <p class="text-emerald-400 font-mono font-bold">${this.currentClaimId || '—'}</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button onclick="navigator.clipboard?.writeText(app.getTrackingUrl())" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold">
+                    ${t.claim.shareTracking}
+                  </button>
+                  <a href="${this.getReceiptUrl()}" target="_blank" class="px-3 py-1 bg-cyan-500 hover:bg-cyan-400 text-slate-900 rounded-lg text-xs font-semibold">
+                    ${t.claim.downloadReceipt}
+                  </a>
                 </div>
                 ${this.claimStatus ? `
                   <div class="flex items-center gap-2">
@@ -812,6 +964,16 @@ class SBSLandingPage {
                     }
                   </div>
                 ` : ''}
+              </div>
+
+              <div class="bg-slate-800/50 rounded-lg p-4 mb-6">
+                <label class="block text-slate-400 text-sm">${t.claim.enterClaimId}</label>
+                <div class="flex flex-col sm:flex-row gap-2 mt-2">
+                  <input id="tracking-claim-id" value="${this.currentClaimId || ''}" placeholder="CLM-XXXXXXX-XXXXXX" class="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:border-emerald-500 focus:outline-none" />
+                  <button onclick="app.startTrackingFromInput()" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-lg font-bold">
+                    ${t.claim.startTracking}
+                  </button>
+                </div>
               </div>
 
               <!-- Progress Bar -->
@@ -848,6 +1010,24 @@ class SBSLandingPage {
                     </h4>
                     <ul class="text-slate-400 text-sm space-y-1">
                       ${this.claimStatus.errors.map(err => `<li>- ${err.stage}: ${err.error}</li>`).join('')}
+                    </ul>
+                  </div>
+                ` : ''}
+
+                <!-- Timeline -->
+                ${this.claimStatus.timeline && this.claimStatus.timeline.length > 0 ? `
+                  <div class="mt-6 p-4 bg-slate-800/50 border border-slate-700 rounded-lg">
+                    <h4 class="text-emerald-400 font-bold mb-3">${t.claim.timeline}</h4>
+                    <ul class="text-slate-400 text-sm space-y-2 max-h-40 overflow-auto">
+                      ${this.claimStatus.timeline
+                        .slice()
+                        .reverse()
+                        .map(entry => `
+                          <li class="flex items-start justify-between gap-3">
+                            <span>${this.escapeHtml(entry.message || entry.event)}</span>
+                            <span class="text-slate-500 text-xs whitespace-nowrap">${new Date(entry.timestamp).toLocaleTimeString()}</span>
+                          </li>
+                        `).join('')}
                     </ul>
                   </div>
                 ` : ''}
@@ -899,6 +1079,11 @@ class SBSLandingPage {
 
       const stageName = t.claim.stages[stage.key] || stage.key;
       const stageStatusText = t.claim.stageStatus[status] || status;
+      const stageGuidance = this.getStageGuidance(stage.key);
+      const stageTimestamp = stageData.timestamp ? new Date(stageData.timestamp) : null;
+      const elapsedSeconds = stageTimestamp ? Math.floor((Date.now() - stageTimestamp.getTime()) / 1000) : 0;
+      const slaSeconds = this.getStageSlaSeconds(stage.key);
+      const showSlaWarning = status === 'in_progress' && elapsedSeconds > slaSeconds;
 
       return `
         <div class="flex items-center gap-4 p-3 rounded-lg ${bgColor} border ${borderColor} transition-all">
@@ -914,6 +1099,11 @@ class SBSLandingPage {
               <span class="text-xs px-2 py-1 rounded-full ${bgColor} text-${statusColor}-400">${stageStatusText}</span>
             </div>
             ${stageData.message ? `<p class="text-slate-400 text-sm mt-1">${stageData.message}</p>` : ''}
+            <div class="text-slate-500 text-xs mt-1">
+              <span class="mr-2">${t.claim.expectedTime}: ${stageGuidance.expectedTime}</span>
+              <span>${t.claim.nextStep}: ${stageGuidance.nextStep}</span>
+            </div>
+            ${showSlaWarning ? `<p class="text-amber-400 text-xs mt-1">${t.claim.slaWarning}</p>` : ''}
             ${stageData.timestamp ? `<p class="text-slate-500 text-xs mt-1">${new Date(stageData.timestamp).toLocaleTimeString()}</p>` : ''}
           </div>
         </div>

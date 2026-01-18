@@ -4,14 +4,23 @@
  */
 
 class SBSAPIClient {
-    constructor() {
-          this.config = window.SBS_CONFIG || {
-                  apiBaseUrl: 'http://localhost:5000',
-                  apiTimeout: 30000,
-                  retryAttempts: 3,
-                  retryDelay: 1000
-          };
+    constructor(baseUrl = null) {
+            const baseConfig = window.SBS_CONFIG || {
+                        apiBaseUrl: 'http://localhost:5000',
+                        apiTimeout: 30000,
+                        retryAttempts: 3,
+                        retryDelay: 1000
+            };
+
+            this.config = {
+                        ...baseConfig,
+                        apiBaseUrl: baseUrl !== null ? baseUrl : baseConfig.apiBaseUrl
+            };
     }
+
+  setBaseUrl(baseUrl) {
+          this.config.apiBaseUrl = baseUrl;
+  }
 
   /**
      * Make an HTTP request with retry logic and error handling
@@ -124,6 +133,17 @@ class SBSAPIClient {
   }
 
   /**
+     * Retry a failed claim
+     * @param {string} claimId - Claim ID to retry
+     * @returns {Promise<Object>} - Retry result
+     */
+  async retryClaim(claimId) {
+          return this.request(`/api/claims/${claimId}/retry`, {
+                    method: 'POST'
+          });
+  }
+
+  /**
      * Check API connectivity
      * @returns {Promise<boolean>} - True if API is reachable
      */
@@ -171,3 +191,4 @@ class SBSAPIClient {
 
 // Create global instance
 window.sbsApiClient = new SBSAPIClient();
+window.SBSAPIClient = SBSAPIClient;
