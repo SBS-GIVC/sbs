@@ -252,7 +252,7 @@ sbs-integration-engine/
 ├── signer-service/           # Digital signing & certificates
 ├── nphies-bridge/            # NPHIES API integration
 ├── database/                 # Schema and migrations
-├── n8n-workflows/            # Workflow templates
+├── sbs-landing/              # Landing API & n8n workflows
 ├── docker/                   # Docker configurations
 ├── docs/                     # Documentation
 └── docker-compose.yml        # Orchestration
