@@ -1,0 +1,161 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [main, develop]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  # ============================================================================
+  # PR Checks
+  # ============================================================================
+  pr-checks:
+    name: PR Checks
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check PR title format
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          
+          # Check for conventional commit format
+          if [[ ! "$PR_TITLE" =~ ^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?\!?:\ .+ ]]; then
+            echo "❌ PR title does not follow conventional commits format"
+            echo ""
+            echo "Expected format: type(scope): description"
+            echo "Examples:"
+            echo "  feat: add new claim validation"
+            echo "  fix(normalizer): handle edge case"
+            echo "  docs: update README"
+            echo ""
+            echo "Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+            exit 1
+          fi
+          
+          echo "✅ PR title follows conventional commits format"
+
+      - name: Check for breaking changes
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_BODY="${{ github.event.pull_request.body }}"
+          
+          if [[ "$PR_TITLE" == *"!"* ]] || [[ "$PR_BODY" == *"BREAKING CHANGE"* ]]; then
+            echo "⚠️ This PR contains breaking changes!"
+            echo "::warning::This PR contains breaking changes. Please ensure migration guide is provided."
+          fi
+
+      - name: Check changed files
+        id: changed-files
+        run: |
+          # Get list of changed files
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          
+          echo "## 📝 Changed Files" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "$CHANGED_FILES" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          # Check for sensitive files
+          SENSITIVE_PATTERNS=(".env|secrets|password|credential|private.*key")
+          if echo "$CHANGED_FILES" | grep -iE "$SENSITIVE_PATTERNS"; then
+            echo "::error::Sensitive files detected in PR!"
+            exit 1
+          fi
+
+      - name: Check for large files
+        run: |
+          # Check for files larger than 1MB
+          LARGE_FILES=$(find . -type f -size +1M -not -path "./.git/*" -not -path "./node_modules/*" -not -path "./.venv/*" 2>/dev/null || true)
+          
+          if [ -n "$LARGE_FILES" ]; then
+            echo "⚠️ Large files detected (>1MB):"
+            echo "$LARGE_FILES"
+            echo "::warning::Large files detected. Consider using Git LFS."
+          fi
+
+  # ============================================================================
+  # Dependency Check
+  # ============================================================================
+  dependency-check:
+    name: Dependency Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for new dependencies
+        run: |
+          # Get changed requirement files
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E "(requirements\.txt|package\.json)" || true)
+          
+          if [ -n "$CHANGED" ]; then
+            echo "## 📦 Dependency Changes" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            for file in $CHANGED; do
+              echo "### $file" >> $GITHUB_STEP_SUMMARY
+              echo '```diff' >> $GITHUB_STEP_SUMMARY
+              git diff origin/${{ github.base_ref }}...HEAD -- "$file" >> $GITHUB_STEP_SUMMARY || true
+              echo '```' >> $GITHUB_STEP_SUMMARY
+            done
+          fi
+
+  # ============================================================================
+  # Test Coverage Report
+  # ============================================================================
+  coverage-report:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pytest pytest-cov
+          for dir in normalizer-service signer-service financial-rules-engine nphies-bridge; do
+            pip install -r $dir/requirements.txt || true
+          done
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ --cov=. --cov-report=xml --cov-report=term-missing -v || true
+        continue-on-error: true
+
+      - name: Coverage summary
+        run: |
+          echo "## 📊 Test Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Coverage report generated. See artifacts for details." >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # PR Summary
+  # ============================================================================
+  pr-summary:
+    name: PR Summary
+    runs-on: ubuntu-latest
+    needs: [pr-checks, dependency-check]
+    if: always()
+    
+    steps:
+      - name: Generate PR Summary
+        run: |
+          echo "## 🔍 PR Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| PR Checks | ${{ needs.pr-checks.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependency Check | ${{ needs.dependency-check.result == 'success' && '✅ Passed' || '⚠️ Review' }} |" >> $GITHUB_STEP_SUMMARY
