@@ -106,6 +106,26 @@ class ToastManager {
 // Global toast instance
 const toast = new ToastManager();
 
+// Confetti celebration effect
+function showConfetti() {
+  const colors = ['#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b'];
+  const confettiCount = 50;
+  
+  for (let i = 0; i < confettiCount; i++) {
+    const confetti = document.createElement('div');
+    confetti.className = 'confetti';
+    confetti.style.left = Math.random() * 100 + 'vw';
+    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    confetti.style.animationDelay = Math.random() * 1 + 's';
+    confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
+    confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+    document.body.appendChild(confetti);
+    
+    // Remove after animation
+    setTimeout(() => confetti.remove(), 5000);
+  }
+}
+
 const translations = {
   en: {
     nav: {
@@ -612,6 +632,29 @@ class SBSLandingPage {
     toast.info(message);
   }
 
+  async copyToClipboard(text, successMessage = 'Copied to clipboard!') {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        toast.success(successMessage);
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        toast.success(successMessage);
+      }
+    } catch (error) {
+      toast.error('Failed to copy to clipboard');
+      console.error('Clipboard error:', error);
+    }
+  }
+
   escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -796,10 +839,14 @@ class SBSLandingPage {
           submittedAt: payload.data?.submittedAt || new Date().toISOString()
         };
 
-        // Show success modal first, then allow tracking
+        // Show success modal with celebration
         this.showSuccessModal = true;
         this.isSubmitting = false;
         this.render();
+        
+        // Trigger confetti celebration
+        showConfetti();
+        toast.success('Claim submitted successfully! 🎉');
 
       } else {
         // Handle validation errors from server
@@ -1065,7 +1112,7 @@ class SBSLandingPage {
                   </svg>
                   ${t.claim.trackStatus}
                 </button>
-                <button onclick="navigator.clipboard?.writeText(app.getTrackingUrl()); app.showSuccessModal = false; app.render();" class="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold transition-all">
+                <button onclick="app.copyToClipboard(app.getTrackingUrl(), 'Tracking link copied!')" class="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-bold transition-all">
                   ${t.claim.shareTracking}
                 </button>
                 <a href="${this.getReceiptUrl()}" target="_blank" class="px-6 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-900 rounded-lg font-bold transition-all">
@@ -1102,7 +1149,7 @@ class SBSLandingPage {
                   <p class="text-emerald-400 font-mono font-bold">${this.currentClaimId || '—'}</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                  <button onclick="navigator.clipboard?.writeText(app.getTrackingUrl())" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold">
+                  <button onclick="app.copyToClipboard(app.getTrackingUrl(), 'Tracking link copied!')" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold">
                     ${t.claim.shareTracking}
                   </button>
                   <a href="${this.getReceiptUrl()}" target="_blank" class="px-3 py-1 bg-cyan-500 hover:bg-cyan-400 text-slate-900 rounded-lg text-xs font-semibold">
