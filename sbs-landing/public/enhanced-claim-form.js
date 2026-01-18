@@ -218,6 +218,14 @@ class EnhancedClaimForm {
   showPreviewModal(formData) {
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+    
+    // Sanitize user input to prevent XSS
+    const sanitize = (str) => {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    };
+    
     modal.innerHTML = `
       <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
         <div class="p-6 border-b border-gray-200">
@@ -241,10 +249,10 @@ class EnhancedClaimForm {
               Patient Information
             </h4>
             <div class="grid grid-cols-2 gap-3 text-sm">
-              <div><span class="text-gray-600">Name:</span> <span class="font-medium">${formData.patientName}</span></div>
-              <div><span class="text-gray-600">ID:</span> <span class="font-medium">${formData.patientId}</span></div>
-              <div><span class="text-gray-600">Member ID:</span> <span class="font-medium">${formData.memberId || 'N/A'}</span></div>
-              <div><span class="text-gray-600">Claim Type:</span> <span class="font-medium capitalize">${formData.claimType}</span></div>
+              <div><span class="text-gray-600">Name:</span> <span class="font-medium">${sanitize(formData.patientName)}</span></div>
+              <div><span class="text-gray-600">ID:</span> <span class="font-medium">${sanitize(formData.patientId)}</span></div>
+              <div><span class="text-gray-600">Member ID:</span> <span class="font-medium">${sanitize(formData.memberId || 'N/A')}</span></div>
+              <div><span class="text-gray-600">Claim Type:</span> <span class="font-medium capitalize">${sanitize(formData.claimType)}</span></div>
             </div>
           </div>
 
@@ -257,8 +265,8 @@ class EnhancedClaimForm {
               Insurance Details
             </h4>
             <div class="grid grid-cols-2 gap-3 text-sm">
-              <div><span class="text-gray-600">Payer:</span> <span class="font-medium">${formData.payerId}</span></div>
-              <div><span class="text-gray-600">Provider:</span> <span class="font-medium">${formData.providerId}</span></div>
+              <div><span class="text-gray-600">Payer:</span> <span class="font-medium">${sanitize(formData.payerId)}</span></div>
+              <div><span class="text-gray-600">Provider:</span> <span class="font-medium">${sanitize(formData.providerId)}</span></div>
             </div>
           </div>
 
@@ -271,7 +279,7 @@ class EnhancedClaimForm {
               Diagnosis
             </h4>
             <div class="text-sm">
-              <span class="font-medium">${formData.diagnosisCode}</span> - ${formData.diagnosisDisplay}
+              <span class="font-medium">${sanitize(formData.diagnosisCode)}</span> - ${sanitize(formData.diagnosisDisplay)}
             </div>
           </div>
 
@@ -288,10 +296,10 @@ class EnhancedClaimForm {
                 <div class="bg-white p-3 rounded border border-green-200">
                   <div class="flex justify-between items-start">
                     <div class="flex-1">
-                      <div class="font-medium text-gray-800">${service.description}</div>
-                      <div class="text-sm text-gray-600">Code: ${service.internalCode}</div>
-                      ${service.sbsCode ? `<div class="text-xs text-gray-500">SBS Code: ${service.sbsCode}</div>` : ''}
-                      <div class="text-sm text-gray-600">Date: ${service.serviceDate}</div>
+                      <div class="font-medium text-gray-800">${sanitize(service.description)}</div>
+                      <div class="text-sm text-gray-600">Code: ${sanitize(service.internalCode)}</div>
+                      ${service.sbsCode ? `<div class="text-xs text-gray-500">SBS Code: ${sanitize(service.sbsCode)}</div>` : ''}
+                      <div class="text-sm text-gray-600">Date: ${sanitize(service.serviceDate)}</div>
                     </div>
                     <div class="text-right ml-4">
                       <div class="text-sm text-gray-600">Qty: ${service.quantity}</div>
