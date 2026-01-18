@@ -183,7 +183,7 @@ curl -X POST http://localhost:8001/generate-test-cert?facility_id=1
 
 # 4. Access n8n
 # Navigate to http://localhost:5678
-# Import: n8n-workflows/sbs-full-workflow.json
+# Import: sbs-landing/n8n-workflow-sbs-complete.json
 ```
 
 ### **Option 3: Production Deployment**

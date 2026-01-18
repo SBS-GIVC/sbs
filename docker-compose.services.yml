@@ -140,8 +140,44 @@ services:
     networks:
       - sbs-network
 
+  # n8n Workflow Engine
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: sbs-n8n
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-changeme}
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+      - GENERIC_TIMEZONE=${TIMEZONE:-Asia/Riyadh}
+      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL:-http://localhost:5678}
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./sbs-landing/n8n-workflow-sbs-complete.json:/home/node/.n8n/workflows/sbs-complete-pipeline.json:ro
+    depends_on:
+      - normalizer-service
+      - financial-rules-engine
+      - signer-service
+      - nphies-bridge
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5678/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sbs-network
+
 volumes:
   postgres_data:
+    driver: local
+  n8n_data:
     driver: local
 
 networks:
