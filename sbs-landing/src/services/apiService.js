@@ -1,6 +1,17 @@
 // API Service - Integration with SBS Backend
-const API_BASE_URL = window.SBS_API_URL || window.location.origin;
+const API_BASE_URL = (() => {
+  // Prefer explicitly configured API URL; fall back to localhost for development.
+  if (window.SBS_API_URL && typeof window.SBS_API_URL === 'string') {
+    return window.SBS_API_URL;
+  }
 
+  const fallbackUrl = 'http://localhost:3000';
+  console.warn(
+    '[APIService] window.SBS_API_URL is not set; falling back to',
+    fallbackUrl
+  );
+  return fallbackUrl;
+})();
 export class APIService {
   /**
    * Submit a claim to the SBS pipeline
