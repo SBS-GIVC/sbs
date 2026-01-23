@@ -47,8 +47,11 @@ export default function App() {
     if (!transcript) return;
     setIsSummarizing(true);
     try {
+      // Sanitize transcript to prevent prompt injection
+      const sanitizedTranscript = transcript.replace(/[`'"\\]/g, '').substring(0, 1000);
+      
       const summary = await callGemini(
-        `Summarize as SOAP note in ${lang === 'ar' ? 'Arabic' : 'English'}: ${transcript}`
+        `Summarize as SOAP note in ${lang === 'ar' ? 'Arabic' : 'English'}: ${sanitizedTranscript}`
       );
       setMedicalNote(summary);
     } catch (e) {
