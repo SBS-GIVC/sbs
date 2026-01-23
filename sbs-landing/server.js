@@ -401,7 +401,10 @@ app.post('/api/gemini/generate', async (req, res) => {
     };
 
     const response = await axios.post(url, payload, {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GEMINI_API_KEY}`
+      },
       timeout: 30000
     });
 
