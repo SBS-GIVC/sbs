@@ -47,9 +47,13 @@ export async function normalizeCode(internalCode, description, lang = 'en') {
 
   // Fallback to AI-based normalization
   try {
+    // Sanitize inputs to prevent prompt injection
+    const sanitizedCode = internalCode.replace(/[`'"\\]/g, '').substring(0, 50);
+    const sanitizedDesc = description.replace(/[`'"\\]/g, '').substring(0, 200);
+    
     const aiResponse = await callGemini(
       `Map hospital service to SBS code.
-       Code: ${internalCode} | Desc: ${description} | Lang: ${lang === 'ar' ? 'Arabic' : 'English'}
+       Code: ${sanitizedCode} | Desc: ${sanitizedDesc} | Lang: ${lang === 'ar' ? 'Arabic' : 'English'}
        Return ONLY JSON: {"code": "SBS-XXX-000", "desc": "Official Name", "confidence": 0.85, "rationale": "Explanation"}`,
       "You are a Senior Saudi Medical Coder. Strict JSON output only."
     );
