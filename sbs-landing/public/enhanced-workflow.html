@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enhanced Claim Workflow - SBS Integration Engine</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .fade-in {
+      animation: fadeIn 0.5s ease-in;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .pulse-ring {
+      animation: pulseRing 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+    }
+    @keyframes pulseRing {
+      0% { transform: scale(0.95); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.7; }
+      100% { transform: scale(0.95); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 min-h-screen">
+  <!-- Header -->
+  <header class="bg-white shadow-md">
+    <div class="container mx-auto px-4 py-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h1 class="text-3xl font-bold text-gray-800">SBS Integration Engine</h1>
+          <p class="text-gray-600 mt-1">Enhanced Claim Processing Workflow</p>
+        </div>
+        <div class="flex gap-3">
+          <a href="/" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors">
+            Home
+          </a>
+          <a href="/dashboard.html" class="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors">
+            Dashboard
+          </a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container mx-auto px-4 py-8">
+    <!-- Info Banner -->
+    <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-lg p-6 mb-8 fade-in">
+      <div class="flex items-start gap-4">
+        <div class="text-5xl">🚀</div>
+        <div class="flex-1">
+          <h2 class="text-2xl font-bold mb-2">Welcome to Enhanced Claim Workflow</h2>
+          <p class="text-blue-100 mb-4">
+            Experience the complete claim processing journey from upload to NPHIES submission with real-time tracking,
+            multi-service support, and automatic bundle detection.
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div class="bg-white bg-opacity-20 rounded-lg p-3">
+              <div class="font-semibold">Multi-Service Claims</div>
+              <div class="text-sm text-blue-100">Add multiple services with individual pricing</div>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-lg p-3">
+              <div class="font-semibold">Bundle Detection</div>
+              <div class="text-sm text-blue-100">Automatic detection and savings calculation</div>
+            </div>
+            <div class="bg-white bg-opacity-20 rounded-lg p-3">
+              <div class="font-semibold">Real-Time Tracking</div>
+              <div class="text-sm text-blue-100">Watch your claim progress through all stages</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Workflow Visualization -->
+    <div class="bg-white rounded-lg shadow-lg p-6 mb-8 fade-in">
+      <h3 class="text-2xl font-bold text-gray-800 mb-6">Complete Claim Processing Pipeline</h3>
+      <div class="relative">
+        <!-- Workflow Steps -->
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+          <!-- Step 1: Upload -->
+          <div class="text-center">
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl pulse-ring">
+              📥
+            </div>
+            <div class="font-semibold text-gray-800">Upload</div>
+            <div class="text-xs text-gray-600 mt-1">Multi-service claim with diagnosis</div>
+          </div>
+
+          <!-- Arrow -->
+          <div class="hidden md:flex items-center justify-center">
+            <div class="text-3xl text-gray-300">→</div>
+          </div>
+
+          <!-- Step 2: Normalization -->
+          <div class="text-center">
+            <div class="bg-gradient-to-br from-green-500 to-green-600 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+              🔄
+            </div>
+            <div class="font-semibold text-gray-800">Normalize</div>
+            <div class="text-xs text-gray-600 mt-1">Map to SBS standard codes</div>
+          </div>
+
+          <!-- Arrow -->
+          <div class="hidden md:flex items-center justify-center">
+            <div class="text-3xl text-gray-300">→</div>
+          </div>
+
+          <!-- Step 3: Bundle Detection -->
+          <div class="text-center">
+            <div class="bg-gradient-to-br from-purple-500 to-purple-600 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+              💰
+            </div>
+            <div class="font-semibold text-gray-800">Bundle Check</div>
+            <div class="text-xs text-gray-600 mt-1">Detect bundles & apply pricing</div>
+          </div>
+
+          <!-- Arrow -->
+          <div class="hidden md:flex items-center justify-center">
+            <div class="text-3xl text-gray-300">→</div>
+          </div>
+
+          <!-- Step 4: Financial Rules -->
+          <div class="text-center">
+            <div class="bg-gradient-to-br from-amber-500 to-amber-600 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+              📊
+            </div>
+            <div class="font-semibold text-gray-800">Financial Rules</div>
+            <div class="text-xs text-gray-600 mt-1">Apply facility tier markup</div>
+          </div>
+        </div>
+
+        <!-- Second Row -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-8">
+          <!-- Step 5: Signing -->
+          <div class="text-center">
+            <div class="bg-gradient-to-br from-red-500 to-red-600 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+              🔐
+            </div>
+            <div class="font-semibold text-gray-800">Digital Signing</div>
+            <div class="text-xs text-gray-600 mt-1">RSA SHA-256 signature</div>
+          </div>
+
+          <!-- Arrow -->
+          <div class="hidden md:flex items-center justify-center">
+            <div class="text-3xl text-gray-300">→</div>
+          </div>
+
+          <!-- Step 6: NPHIES Submit -->
+          <div class="text-center">
+            <div class="bg-gradient-to-br from-pink-500 to-pink-600 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+              🚀
+            </div>
+            <div class="font-semibold text-gray-800">NPHIES Submit</div>
+            <div class="text-xs text-gray-600 mt-1">Submit with retry logic</div>
+          </div>
+
+          <!-- Arrow -->
+          <div class="hidden md:flex items-center justify-center">
+            <div class="text-3xl text-gray-300">→</div>
+          </div>
+
+          <!-- Step 7: Result -->
+          <div class="text-center">
+            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
+              ✅
+            </div>
+            <div class="font-semibold text-gray-800">Accepted</div>
+            <div class="text-xs text-gray-600 mt-1">Claim successfully processed</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Enhanced Claim Form -->
+    <div id="enhancedClaimFormContainer" class="fade-in"></div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-gray-200 mt-12">
+    <div class="container mx-auto px-4 py-6">
+      <div class="text-center text-gray-600">
+        <p>&copy; 2024 SBS Integration Engine. Enhanced Workflow v2.0.0</p>
+        <p class="text-sm mt-2">Powered by FastAPI, Node.js, and PostgreSQL</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="/config.js"></script>
+  <script src="/landing.js"></script>
+  <script src="/enhanced-claim-form.js"></script>
+  <script>
+    // Initialize toast manager
+    const toast = new ToastManager();
+
+    // Initialize enhanced claim form when page loads
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Check if simulation service is available
+      try {
+        const response = await fetch(`${window.SBS_API_BASE_URL || ''}/api/simulation/scenarios`);
+        if (response.ok) {
+          toast.success('Simulation service is online! You can generate test data.', 3000);
+        }
+      } catch (error) {
+        console.warn('Simulation service not available');
+      }
+
+      // Initialize claim form
+      if (typeof claimForm !== 'undefined' && claimForm) {
+        await claimForm.init();
+      }
+    });
+  </script>
+</body>
+</html>

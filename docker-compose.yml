@@ -116,6 +116,20 @@ services:
     networks:
       - sbs-network
 
+  # Simulation Service (for testing)
+  simulation-service:
+    build:
+      context: ./simulation-service
+      dockerfile: Dockerfile
+    container_name: sbs-simulation
+    environment:
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8004:8004"
+    restart: unless-stopped
+    networks:
+      - sbs-network
+
   # n8n Workflow Engine
   n8n:
     image: n8nio/n8n:latest
@@ -140,6 +154,7 @@ services:
       - financial-rules-engine
       - signer-service
       - nphies-bridge
+      - simulation-service
     restart: unless-stopped
     networks:
       - sbs-network

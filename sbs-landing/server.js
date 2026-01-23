@@ -1039,6 +1039,390 @@ app.get('/api/services/status', async (req, res) => {
   }
 });
 
+// ============================================================================
+// ENHANCED CLAIM SUBMISSION WITH SERVICE DETAILS
+// ============================================================================
+
+const SBS_SIMULATION_URL = process.env.SBS_SIMULATION_URL || 'http://localhost:8004';
+
+app.post('/api/submit-claim-enhanced', async (req, res) => {
+  let claimId = null;
+
+  try {
+    claimId = generateClaimId();
+    console.log('✅ POST /api/submit-claim-enhanced endpoint hit', {
+      claimId,
+      bodyKeys: Object.keys(req.body)
+    });
+
+    const {
+      patientName,
+      patientId,
+      memberId,
+      payerId,
+      providerId,
+      claimType,
+      userEmail,
+      diagnosisCode,
+      diagnosisDisplay,
+      services,
+      totalAmount
+    } = req.body;
+
+    // Enhanced validation
+    const validationErrors = [];
+    if (!patientName) validationErrors.push('patientName is required');
+    if (!patientId) validationErrors.push('patientId is required');
+    if (!claimType) validationErrors.push('claimType is required');
+    if (!userEmail) validationErrors.push('userEmail is required');
+    if (!diagnosisCode) validationErrors.push('diagnosisCode is required');
+    if (!services || services.length === 0) validationErrors.push('At least one service is required');
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (userEmail && !emailRegex.test(userEmail)) {
+      validationErrors.push('Invalid email format');
+    }
+
+    // Validate claim type
+    const validClaimTypes = ['professional', 'institutional', 'pharmacy', 'vision'];
+    if (claimType && !validClaimTypes.includes(claimType.toLowerCase())) {
+      validationErrors.push(`Invalid claim type. Must be one of: ${validClaimTypes.join(', ')}`);
+    }
+
+    // Validate services
+    if (services && Array.isArray(services)) {
+      services.forEach((service, index) => {
+        if (!service.internalCode) validationErrors.push(`Service ${index + 1}: internal code is required`);
+        if (!service.description) validationErrors.push(`Service ${index + 1}: description is required`);
+        if (!service.quantity || service.quantity < 1) validationErrors.push(`Service ${index + 1}: quantity must be at least 1`);
+      });
+    }
+
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        validationErrors,
+        required: ['patientName', 'patientId', 'claimType', 'userEmail', 'diagnosisCode', 'services']
+      });
+    }
+
+    const claimData = {
+      // Patient Information
+      patient: {
+        name: patientName,
+        id: patientId,
+        memberId: memberId || patientId
+      },
+
+      // Payer & Provider
+      payerId: payerId || 'DEFAULT_PAYER',
+      providerId: providerId || 'DEFAULT_PROVIDER',
+
+      // Claim Details
+      claimType: claimType.toLowerCase(),
+      submissionDate: new Date().toISOString(),
+
+      // Diagnosis
+      diagnosis: {
+        code: diagnosisCode,
+        display: diagnosisDisplay
+      },
+
+      // Services
+      services: services,
+      totalAmount: totalAmount,
+
+      // Metadata
+      metadata: {
+        submittedBy: userEmail,
+        submittedAt: new Date().toISOString(),
+        source: 'enhanced-claim-form',
+        version: '2.0.0',
+        claimId
+      }
+    };
+
+    // Create claim tracker
+    const claim = new ClaimTracker(claimId, claimData);
+    claim.updateStage('validation', 'in_progress', 'Validating enhanced claim data');
+    claim.setStatus(WORKFLOW_STAGES.VALIDATING);
+    saveClaim(claim);
+
+    // Mark validation as completed
+    claim.updateStage('validation', 'completed', 'Enhanced claim validated successfully');
+    claim.setStatus(WORKFLOW_STAGES.VALIDATED);
+    saveClaim(claim);
+
+    // Send immediate response
+    res.json({
+      success: true,
+      message: 'Enhanced claim submitted successfully',
+      claimId: claim.claimId,
+      status: 'processing',
+      data: {
+        patientId,
+        patientName,
+        claimType,
+        submittedAt: new Date().toISOString(),
+        estimatedProcessingTime: '2-5 minutes',
+        trackingUrl: `/api/claim-status/${claimId}`,
+        statusCheckInterval: 3000,
+        servicesCount: services.length,
+        totalAmount
+      }
+    });
+
+    // Process workflow asynchronously
+    processClaimWorkflowEnhanced(claim, claimData).catch(error => {
+      console.error(`❌ Background workflow processing failed for ${claim.claimId}:`, error.message);
+    });
+
+  } catch (error) {
+    console.error('❌ Error in enhanced claim submission:', error);
+
+    if (claimId) {
+      const claim = getClaim(claimId);
+      if (claim) {
+        claim.addError('submission', error.message);
+        claim.setStatus(WORKFLOW_STAGES.ERROR);
+        saveClaim(claim);
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      claimId,
+      error: 'Failed to process enhanced claim submission',
+      message: error.message
+    });
+  }
+});
+
+// Enhanced workflow processing for multi-service claims
+async function processClaimWorkflowEnhanced(claim, claimData) {
+  const startTime = Date.now();
+
+  try {
+    // Stage 1: Normalize all services
+    claim.updateStage('normalization', 'in_progress', 'Normalizing service codes');
+    claim.setStatus(WORKFLOW_STAGES.NORMALIZING);
+    saveClaim(claim);
+
+    const normalizedServices = [];
+    for (const service of claimData.services) {
+      try {
+        const normalizeResponse = await axios.post(`${SBS_NORMALIZER_URL}/normalize`, {
+          facility_id: 1,
+          internal_code: service.internalCode,
+          description: service.description
+        }, { timeout: 30000 });
+
+        normalizedServices.push({
+          ...service,
+          sbsCode: normalizeResponse.data.sbs_mapped_code,
+          confidence: normalizeResponse.data.confidence,
+          standardPrice: normalizeResponse.data.standard_price || service.unitPrice
+        });
+      } catch (error) {
+        console.error('Failed to normalize service %s:', service.internalCode, error.message);
+        normalizedServices.push({
+          ...service,
+          sbsCode: `SBS-UNKNOWN-${service.internalCode}`,
+          confidence: 0,
+          error: error.message
+        });
+      }
+    }
+
+    claim.updateStage('normalization', 'completed', 'All services normalized', {
+      servicesNormalized: normalizedServices.length,
+      averageConfidence: (normalizedServices.reduce((sum, s) => sum + (s.confidence || 0), 0) / normalizedServices.length).toFixed(2)
+    });
+    claim.setStatus(WORKFLOW_STAGES.NORMALIZED);
+    saveClaim(claim);
+
+    // Stage 2: Apply Financial Rules with bundle detection
+    claim.updateStage('financialRules', 'in_progress', 'Applying financial rules and detecting bundles');
+    saveClaim(claim);
+
+    const fhirClaim = buildFHIRClaimEnhanced(claimData, normalizedServices);
+    const rulesResponse = await axios.post(`${SBS_FINANCIAL_RULES_URL}/validate`, fhirClaim, { timeout: 30000 });
+
+    claim.updateStage('financialRules', 'completed', 'Financial rules applied', {
+      total: rulesResponse.data.total?.value,
+      currency: rulesResponse.data.total?.currency,
+      bundleApplied: rulesResponse.data.extensions?.bundle_applied || false
+    });
+    claim.setStatus(WORKFLOW_STAGES.RULES_APPLIED);
+    saveClaim(claim);
+
+    // Stage 3: Sign the claim
+    claim.updateStage('signing', 'in_progress', 'Digitally signing claim');
+    saveClaim(claim);
+
+    const signResponse = await axios.post(`${SBS_SIGNER_URL}/sign`, {
+      payload: rulesResponse.data,
+      facility_id: 1
+    }, { timeout: 30000 });
+
+    claim.updateStage('signing', 'completed', 'Claim signed successfully', {
+      algorithm: signResponse.data.algorithm,
+      certificateSerial: signResponse.data.certificate_serial
+    });
+    claim.setStatus(WORKFLOW_STAGES.SIGNED);
+    saveClaim(claim);
+
+    // Stage 4: Submit to NPHIES
+    claim.updateStage('nphiesSubmission', 'in_progress', 'Submitting to NPHIES');
+    saveClaim(claim);
+
+    const nphiesResponse = await axios.post(`${SBS_NPHIES_BRIDGE_URL}/submit-claim`, {
+      facility_id: 1,
+      fhir_payload: rulesResponse.data,
+      signature: signResponse.data.signature,
+      resource_type: 'Claim'
+    }, { timeout: 30000 });
+
+    claim.updateStage('nphiesSubmission', 'completed', 'Submitted to NPHIES', {
+      transactionId: nphiesResponse.data.transaction_id,
+      httpStatus: nphiesResponse.data.http_status
+    });
+    claim.setStatus(WORKFLOW_STAGES.SUBMITTED);
+    claim.setNphiesResponse(nphiesResponse.data.nphies_response);
+    claim.processingTimeMs = Date.now() - startTime;
+    saveClaim(claim);
+
+    console.log(`✅ Enhanced claim ${claim.claimId} processed successfully in ${claim.processingTimeMs}ms`);
+    return { success: true, claimId: claim.claimId, status: claim.status };
+
+  } catch (error) {
+    claim.processingTimeMs = Date.now() - startTime;
+    claim.addError('workflow', error.message);
+    claim.setStatus(WORKFLOW_STAGES.ERROR);
+    saveClaim(claim);
+    throw error;
+  }
+}
+
+// Build FHIR claim for enhanced multi-service claims
+function buildFHIRClaimEnhanced(claimData, normalizedServices) {
+  return {
+    resourceType: 'Claim',
+    status: 'active',
+    type: {
+      coding: [{
+        system: 'http://terminology.hl7.org/CodeSystem/claim-type',
+        code: claimData.claimType
+      }]
+    },
+    patient: {
+      reference: `Patient/${claimData.patient.id}`,
+      display: claimData.patient.name
+    },
+    insurer: {
+      reference: `Organization/${claimData.payerId}`
+    },
+    provider: {
+      reference: `Organization/${claimData.providerId}`
+    },
+    diagnosis: [{
+      sequence: 1,
+      diagnosisCodeableConcept: {
+        coding: [{
+          system: 'http://hl7.org/fhir/sid/icd-10',
+          code: claimData.diagnosis.code,
+          display: claimData.diagnosis.display
+        }]
+      }
+    }],
+    item: normalizedServices.map((service, index) => ({
+      sequence: index + 1,
+      productOrService: {
+        coding: [{
+          system: 'http://sbs.sa/coding/services',
+          code: service.sbsCode,
+          display: service.description
+        }]
+      },
+      servicedDate: service.serviceDate,
+      quantity: {
+        value: service.quantity
+      },
+      unitPrice: {
+        value: service.unitPrice,
+        currency: 'SAR'
+      },
+      extensions: {
+        internal_code: service.internalCode,
+        confidence: service.confidence
+      }
+    })),
+    facility_id: 1
+  };
+}
+
+// ============================================================================
+// SIMULATION PROXY ENDPOINTS
+// ============================================================================
+
+app.get('/api/simulation/service-catalog', async (req, res) => {
+  try {
+    const response = await axios.get(`${SBS_SIMULATION_URL}/service-catalog`, { timeout: 10000 });
+    res.json(response.data);
+  } catch (error) {
+    console.error('❌ Failed to fetch service catalog:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch service catalog',
+      message: error.message
+    });
+  }
+});
+
+app.get('/api/simulation/bundles', async (req, res) => {
+  try {
+    const response = await axios.get(`${SBS_SIMULATION_URL}/bundles`, { timeout: 10000 });
+    res.json(response.data);
+  } catch (error) {
+    console.error('❌ Failed to fetch bundles:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch bundles',
+      message: error.message
+    });
+  }
+});
+
+app.get('/api/simulation/scenarios', async (req, res) => {
+  try {
+    const response = await axios.get(`${SBS_SIMULATION_URL}/scenarios`, { timeout: 10000 });
+    res.json(response.data);
+  } catch (error) {
+    console.error('❌ Failed to fetch scenarios:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch scenarios',
+      message: error.message
+    });
+  }
+});
+
+app.post('/api/simulation/generate-test-claim', async (req, res) => {
+  try {
+    const response = await axios.post(`${SBS_SIMULATION_URL}/generate-test-claim`, req.body, { timeout: 10000 });
+    res.json(response.data);
+  } catch (error) {
+    console.error('❌ Failed to generate test claim:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate test claim',
+      message: error.message
+    });
+  }
+});
+
 // 404 handler for API routes
 app.use('/api/*', (req, res) => {
   console.log(`⚠️ 404 Not Found: ${req.method} ${req.path}`);
