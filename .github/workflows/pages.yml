@@ -1,10 +1,13 @@
-name: Deploy SBS Landing to GitHub Pages
+name: Deploy GIVC Health Frontend to GitHub Pages
 
 on:
   push:
     branches: [main]
     paths:
-      - "sbs-landing/public/**"
+      - "sbs-landing/src/**"
+      - "sbs-landing/index.html"
+      - "sbs-landing/package.json"
+      - "sbs-landing/vite.config.js"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -24,12 +27,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Configure API URL if provided
-        if: ${{ vars.PAGES_API_BASE_URL != '' }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: sbs-landing/package-lock.json
+
+      - name: Install dependencies
+        working-directory: sbs-landing
+        run: npm ci
+
+      - name: Configure API URL
+        working-directory: sbs-landing
         run: |
-          # Inject the API URL into config.js without overwriting the whole file
-          # This adds a script tag at the beginning of index.html
-          sed -i 's|</head>|<script>window.SBS_API_URL = "${{ vars.PAGES_API_BASE_URL }}";</script></head>|' sbs-landing/public/index.html
+          # Inject the API URL into index.html before build
+          if [ -n "${{ vars.PAGES_API_BASE_URL }}" ]; then
+            sed -i "s|window.SBS_API_URL = window.SBS_API_URL \|\| 'http://localhost:3000';|window.SBS_API_URL = '${{ vars.PAGES_API_BASE_URL }}';|" index.html
+          fi
+
+      - name: Build React app
+        working-directory: sbs-landing
+        run: npm run build
+        env:
+          NODE_ENV: production
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -37,7 +58,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: sbs-landing/public
+          path: sbs-landing/dist
 
   deploy:
     needs: build

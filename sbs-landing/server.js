@@ -377,6 +377,50 @@ app.get('/api/metrics', (req, res) => {
   });
 });
 
+// Gemini AI proxy endpoint for GIVC Health frontend
+app.post('/api/gemini/generate', async (req, res) => {
+  try {
+    const { prompt, systemInstruction } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({ error: 'Prompt is required' });
+    }
+
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    if (!GEMINI_API_KEY) {
+      console.error('GEMINI_API_KEY not configured');
+      return res.status(503).json({ error: 'AI service not configured' });
+    }
+
+    const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+    const payload = {
+      contents: [{ parts: [{ text: prompt }] }],
+      systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined
+    };
+
+    const response = await axios.post(url, payload, {
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 30000
+    });
+
+    const generatedText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!generatedText) {
+      throw new Error('No text generated from Gemini API');
+    }
+
+    res.json({ text: generatedText });
+  } catch (error) {
+    console.error('Gemini API Error:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      error: 'Failed to generate content',
+      details: error.response?.data?.error?.message || error.message
+    });
+  }
+});
+
 // Main claim submission endpoint with comprehensive workflow tracking
 app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
   let claimId = null;
