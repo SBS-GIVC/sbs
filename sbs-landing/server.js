@@ -416,7 +416,10 @@ app.post('/api/gemini/generate', async (req, res) => {
 
     res.json({ text: generatedText });
   } catch (error) {
-    console.error('Gemini API Error:', error.response?.data || error.message);
+    console.error('Gemini API Error:', {
+      status: error.response?.status,
+      message: error.response?.data?.error?.message || error.message
+    });
     res.status(error.response?.status || 500).json({
       error: 'Failed to generate content',
       details: error.response?.data?.error?.message || error.message
