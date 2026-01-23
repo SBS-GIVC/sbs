@@ -103,8 +103,18 @@ export default function App() {
       }
 
       setPipelineStatus('signing');
+      
+      // Sanitize and limit claim data for AI analysis
+      const claimSummary = {
+        resourceType: finalClaim.resourceType,
+        status: finalClaim.status,
+        itemCount: finalClaim.items?.length || 0,
+        totalValue: finalClaim.total?.value || 0,
+        currency: finalClaim.total?.currency || 'SAR'
+      };
+      
       const risk = await callGemini(
-        `Predict denial risk for: ${JSON.stringify(finalClaim)}. Language: ${lang === 'ar' ? 'Arabic' : 'English'}`
+        `Predict denial risk for claim summary: ${JSON.stringify(claimSummary)}. Language: ${lang === 'ar' ? 'Arabic' : 'English'}`
       );
       setDenialRisk(risk);
       setPipelineStatus('submitted');
