@@ -16,12 +16,7 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Check for docker compose (modern) or docker-compose (legacy)
-if docker compose version &> /dev/null; then
-    DOCKER_COMPOSE="docker compose"
-elif command -v docker-compose &> /dev/null; then
-    DOCKER_COMPOSE="docker-compose"
-else
+if ! command -v docker-compose &> /dev/null; then
     echo "❌ Docker Compose is not installed. Please install Docker Compose first."
     exit 1
 fi
@@ -49,11 +44,11 @@ chmod 700 certs
 
 # Build Docker images
 echo "🔨 Building Docker images..."
-$DOCKER_COMPOSE build
+docker-compose build
 
 # Start services
 echo "🚀 Starting services..."
-$DOCKER_COMPOSE up -d
+docker-compose up -d
 
 # Wait for services to be ready
 echo "⏳ Waiting for services to start..."
@@ -98,7 +93,7 @@ if [ "$all_healthy" = true ]; then
     echo ""
     echo "  2. Access n8n and import workflow:"
     echo "     - Navigate to http://localhost:5678"
-    echo "     - Import: sbs-landing/n8n-workflow-sbs-complete.json"
+    echo "     - Import: n8n-workflows/sbs-full-workflow.json"
     echo ""
     echo "  3. Test the integration:"
     echo "     curl -X POST http://localhost:8000/normalize \\"
@@ -106,14 +101,14 @@ if [ "$all_healthy" = true ]; then
     echo "       -d '{\"facility_id\":1,\"internal_code\":\"LAB-CBC-01\",\"description\":\"CBC Test\"}'"
     echo ""
     echo "Documentation: ./docs/"
-    echo "Logs: $DOCKER_COMPOSE logs -f"
+    echo "Logs: docker-compose logs -f"
     echo ""
 else
     echo "=========================================="
     echo "⚠️  Some services failed to start"
     echo "=========================================="
     echo ""
-    echo "Check logs with: $DOCKER_COMPOSE logs"
+    echo "Check logs with: docker-compose logs"
     echo ""
     exit 1
 fi

@@ -4,6 +4,7 @@ Test Suite for Normalizer Service
 
 import pytest
 import requests
+import json
 
 BASE_URL = "http://localhost:8000"
 
@@ -23,10 +24,10 @@ def test_normalize_with_local_mapping():
         "internal_code": "LAB-CBC-01",
         "description": "Complete Blood Count Test"
     }
-
+    
     response = requests.post(f"{BASE_URL}/normalize", json=payload)
     assert response.status_code == 200
-
+    
     data = response.json()
     assert "sbs_mapped_code" in data
     assert "official_description" in data
@@ -41,7 +42,7 @@ def test_normalize_invalid_facility():
         "internal_code": "INVALID-001",
         "description": "Invalid service"
     }
-
+    
     response = requests.post(f"{BASE_URL}/normalize", json=payload)
     # Should either return 404 or AI suggestion
     assert response.status_code in [200, 404]
@@ -53,7 +54,7 @@ def test_normalize_missing_fields():
         "facility_id": 1
         # Missing internal_code and description
     }
-
+    
     response = requests.post(f"{BASE_URL}/normalize", json=payload)
     assert response.status_code == 422  # Validation error
 

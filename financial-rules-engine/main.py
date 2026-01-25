@@ -5,7 +5,7 @@ Port: 8002
 """
 
 from fastapi import FastAPI, HTTPException, status, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any
 from decimal import Decimal
 import os
@@ -56,9 +56,9 @@ def get_facility_tier(facility_id: int) -> Optional[Dict]:
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-
+        
         query = """
-        SELECT
+        SELECT 
             f.facility_id,
             f.accreditation_tier,
             ptr.markup_pct,
@@ -67,15 +67,15 @@ def get_facility_tier(facility_id: int) -> Optional[Dict]:
         JOIN pricing_tier_rules ptr ON f.accreditation_tier = ptr.tier_level
         WHERE f.facility_id = %s AND f.is_active = TRUE
         """
-
+        
         cursor.execute(query, (facility_id,))
         result = cursor.fetchone()
-
+        
         cursor.close()
         conn.close()
-
+        
         return dict(result) if result else None
-
+        
     except Exception as e:
         print(f"Error fetching facility tier: {e}")
         return None
@@ -86,19 +86,19 @@ def get_sbs_standard_price(sbs_code: str) -> Optional[Decimal]:
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-
+        
         cursor.execute(
             "SELECT standard_price FROM sbs_master_catalogue WHERE sbs_id = %s AND is_active = TRUE",
             (sbs_code,)
         )
-
+        
         result = cursor.fetchone()
-
+        
         cursor.close()
         conn.close()
-
+        
         return Decimal(result['standard_price']) if result and result['standard_price'] else None
-
+        
     except Exception as e:
         print(f"Error fetching SBS price: {e}")
         return None
@@ -112,10 +112,10 @@ def check_for_bundles(item_codes: List[str]) -> Optional[Dict]:
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-
+        
         # Find bundles that contain all the provided codes
         query = """
-        SELECT
+        SELECT 
             sb.bundle_id,
             sb.bundle_code,
             sb.bundle_name,
@@ -130,15 +130,15 @@ def check_for_bundles(item_codes: List[str]) -> Optional[Dict]:
         ORDER BY matched_items DESC
         LIMIT 1
         """
-
+        
         cursor.execute(query, (item_codes,))
         result = cursor.fetchone()
-
+        
         cursor.close()
         conn.close()
-
+        
         return dict(result) if result else None
-
+        
     except Exception as e:
         print(f"Error checking bundles: {e}")
         return None
@@ -153,11 +153,11 @@ def apply_pricing_markup(base_price: Decimal, markup_pct: float) -> Decimal:
 def calculate_claim_total(items: List[Dict]) -> Decimal:
     """Calculate total claim amount from all items"""
     total = Decimal('0.00')
-
+    
     for item in items:
         if 'net' in item and 'value' in item['net']:
             total += Decimal(str(item['net']['value']))
-
+    
     return total
 
 
@@ -188,27 +188,27 @@ def health_check():
 async def validate_claim(request: Request):
     """
     Apply financial rules to a FHIR claim
-
+    
     Accepts either:
     - Direct FHIR claim: {"resourceType": "Claim", "facility_id": 1, ...}
     - Wrapped claim: {"claim": {"resourceType": "Claim", ...}}
-
+    
     Rules Applied:
     1. Calculate service bundles
     2. Apply facility tier markup
     3. Validate coverage limits
     4. Calculate net prices
     """
-
+    
     # Get the raw body
     body = await request.json()
-
+    
     # Handle both wrapped and unwrapped formats
     if "claim" in body:
         claim_data = body["claim"]
     else:
         claim_data = body
-
+    
     # Validate the claim data using Pydantic
     try:
         claim = FHIRClaim(**claim_data)
@@ -217,7 +217,7 @@ async def validate_claim(request: Request):
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Invalid claim data: {str(e)}"
         )
-
+    
     # Get facility pricing tier
     facility_info = get_facility_tier(claim.facility_id)
     if not facility_info:
@@ -225,9 +225,9 @@ async def validate_claim(request: Request):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Facility {claim.facility_id} not found or inactive"
         )
-
+    
     markup_pct = float(facility_info['markup_pct'])
-
+    
     # Extract SBS codes from claim items
     sbs_codes = []
     for item in claim.item:
@@ -235,19 +235,19 @@ async def validate_claim(request: Request):
             for coding in item['productOrService']['coding']:
                 if coding.get('system') == 'http://sbs.sa/coding/services':
                     sbs_codes.append(coding['code'])
-
+    
     # Check for applicable bundles
     bundle_info = check_for_bundles(sbs_codes)
-
+    
     # Process each item
     validated_items = []
     bundle_applied = False
-
+    
     if bundle_info and not bundle_applied:
         # Apply bundle pricing
         bundle_price = Decimal(str(bundle_info['total_allowed_price']))
         final_price = apply_pricing_markup(bundle_price, markup_pct)
-
+        
         # Create a single bundled item
         bundled_item = {
             "sequence": 1,
@@ -271,7 +271,7 @@ async def validate_claim(request: Request):
         }
         validated_items.append(bundled_item)
         bundle_applied = True
-
+        
     else:
         # Apply individual pricing
         for idx, item in enumerate(claim.item, start=1):
@@ -281,12 +281,12 @@ async def validate_claim(request: Request):
                     if coding.get('system') == 'http://sbs.sa/coding/services':
                         sbs_code = coding['code']
                         break
-
+                
                 if sbs_code:
                     base_price = get_sbs_standard_price(sbs_code)
                     if base_price:
                         final_price = apply_pricing_markup(base_price, markup_pct)
-
+                        
                         validated_item = {
                             "sequence": idx,
                             "productOrService": item['productOrService'],
@@ -305,10 +305,10 @@ async def validate_claim(request: Request):
                             }
                         }
                         validated_items.append(validated_item)
-
+    
     # Calculate total
     total_amount = calculate_claim_total(validated_items)
-
+    
     # Build response
     return ValidatedClaim(
         resourceType="Claim",

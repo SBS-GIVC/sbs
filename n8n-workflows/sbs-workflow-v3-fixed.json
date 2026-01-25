@@ -1,0 +1,134 @@
+{
+  "name": "SBS Integration - Full Workflow (Fixed)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sbs-gateway",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook: HIS Claim",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "webhookId": "sbs-his-webhook"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://sbs-normalizer:8000/normalize",
+        "authentication": "none",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParametersJson": "={{ JSON.stringify({\n  facility_id: $json.body.facility_id,\n  internal_code: $json.body.service_code,\n  description: $json.body.service_desc\n}) }}",
+        "options": {}
+      },
+      "id": "normalizer-node",
+      "name": "AI Normalizer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const normalized = $input.item.json;\nconst rawClaim = $('Webhook: HIS Claim').item.json.body;\n\nreturn {\n  json: {\n    resourceType: \"Claim\",\n    status: \"active\",\n    facility_id: rawClaim.facility_id,\n    patient: {\n      reference: rawClaim.patient_id || \"Patient/12345\"\n    },\n    provider: {\n      reference: `Organization/${rawClaim.facility_id}`\n    },\n    item: [{\n      sequence: 1,\n      productOrService: {\n        coding: [{\n          system: \"http://sbs.sa/coding/services\",\n          code: normalized.sbs_mapped_code,\n          display: normalized.official_description\n        }]\n      }\n    }]\n  }\n};"
+      },
+      "id": "fhir-builder-node",
+      "name": "Build FHIR",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://sbs-financial-rules:8002/validate",
+        "authentication": "none",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParametersJson": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "financial-rules-node",
+      "name": "Financial Rules",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://sbs-signer:8001/sign",
+        "authentication": "none",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParametersJson": "={{ JSON.stringify({\n  payload: $json,\n  facility_id: $('Webhook: HIS Claim').item.json.body.facility_id\n}) }}",
+        "options": {}
+      },
+      "id": "signer-node",
+      "name": "Digital Signer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://sbs-nphies-bridge:8003/submit-claim",
+        "authentication": "none",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParametersJson": "={{ JSON.stringify({\n  facility_id: $('Webhook: HIS Claim').item.json.body.facility_id,\n  fhir_payload: $('Financial Rules').item.json,\n  signature: $json.signature,\n  resource_type: \"Claim\"\n}) }}",
+        "options": {}
+      },
+      "id": "nphies-bridge-node",
+      "name": "NPHIES Submission",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "response-node",
+      "name": "Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1560, 300]
+    }
+  ],
+  "connections": {
+    "Webhook: HIS Claim": {
+      "main": [[{"node": "AI Normalizer", "type": "main", "index": 0}]]
+    },
+    "AI Normalizer": {
+      "main": [[{"node": "Build FHIR", "type": "main", "index": 0}]]
+    },
+    "Build FHIR": {
+      "main": [[{"node": "Financial Rules", "type": "main", "index": 0}]]
+    },
+    "Financial Rules": {
+      "main": [[{"node": "Digital Signer", "type": "main", "index": 0}]]
+    },
+    "Digital Signer": {
+      "main": [[{"node": "NPHIES Submission", "type": "main", "index": 0}]]
+    },
+    "NPHIES Submission": {
+      "main": [[{"node": "Response", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-14T09:20:00.000Z",
+  "versionId": "2"
+}

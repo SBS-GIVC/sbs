@@ -2,23 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SBS Integration Engine - BrainSAIT برينسايت</title>
     <meta name="description" content="The Ultimate Saudi Billing System Integration Engine - Powered by BrainSAIT">
-    
-    <!-- PWA Meta Tags -->
-    <link rel="manifest" href="./manifest.json">
-    <meta name="theme-color" content="#10b981">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="SBS Engine">
-    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
-    
-    <!-- Open Graph / Social Media -->
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="SBS Integration Engine">
-    <meta property="og:description" content="AI-powered bridge between your hospital system and NPHIES">
-    <meta property="og:image" content="icons/icon-512x512.png">
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -54,46 +40,6 @@
             transform: scale(1.02);
         }
         
-        /* Form input focus styles */
-        input:focus, select:focus, textarea:focus {
-            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
-            transition: box-shadow 0.2s ease;
-        }
-        
-        /* Button press effect */
-        button:active:not(:disabled) {
-            transform: scale(0.98);
-        }
-        
-        /* Modal animation */
-        .modal-enter {
-            animation: modalEnter 0.3s ease-out forwards;
-        }
-        
-        @keyframes modalEnter {
-            from {
-                opacity: 0;
-                transform: translateY(-20px) scale(0.95);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-        
-        /* Confetti animation */
-        @keyframes confetti-fall {
-            0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
-            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-        }
-        
-        .confetti {
-            position: fixed;
-            width: 10px;
-            height: 10px;
-            animation: confetti-fall 3s ease-in-out forwards;
-        }
-        
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
@@ -120,53 +66,7 @@
         // Full standalone vanilla JS implementation
         // to be continued in next file due to size...
     </script>
-
-    <script src="./config.js"></script>
-    <script src="./api-client.js"></script>
-    <script src="./landing.js"></script>
     
-    <!-- Register Service Worker -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then((registration) => {
-                        console.log('✅ ServiceWorker registered:', registration.scope);
-                        
-                        // Check for updates periodically
-                        setInterval(() => {
-                            registration.update();
-                        }, 60 * 60 * 1000); // Every hour
-                        
-                        // Listen for updates
-                        registration.addEventListener('updatefound', () => {
-                            const newWorker = registration.installing;
-                            newWorker.addEventListener('statechange', () => {
-                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    // New content available, notify user
-                                    if (typeof toast !== 'undefined') {
-                                        toast.info('New version available! Refresh to update.');
-                                    }
-                                }
-                            });
-                        });
-                    })
-                    .catch((error) => {
-                        console.log('⚠️ ServiceWorker registration failed:', error);
-                    });
-            });
-        }
-        
-        // Handle URL parameters for actions
-        window.addEventListener('DOMContentLoaded', () => {
-            const params = new URLSearchParams(window.location.search);
-            const action = params.get('action');
-            if (action === 'submit' && typeof app !== 'undefined') {
-                setTimeout(() => app.openClaimModal(), 500);
-            } else if (action === 'track' && typeof app !== 'undefined') {
-                setTimeout(() => app.openTrackingModal(), 500);
-            }
-        });
-    </script>
+    <script src="/landing.js"></script>
 </body>
 </html>

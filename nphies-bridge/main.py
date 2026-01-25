@@ -74,19 +74,19 @@ def log_transaction(
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-
+        
         txn_uuid = str(uuid.uuid4())
         txn_status = "submitted" if http_status and http_status < 400 else "error"
-
+        
         if http_status and http_status >= 200 and http_status < 300:
             txn_status = "accepted"
         elif http_status and http_status >= 400:
             txn_status = "rejected"
-
+        
         cursor.execute("""
-            INSERT INTO nphies_transactions
+            INSERT INTO nphies_transactions 
             (facility_id, transaction_uuid, request_type, fhir_payload, signature,
-             nphies_transaction_id, http_status_code, response_payload, status,
+             nphies_transaction_id, http_status_code, response_payload, status, 
              error_message, submission_timestamp, response_timestamp)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING transaction_id
@@ -104,16 +104,16 @@ def log_transaction(
             datetime.utcnow(),
             datetime.utcnow() if response_data else None
         ))
-
-        # Consume result to ensure query completed
-        cursor.fetchone()
-
+        
+        result = cursor.fetchone()
+        transaction_id = result['transaction_id']
+        
         conn.commit()
         cursor.close()
         conn.close()
-
+        
         return txn_uuid
-
+        
     except Exception as e:
         print(f"Error logging transaction: {e}")
         return str(uuid.uuid4())  # Return UUID even if logging fails
@@ -129,42 +129,42 @@ async def submit_to_nphies_with_retry(
     Submit request to NPHIES with exponential backoff retry logic
     Returns (response_dict, status_code, error_message)
     """
-
+    
     headers = {
         "Content-Type": "application/fhir+json",
         "Accept": "application/fhir+json",
         "X-NPHIES-Signature": signature,
         "Authorization": f"Bearer {os.getenv('NPHIES_API_KEY', '')}"
     }
-
+    
     url = f"{NPHIES_BASE_URL}/{endpoint}"
-
+    
     async with httpx.AsyncClient(timeout=NPHIES_TIMEOUT) as client:
         try:
             response = await client.post(url, json=payload, headers=headers)
-
+            
             # Success
             if response.status_code in [200, 201]:
                 return response.json(), response.status_code, None
-
+            
             # Retriable errors (500s, 429)
             if response.status_code >= 500 or response.status_code == 429:
                 if retry_count < MAX_RETRIES:
                     wait_time = 2 ** retry_count  # Exponential backoff
                     await asyncio.sleep(wait_time)
                     return await submit_to_nphies_with_retry(endpoint, payload, signature, retry_count + 1)
-
+            
             # Client errors (4xx)
             error_message = f"HTTP {response.status_code}: {response.text}"
             return response.json() if response.text else {}, response.status_code, error_message
-
+            
         except httpx.TimeoutException:
             if retry_count < MAX_RETRIES:
                 wait_time = 2 ** retry_count
                 await asyncio.sleep(wait_time)
                 return await submit_to_nphies_with_retry(endpoint, payload, signature, retry_count + 1)
             return {}, None, f"Timeout after {MAX_RETRIES} retries"
-
+            
         except Exception as e:
             error_message = f"Connection error: {str(e)}"
             if retry_count < MAX_RETRIES:
@@ -206,32 +206,32 @@ def health_check():
 async def submit_claim(submission: ClaimSubmission, background_tasks: BackgroundTasks):
     """
     Submit a signed FHIR Claim to NPHIES
-
+    
     Features:
     - Automatic retry with exponential backoff
     - Transaction logging for audit
     - Error handling and reporting
     """
-
+    
     # Validate payload structure
     if submission.fhir_payload.get('resourceType') != 'Claim':
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid FHIR payload: resourceType must be 'Claim'"
         )
-
+    
     # Submit to NPHIES
     response_data, http_status, error_msg = await submit_to_nphies_with_retry(
         endpoint="Claim",
         payload=submission.fhir_payload,
         signature=submission.signature
     )
-
+    
     # Extract NPHIES transaction ID if available
     nphies_txn_id = None
     if response_data and 'id' in response_data:
         nphies_txn_id = response_data['id']
-
+    
     # Log transaction
     txn_uuid = log_transaction(
         facility_id=submission.facility_id,
@@ -243,7 +243,7 @@ async def submit_claim(submission: ClaimSubmission, background_tasks: Background
         nphies_txn_id=nphies_txn_id,
         error_msg=error_msg
     )
-
+    
     # Determine status
     if http_status and 200 <= http_status < 300:
         status_msg = "submitted_successfully"
@@ -254,7 +254,7 @@ async def submit_claim(submission: ClaimSubmission, background_tasks: Background
     else:
         status_msg = "error"
         message = f"Error submitting claim: {error_msg or 'Unknown error'}"
-
+    
     return SubmissionResponse(
         transaction_id=nphies_txn_id or "N/A",
         transaction_uuid=txn_uuid,
@@ -270,15 +270,15 @@ async def submit_preauth(submission: ClaimSubmission):
     """
     Submit a pre-authorization request to NPHIES
     """
-
+    
     response_data, http_status, error_msg = await submit_to_nphies_with_retry(
         endpoint="Claim/$submit",
         payload=submission.fhir_payload,
         signature=submission.signature
     )
-
+    
     nphies_txn_id = response_data.get('id') if response_data else None
-
+    
     txn_uuid = log_transaction(
         facility_id=submission.facility_id,
         request_type="PreAuth",
@@ -289,7 +289,7 @@ async def submit_preauth(submission: ClaimSubmission):
         nphies_txn_id=nphies_txn_id,
         error_msg=error_msg
     )
-
+    
     return SubmissionResponse(
         transaction_id=nphies_txn_id or "N/A",
         transaction_uuid=txn_uuid,
@@ -308,9 +308,9 @@ def get_transaction_status(transaction_uuid: str):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-
+        
         cursor.execute("""
-            SELECT
+            SELECT 
                 transaction_id,
                 transaction_uuid,
                 request_type,
@@ -323,20 +323,20 @@ def get_transaction_status(transaction_uuid: str):
             FROM nphies_transactions
             WHERE transaction_uuid = %s
         """, (transaction_uuid,))
-
+        
         result = cursor.fetchone()
-
+        
         cursor.close()
         conn.close()
-
+        
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Transaction {transaction_uuid} not found"
             )
-
+        
         return dict(result)
-
+        
     except HTTPException:
         raise
     except Exception as e:
@@ -354,9 +354,9 @@ def get_facility_transactions(facility_id: int, limit: int = 50):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-
+        
         cursor.execute("""
-            SELECT
+            SELECT 
                 transaction_uuid,
                 request_type,
                 status,
@@ -368,14 +368,14 @@ def get_facility_transactions(facility_id: int, limit: int = 50):
             ORDER BY submission_timestamp DESC
             LIMIT %s
         """, (facility_id, limit))
-
+        
         results = cursor.fetchall()
-
+        
         cursor.close()
         conn.close()
-
+        
         return [dict(row) for row in results]
-
+        
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

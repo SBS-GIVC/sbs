@@ -1,0 +1,225 @@
+{
+  "name": "SBS Integration - Full Workflow (v2.3.4 Compatible)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sbs-gateway",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Webhook: HIS Claim",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "sbs-gateway"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://sbs-normalizer:8000/normalize",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "facility_id",
+              "value": "={{ $json.body.facility_id }}"
+            },
+            {
+              "name": "internal_code",
+              "value": "={{ $json.body.service_code }}"
+            },
+            {
+              "name": "description",
+              "value": "={{ $json.body.service_desc }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-normalizer",
+      "name": "AI Normalizer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const normalizedData = $input.item.json;\nconst webhookData = $('Webhook: HIS Claim').item.json.body;\n\nreturn {\n  resourceType: \"Claim\",\n  status: \"active\",\n  type: {\n    coding: [{\n      system: \"http://terminology.hl7.org/CodeSystem/claim-type\",\n      code: \"institutional\"\n    }]\n  },\n  use: \"claim\",\n  patient: {\n    reference: webhookData.patient_id\n  },\n  created: new Date().toISOString(),\n  provider: {\n    reference: `Organization/${webhookData.facility_id}`\n  },\n  priority: {\n    coding: [{\n      system: \"http://terminology.hl7.org/CodeSystem/processpriority\",\n      code: \"normal\"\n    }]\n  },\n  item: [{\n    sequence: 1,\n    productOrService: {\n      coding: [{\n        system: \"http://sbs.sa/coding/services\",\n        code: normalizedData.sbs_mapped_code,\n        display: normalizedData.official_description\n      }]\n    },\n    quantity: {\n      value: webhookData.quantity || 1\n    },\n    unitPrice: {\n      value: webhookData.unit_price || 0,\n      currency: \"SAR\"\n    }\n  }]\n};"
+      },
+      "id": "code-fhir",
+      "name": "Build FHIR",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://sbs-financial-rules:8002/validate",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "claim",
+              "value": "={{ $json }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-financial",
+      "name": "Financial Rules",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://sbs-signer:8001/sign",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "payload",
+              "value": "={{ $json }}"
+            },
+            {
+              "name": "facility_id",
+              "value": "={{ $('Webhook: HIS Claim').item.json.body.facility_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-signer",
+      "name": "Digital Signer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://sbs-nphies-bridge:8003/submit",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "fhir_payload",
+              "value": "={{ $('Financial Rules').item.json }}"
+            },
+            {
+              "name": "signature",
+              "value": "={{ $json.signature }}"
+            },
+            {
+              "name": "facility_id",
+              "value": "={{ $('Webhook: HIS Claim').item.json.body.facility_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-nphies",
+      "name": "NPHIES Submission",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond-1",
+      "name": "Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1560, 300]
+    }
+  ],
+  "connections": {
+    "Webhook: HIS Claim": {
+      "main": [
+        [
+          {
+            "node": "AI Normalizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Normalizer": {
+      "main": [
+        [
+          {
+            "node": "Build FHIR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build FHIR": {
+      "main": [
+        [
+          {
+            "node": "Financial Rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Financial Rules": {
+      "main": [
+        [
+          {
+            "node": "Digital Signer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Digital Signer": {
+      "main": [
+        [
+          {
+            "node": "NPHIES Submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NPHIES Submission": {
+      "main": [
+        [
+          {
+            "node": "Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2026-01-14T09:50:00.000Z",
+  "versionId": "1"
+}

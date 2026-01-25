@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
 from typing import Dict, Any
 import json
+import hashlib
 import base64
 import os
 from cryptography.hazmat.primitives import hashes, serialization
@@ -56,9 +57,9 @@ def get_facility_certificate(facility_id: int) -> Dict:
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-
+        
         query = """
-        SELECT
+        SELECT 
             cert_id,
             serial_number,
             private_key_path,
@@ -66,28 +67,28 @@ def get_facility_certificate(facility_id: int) -> Dict:
             valid_from,
             valid_until
         FROM facility_certificates
-        WHERE facility_id = %s
+        WHERE facility_id = %s 
           AND cert_type IN ('signing', 'both')
           AND is_active = TRUE
           AND valid_until > CURRENT_DATE
         ORDER BY valid_until DESC
         LIMIT 1
         """
-
+        
         cursor.execute(query, (facility_id,))
         result = cursor.fetchone()
-
+        
         cursor.close()
         conn.close()
-
+        
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"No valid signing certificate found for facility {facility_id}"
             )
-
+        
         return dict(result)
-
+        
     except HTTPException:
         raise
     except Exception as e:
@@ -106,16 +107,16 @@ def load_private_key(key_path: str) -> rsa.RSAPrivateKey:
         # Check if path is absolute or relative
         if not os.path.isabs(key_path):
             key_path = os.path.join(os.getenv("CERT_BASE_PATH", "/certs"), key_path)
-
+        
         with open(key_path, "rb") as key_file:
             private_key = serialization.load_pem_private_key(
                 key_file.read(),
                 password=os.getenv("CERT_PASSWORD", "").encode() if os.getenv("CERT_PASSWORD") else None,
                 backend=default_backend()
             )
-
+        
         return private_key
-
+        
     except FileNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -131,7 +132,7 @@ def load_private_key(key_path: str) -> rsa.RSAPrivateKey:
 def canonicalize_payload(payload: Dict[str, Any]) -> str:
     """
     Convert FHIR JSON to canonical string format
-
+    
     Steps:
     1. Sort all keys alphabetically
     2. Remove whitespace
@@ -149,7 +150,7 @@ def canonicalize_payload(payload: Dict[str, Any]) -> str:
 def sign_payload(canonical_string: str, private_key: rsa.RSAPrivateKey) -> str:
     """
     Sign the canonical payload using SHA-256 with RSA
-
+    
     Steps:
     1. Hash the canonical string using SHA-256
     2. Sign the hash using RSA private key
@@ -158,19 +159,19 @@ def sign_payload(canonical_string: str, private_key: rsa.RSAPrivateKey) -> str:
     try:
         # Create SHA-256 hash
         message_bytes = canonical_string.encode('utf-8')
-
+        
         # Sign using RSA with PKCS#1 v1.5 padding (NPHIES standard)
         signature = private_key.sign(
             message_bytes,
             padding.PKCS1v15(),
             hashes.SHA256()
         )
-
+        
         # Encode as Base64
         signature_b64 = base64.b64encode(signature).decode('utf-8')
-
+        
         return signature_b64
-
+        
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -183,47 +184,16 @@ def generate_test_keypair(facility_id: int) -> tuple:
     Generate a test RSA keypair for development/sandbox
     WARNING: Only use in non-production environments
     """
-    # Ensure facility_id is a non-negative integer
-    try:
-        facility_id_int = int(facility_id)
-    except (TypeError, ValueError):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="facility_id must be an integer"
-        )
-    if facility_id_int < 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="facility_id must be non-negative"
-        )
-
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048,
         backend=default_backend()
     )
-
-    # Create certificates directory if it doesn't exist, ensuring it stays under CERT_BASE_PATH
-    env_cert_base = os.getenv("CERT_BASE_PATH")
-    base_cert_dir = os.path.abspath(env_cert_base.strip() if env_cert_base and env_cert_base.strip() else "/certs")
-    cert_dir = os.path.abspath(os.path.normpath(os.path.join(base_cert_dir, f"facility_{facility_id_int}")))
-
-    # Verify that the constructed directory is within the base certificate directory
-    try:
-        common_prefix = os.path.commonpath([base_cert_dir, cert_dir])
-    except ValueError:
-        # Handle edge cases where paths cannot be compared (e.g., different drives on Windows)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid certificate path configuration"
-        )
-    if common_prefix != base_cert_dir:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid facility_id resulting in unsafe certificate directory"
-        )
+    
+    # Create certificates directory if it doesn't exist
+    cert_dir = os.path.join(os.getenv("CERT_BASE_PATH", "/certs"), f"facility_{facility_id}")
     os.makedirs(cert_dir, exist_ok=True)
-
+    
     # Save private key
     private_key_path = os.path.join(cert_dir, "private_key.pem")
     with open(private_key_path, "wb") as f:
@@ -232,7 +202,7 @@ def generate_test_keypair(facility_id: int) -> tuple:
             format=serialization.PrivateFormat.PKCS8,
             encryption_algorithm=serialization.NoEncryption()
         ))
-
+    
     # Save public key
     public_key = private_key.public_key()
     public_key_path = os.path.join(cert_dir, "public_key.pem")
@@ -241,7 +211,7 @@ def generate_test_keypair(facility_id: int) -> tuple:
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo
         ))
-
+    
     return private_key_path, public_key_path
 
 
@@ -273,7 +243,7 @@ def health_check():
 def sign_claim(request: SignRequest):
     """
     Sign a FHIR payload with facility's digital certificate
-
+    
     Process:
     1. Retrieve facility's signing certificate
     2. Load private key
@@ -282,19 +252,19 @@ def sign_claim(request: SignRequest):
     5. Sign with RSA private key
     6. Return Base64-encoded signature
     """
-
+    
     # Get facility certificate
     cert_info = get_facility_certificate(request.facility_id)
-
+    
     # Load private key
     private_key = load_private_key(cert_info['private_key_path'])
-
+    
     # Canonicalize payload
     canonical_string = canonicalize_payload(request.payload)
-
+    
     # Sign the payload
     signature = sign_payload(canonical_string, private_key)
-
+    
     # Return signature with metadata
     return SignResponse(
         signature=signature,
@@ -310,26 +280,26 @@ def generate_test_certificate(facility_id: int):
     Generate test certificate for sandbox environment
     WARNING: Only for development/testing
     """
-
+    
     if os.getenv("NPHIES_ENV", "sandbox") == "production":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cannot generate test certificates in production environment"
         )
-
+    
     try:
         private_path, public_path = generate_test_keypair(facility_id)
-
+        
         # Insert into database
         conn = get_db_connection()
         cursor = conn.cursor()
-
+        
         cursor.execute("""
-            INSERT INTO facility_certificates
-            (facility_id, cert_type, serial_number, private_key_path, public_cert_path,
+            INSERT INTO facility_certificates 
+            (facility_id, cert_type, serial_number, private_key_path, public_cert_path, 
              valid_from, valid_until, is_active)
             VALUES (%s, %s, %s, %s, %s, CURRENT_DATE, CURRENT_DATE + INTERVAL '1 year', TRUE)
-            ON CONFLICT (facility_id, cert_type, serial_number)
+            ON CONFLICT (facility_id, cert_type, serial_number) 
             DO UPDATE SET is_active = TRUE
         """, (
             facility_id,
@@ -338,11 +308,11 @@ def generate_test_certificate(facility_id: int):
             private_path,
             public_path
         ))
-
+        
         conn.commit()
         cursor.close()
         conn.close()
-
+        
         return {
             "status": "success",
             "message": "Test certificate generated",
@@ -350,7 +320,7 @@ def generate_test_certificate(facility_id: int):
             "public_key_path": public_path,
             "expires": "1 year from now"
         }
-
+        
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -365,11 +335,11 @@ def verify_certificate(facility_id: int):
     """
     try:
         cert_info = get_facility_certificate(facility_id)
-
+        
         # Check if certificate is expired
         valid_until = cert_info['valid_until']
         is_expired = valid_until < datetime.now().date()
-
+        
         return {
             "facility_id": facility_id,
             "certificate_serial": cert_info['serial_number'],
@@ -378,7 +348,7 @@ def verify_certificate(facility_id: int):
             "is_expired": is_expired,
             "status": "invalid" if is_expired else "valid"
         }
-
+        
     except HTTPException as e:
         return {
             "facility_id": facility_id,

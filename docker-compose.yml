@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   # PostgreSQL Database
@@ -116,45 +115,23 @@ services:
     networks:
       - sbs-network
 
-  # Simulation Service (for testing)
-  simulation-service:
-    build:
-      context: ./simulation-service
-      dockerfile: Dockerfile
-    container_name: sbs-simulation
-    environment:
-      - PYTHONUNBUFFERED=1
-    ports:
-      - "8004:8004"
-    restart: unless-stopped
-    networks:
-      - sbs-network
-
   # n8n Workflow Engine
   n8n:
     image: n8nio/n8n:latest
     container_name: sbs-n8n
     environment:
       - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-changeme}
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-changeme}
       - N8N_HOST=${N8N_HOST:-localhost}
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
-      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
-      - GENERIC_TIMEZONE=${TIMEZONE:-Asia/Riyadh}
-      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL:-http://localhost:5678}
+      - WEBHOOK_URL=http://n8n:5678/
     ports:
       - "5678:5678"
     volumes:
       - n8n_data:/home/node/.n8n
-      - ./sbs-landing/n8n-workflow-sbs-complete.json:/home/node/.n8n/workflows/sbs-complete-pipeline.json:ro
-    depends_on:
-      - normalizer-service
-      - financial-rules-engine
-      - signer-service
-      - nphies-bridge
-      - simulation-service
+      - ./n8n-workflows:/workflows
     restart: unless-stopped
     networks:
       - sbs-network
