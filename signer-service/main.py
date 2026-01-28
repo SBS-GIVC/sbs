@@ -58,6 +58,12 @@ class RateLimiter:
                 self.requests[identifier] = deque()
             while self.requests[identifier] and self.requests[identifier][0] < now - self.time_window:
                 self.requests[identifier].popleft()
+            
+            # Clean up empty entries to prevent memory leak
+            if not self.requests[identifier]:
+                del self.requests[identifier]
+                return True
+                
             if len(self.requests[identifier]) < self.max_requests:
                 self.requests[identifier].append(now)
                 return True
