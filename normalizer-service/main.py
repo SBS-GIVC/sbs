@@ -34,13 +34,14 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# CORS middleware
+# CORS middleware - Restrict to allowed origins
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
 )
 
 # Database connection pool
@@ -136,14 +137,35 @@ class InternalClaimItem(BaseModel):
     
     @validator('internal_code')
     def validate_code(cls, v):
-        # Prevent SQL injection attempts
-        if any(char in v for char in [';', '--', '/*', '*/']):
-            raise ValueError('Invalid characters in code')
+        import re
+        # Prevent SQL injection and command injection attempts
+        dangerous_patterns = [
+            r';', r'--', r'/\*', r'\*/', r'\\', r'\x00',  # SQL injection
+            r'\$\(', r'`', r'\|', r'&&', r'\|\|',  # Command injection
+            r'<script', r'javascript:', r'data:',  # XSS
+            r'\.\./', r'\.\.\\',  # Path traversal
+        ]
+        v_lower = v.lower()
+        for pattern in dangerous_patterns:
+            if re.search(pattern, v_lower):
+                raise ValueError('Invalid characters in code')
+        # Only allow alphanumeric, hyphen, underscore, and period
+        if not re.match(r'^[a-zA-Z0-9_\-\.]+$', v):
+            raise ValueError('Code must contain only alphanumeric characters, hyphens, underscores, and periods')
         return v.strip()
     
     @validator('description')
     def validate_description(cls, v):
-        return v.strip()
+        import re
+        # Sanitize description - remove potentially dangerous content
+        dangerous_patterns = [
+            r'<script.*?>.*?</script>', r'javascript:', r'on\w+\s*=',  # XSS
+            r'\.\./', r'\.\.\\',  # Path traversal
+        ]
+        v_clean = v
+        for pattern in dangerous_patterns:
+            v_clean = re.sub(pattern, '', v_clean, flags=re.IGNORECASE)
+        return v_clean.strip()
 
 
 class NormalizedResponse(BaseModel):

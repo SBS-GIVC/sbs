@@ -4,7 +4,9 @@ Manages all API communications with NPHIES platform
 Port: 8003
 """
 
-from fastapi import FastAPI, HTTPException, status, BackgroundTasks
+from fastapi import FastAPI, HTTPException, status, BackgroundTasks, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 import httpx
@@ -16,6 +18,9 @@ from psycopg2.extras import RealDictCursor
 from datetime import datetime
 import asyncio
 import uuid
+from collections import deque
+from threading import Lock
+import time
 
 load_dotenv()
 
@@ -24,6 +29,52 @@ app = FastAPI(
     description="API Bridge to NPHIES national platform",
     version="1.0.0"
 )
+
+# CORS middleware - Restrict to allowed origins
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
+)
+
+# Rate limiter implementation
+class RateLimiter:
+    """Token bucket rate limiter"""
+    def __init__(self, max_requests: int = 100, time_window: int = 60):
+        self.max_requests = max_requests
+        self.time_window = time_window
+        self.requests = {}
+        self.lock = Lock()
+
+    def is_allowed(self, identifier: str) -> bool:
+        with self.lock:
+            now = time.time()
+            if identifier not in self.requests:
+                self.requests[identifier] = deque()
+            while self.requests[identifier] and self.requests[identifier][0] < now - self.time_window:
+                self.requests[identifier].popleft()
+            if len(self.requests[identifier]) < self.max_requests:
+                self.requests[identifier].append(now)
+                return True
+            return False
+
+rate_limiter = RateLimiter(max_requests=100, time_window=60)
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Rate limiting middleware"""
+    if request.url.path in ["/health", "/"]:
+        return await call_next(request)
+    client_ip = request.client.host if request.client else "unknown"
+    if not rate_limiter.is_allowed(client_ip):
+        return JSONResponse(
+            status_code=429,
+            content={"error": "Rate limit exceeded", "retry_after_seconds": 60}
+        )
+    return await call_next(request)
 
 # NPHIES API Configuration
 NPHIES_BASE_URL = os.getenv("NPHIES_BASE_URL", "https://nphies.sa/api/v1")

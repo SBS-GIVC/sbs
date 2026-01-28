@@ -4,7 +4,9 @@ Manages digital certificates and payload signing for NPHIES
 Port: 8001
 """
 
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Dict, Any
 import json
@@ -18,6 +20,9 @@ from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
+from collections import deque
+from threading import Lock
+import time
 
 load_dotenv()
 
@@ -26,6 +31,58 @@ app = FastAPI(
     description="Digital signing service for NPHIES integration",
     version="1.0.0"
 )
+
+# CORS middleware - Restrict to allowed origins
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
+)
+
+# Rate limiter implementation
+class RateLimiter:
+    """Token bucket rate limiter"""
+    def __init__(self, max_requests: int = 50, time_window: int = 60):
+        self.max_requests = max_requests
+        self.time_window = time_window
+        self.requests = {}
+        self.lock = Lock()
+
+    def is_allowed(self, identifier: str) -> bool:
+        with self.lock:
+            now = time.time()
+            if identifier not in self.requests:
+                self.requests[identifier] = deque()
+            while self.requests[identifier] and self.requests[identifier][0] < now - self.time_window:
+                self.requests[identifier].popleft()
+            
+            # Clean up empty entries to prevent memory leak
+            if not self.requests[identifier]:
+                del self.requests[identifier]
+                return True
+                
+            if len(self.requests[identifier]) < self.max_requests:
+                self.requests[identifier].append(now)
+                return True
+            return False
+
+rate_limiter = RateLimiter(max_requests=50, time_window=60)
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Rate limiting middleware"""
+    if request.url.path in ["/health", "/"]:
+        return await call_next(request)
+    client_ip = request.client.host if request.client else "unknown"
+    if not rate_limiter.is_allowed(client_ip):
+        return JSONResponse(
+            status_code=429,
+            content={"error": "Rate limit exceeded", "retry_after_seconds": 60}
+        )
+    return await call_next(request)
 
 
 def get_db_connection():
@@ -275,17 +332,24 @@ def sign_claim(request: SignRequest):
 
 
 @app.post("/generate-test-cert")
-def generate_test_certificate(facility_id: int):
+def generate_test_certificate(facility_id: int, request: Request):
     """
     Generate test certificate for sandbox environment
-    WARNING: Only for development/testing
+    WARNING: Only for development/testing - disabled by default in production
     """
-    
-    if os.getenv("NPHIES_ENV", "sandbox") == "production":
+    # Strictly enforce environment check
+    nphies_env = os.getenv("NPHIES_ENV", "sandbox").lower()
+    enable_test_certs = os.getenv("ENABLE_TEST_CERTIFICATES", "false").lower() == "true"
+
+    if nphies_env == "production" or not enable_test_certs:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot generate test certificates in production environment"
+            detail="Test certificate generation is disabled. Set ENABLE_TEST_CERTIFICATES=true and NPHIES_ENV=sandbox to enable."
         )
+
+    # Log this security-sensitive operation
+    client_ip = request.client.host if request.client else "unknown"
+    print(f"[SECURITY] Test certificate generation requested for facility {facility_id} from IP {client_ip}")
     
     try:
         private_path, public_path = generate_test_keypair(facility_id)

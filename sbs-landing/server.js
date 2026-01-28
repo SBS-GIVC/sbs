@@ -16,9 +16,21 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Security middleware
+// Security middleware with proper CSP
 app.use(helmet({
-  contentSecurityPolicy: false, // Allow iframe for Google Calendar
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      frameSrc: ["'self'", "https://calendar.google.com"],
+      frameAncestors: ["'self'"],
+    }
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
 // Rate limiting
@@ -28,9 +40,25 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// CORS configuration
-app.use(cors());
-app.use(express.json());
+// CORS configuration - Restrict to allowed origins
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001').split(',');
+app.use(cors({
+  origin: function(origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc.) only in development
+    if (!origin && process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID']
+}));
+app.use(express.json({ limit: '1mb' })); // Limit JSON body size
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files
@@ -49,22 +77,45 @@ const storage = multer.diskStorage({
   }
 });
 
+// MIME type to extension mapping for validation
+const ALLOWED_FILE_TYPES = {
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'image/png': ['.png'],
+  'application/pdf': ['.pdf'],
+  'application/msword': ['.doc'],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+  'application/vnd.ms-excel': ['.xls'],
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+  'application/xml': ['.xml'],
+  'text/xml': ['.xml'],
+  'application/json': ['.json']
+};
+
 const upload = multer({
   storage: storage,
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
+    files: 1 // Limit to single file
   },
   fileFilter: (req, file, cb) => {
-    // Accept common file types for medical claims
-    const allowedTypes = /jpeg|jpg|png|pdf|doc|docx|xls|xlsx|xml|json/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Allowed: PDF, DOC, XLS, JSON, XML, Images'));
+    // Validate MIME type
+    const allowedMimeTypes = Object.keys(ALLOWED_FILE_TYPES);
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      return cb(new Error('Invalid file type. Allowed: PDF, DOC, XLS, JSON, XML, Images'));
     }
+
+    // Validate extension matches MIME type
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowedExtensions = ALLOWED_FILE_TYPES[file.mimetype];
+    if (!allowedExtensions || !allowedExtensions.includes(ext)) {
+      return cb(new Error('File extension does not match content type'));
+    }
+
+    // Sanitize filename - remove path traversal attempts
+    const sanitizedName = path.basename(file.originalname).replace(/[^a-zA-Z0-9._-]/g, '_');
+    file.originalname = sanitizedName;
+
+    cb(null, true);
   }
 });
 
@@ -91,15 +142,15 @@ app.get('/api/metrics', (req, res) => {
 // Main claim submission endpoint
 app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
   try {
-    const { 
-      patientName, 
-      patientId, 
+    const {
+      patientName,
+      patientId,
       memberId,
       payerId,
       providerId,
       claimType,
-      userEmail,
-      userCredentials 
+      userEmail
+      // Note: userCredentials removed for security - authenticate server-side
     } = req.body;
 
     // Validate required fields
@@ -127,8 +178,7 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       claimType: claimType,
       submissionDate: new Date().toISOString(),
       
-      // User Credentials (for NPHIES authentication)
-      credentials: userCredentials ? JSON.parse(userCredentials) : null,
+      // Note: Credentials are now handled server-side for security
       
       // File information
       attachment: req.file ? {
@@ -196,11 +246,13 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
   } catch (error) {
     console.error('❌ Error processing claim:', error);
     
+    // Log error server-side, don't expose details to client
+    console.error('Claim processing error details:', error.stack);
     res.status(500).json({
       success: false,
       error: 'Failed to process claim submission',
-      message: error.message,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      message: 'An error occurred while processing your claim. Please try again.',
+      requestId: req.headers['x-request-id'] || `REQ-${Date.now()}`
     });
   }
 });

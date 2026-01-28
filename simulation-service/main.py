@@ -29,13 +29,14 @@ RULES_ENGINE_URL = os.getenv("RULES_ENGINE_URL", "http://localhost:8002")
 NPHIES_BRIDGE_URL = os.getenv("NPHIES_BRIDGE_URL", "http://localhost:8003")
 
 
-# CORS
+# CORS - Restrict to allowed origins from environment
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["", ""],  # Restrict to specific origins
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],  # Limit to required methods
-    allow_headers=["Content-Type", "Authorization"],  # Limit to required headers
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
 )
 
 

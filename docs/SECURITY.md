@@ -1,5 +1,48 @@
 # Security Implementation Guide
 
+## Recent Security Updates (January 2026)
+
+The following security improvements have been implemented:
+
+### CORS Configuration
+- **Fixed**: All services now restrict CORS to specified allowed origins via `ALLOWED_ORIGINS` environment variable
+- **Services updated**: server.js, normalizer-service, financial-rules-engine, signer-service, nphies-bridge, simulation-service
+- **Default**: `http://localhost:3000,http://localhost:3001` (configure for production)
+
+### Rate Limiting
+- **Added**: Token bucket rate limiting to all Python microservices
+- **Default**: 100 requests per minute per IP (50 for signer service)
+- **Exempted**: Health check endpoints
+
+### Input Validation
+- **Enhanced**: SQL injection, command injection, XSS, and path traversal protection
+- **Normalizer service**: Strict alphanumeric validation for internal codes
+- **File uploads**: MIME type and extension validation with filename sanitization
+
+### Environment Security
+- **Removed**: All insecure default passwords from docker-compose.yml
+- **Required**: Mandatory environment variables now fail startup if not set
+- **Added**: Production checklist in .env.example
+
+### Docker Security
+- **Added**: `security_opt: no-new-privileges:true` to all services
+- **Added**: Read-only filesystems where applicable
+- **Changed**: Ports bound to localhost (127.0.0.1) except for public-facing landing API
+- **Added**: Read-only volume mounts for certificates and workflows
+
+### Test Certificate Endpoint
+- **Secured**: `/generate-test-cert` now requires `ENABLE_TEST_CERTIFICATES=true` explicitly
+- **Default**: Disabled in all environments
+
+### Error Handling
+- **Fixed**: Production mode no longer exposes stack traces or internal error details
+- **Added**: Request ID tracking for all errors
+
+### Content Security Policy
+- **Added**: Proper CSP headers in server.js (Helmet.js configuration)
+
+---
+
 ## Overview
 
 This document details the security architecture and implementation for the SBS Integration Engine, ensuring compliance with:
