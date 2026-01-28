@@ -176,7 +176,7 @@ services:
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
       - ENABLE_DIRECT_SBS=${ENABLE_DIRECT_SBS:-false}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"  # Bind to localhost only for security
     depends_on:
       - n8n
       - normalizer-service
