@@ -1,29 +1,29 @@
 // API Service - Integration with SBS Backend
 const API_BASE_URL = (() => {
-  // Prefer explicitly configured API URL; fall back to localhost for development.
+  // Prefer explicitly configured API URL; fall back to relative path for Vite proxy.
   if (window.SBS_API_URL && typeof window.SBS_API_URL === 'string') {
     return window.SBS_API_URL;
   }
-
-  const fallbackUrl = 'http://localhost:3000';
-  console.warn(
-    '[APIService] window.SBS_API_URL is not set; falling back to',
-    fallbackUrl
-  );
-  return fallbackUrl;
+  return ''; // Relative path to use Vite proxy
 })();
+
 export class APIService {
   /**
-   * Submit a claim to the SBS pipeline
+   * Submit a signed claim payload to NPHIES Bridge
    */
-  static async submitClaim(claimData) {
+  static async submitClaim(facilityId, fhirPayload, signature) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/submit-claim`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(claimData)
+        body: JSON.stringify({
+          facility_id: facilityId,
+          fhir_payload: fhirPayload,
+          signature: signature,
+          resource_type: "Claim"
+        })
       });
 
       if (!response.ok) {
@@ -38,11 +38,11 @@ export class APIService {
   }
 
   /**
-   * Get claim status by ID
+   * Get claim status by Transaction UUID
    */
-  static async getClaimStatus(claimId) {
+  static async getClaimStatus(transactionUuid) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/claim-status/${claimId}`);
+      const response = await fetch(`${API_BASE_URL}/api/claim-status/${transactionUuid}`);
 
       if (!response.ok) {
         throw new Error(`Failed to get claim status: ${response.statusText}`);
@@ -57,6 +57,7 @@ export class APIService {
 
   /**
    * Normalize medical codes using SBS engine
+   * Payload: { facility_id, internal_code, description }
    */
   static async normalizeCode(internalCode, description, facilityId = 1) {
     try {
@@ -84,11 +85,63 @@ export class APIService {
   }
 
   /**
-   * Health check
+   * Validate claim against Financial Rules Engine
+   * Payload: FHIR Claim resource
+   */
+  static async validateClaim(claimData) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/validate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(claimData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to validate claim: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error validating claim:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Sign claim payload using Facility Certificate
+   */
+  static async signClaim(facilityId, payload) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/sign`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          facility_id: facilityId,
+          payload: payload
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to sign claim: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error signing claim:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Health check (Broad check)
    */
   static async healthCheck() {
     try {
-      const response = await fetch(`${API_BASE_URL}/health`);
+      const response = await fetch(`${API_BASE_URL}/api/health`);
       return await response.json();
     } catch (error) {
       console.error('Health check failed:', error);

@@ -11,12 +11,23 @@ from datetime import datetime, timedelta
 import random
 import uuid
 from enum import Enum
+import httpx
+import os
+import asyncio
+
 
 app = FastAPI(
     title="SBS Simulation Service",
-    description="Generate test claims and simulate workflow responses",
-    version="1.0.0"
+    description="Generate test claims and simulate workflow responses. Can act as an orchestrator calling real services.",
+    version="1.1.0"
 )
+
+# Service URLs
+NORMALIZER_URL = os.getenv("NORMALIZER_URL", "http://localhost:8000")
+SIGNER_URL = os.getenv("SIGNER_URL", "http://localhost:8001")
+RULES_ENGINE_URL = os.getenv("RULES_ENGINE_URL", "http://localhost:8002")
+NPHIES_BRIDGE_URL = os.getenv("NPHIES_BRIDGE_URL", "http://localhost:8003")
+
 
 # CORS
 app.add_middleware(
@@ -373,7 +384,7 @@ async def get_bundles():
 
 
 @app.post("/simulate-workflow/{stage}")
-async def simulate_workflow_stage(stage: str, payload: Dict[str, Any]):
+async def simulate_workflow_stage(stage: str, payload: Dict[str, Any], use_real_services: bool = True):
     """
     Simulate a specific workflow stage response
     """
@@ -390,12 +401,33 @@ async def simulate_workflow_stage(stage: str, payload: Dict[str, Any]):
             detail=f"Invalid stage. Must be one of: {', '.join(stage_simulators.keys())}"
         )
 
-    return await stage_simulators[stage](payload)
+    return await stage_simulators[stage](payload, use_real_services)
 
 
-async def simulate_normalization(payload: Dict[str, Any]) -> Dict[str, Any]:
+async def simulate_normalization(payload: Dict[str, Any], use_real_services: bool = False) -> Dict[str, Any]:
     """Simulate normalization service response"""
     internal_code = payload.get("internal_code", "UNKNOWN")
+    description = payload.get("description", "Unknown Description")
+    facility_id = payload.get("facility_id", 1)
+
+    if use_real_services:
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{NORMALIZER_URL}/normalize", 
+                    json={
+                        "facility_id": facility_id,
+                        "internal_code": internal_code,
+                        "description": description
+                    },
+                    timeout=5.0
+                )
+                if response.status_code == 200:
+                    return response.json()
+                print(f"Normalizer service returned {response.status_code}")
+        except Exception as e:
+            print(f"Failed to call real normalizer service: {e}")
+            # Fallback to simulation
 
     # Find matching service
     for services in SERVICE_CATALOG.values():
@@ -426,9 +458,35 @@ async def simulate_normalization(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-async def simulate_financial_rules(payload: Dict[str, Any]) -> Dict[str, Any]:
+async def simulate_financial_rules(payload: Dict[str, Any], use_real_services: bool = False) -> Dict[str, Any]:
     """Simulate financial rules engine response"""
     facility_id = payload.get("facility_id", 1)
+    
+    if use_real_services:
+        try:
+            # Adapt payload to FHIR Claim for the rules engine
+            # Assuming payload is close to a FHIR claim or has parts of it
+            # If payload is just items, we wrap it.
+            claim_payload = payload
+            if "resourceType" not in payload:
+                 claim_payload = {
+                    "resourceType": "Claim",
+                    "status": "active",
+                    "facility_id": facility_id,
+                    "item": payload.get("item", [])
+                 }
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{RULES_ENGINE_URL}/validate", 
+                    json=claim_payload, 
+                    timeout=5.0
+                )
+                if response.status_code == 200:
+                    return response.json()
+                print(f"Financial Rules service returned {response.status_code}")
+        except Exception as e:
+            print(f"Failed to call real financial rules service: {e}")
     items = payload.get("item", [])
 
     facility_tier = random.randint(1, 8)
@@ -468,8 +526,28 @@ async def simulate_financial_rules(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-async def simulate_signing(payload: Dict[str, Any]) -> Dict[str, Any]:
+async def simulate_signing(payload: Dict[str, Any], use_real_services: bool = False) -> Dict[str, Any]:
     """Simulate signing service response"""
+    if use_real_services:
+        try:
+            facility_id = payload.get("facility_id", 1)
+            # The payload to sign might be the entire payload passed, or a field inside it
+            fhir_payload = payload.get("fhir_payload", payload)
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{SIGNER_URL}/sign", 
+                    json={
+                        "facility_id": facility_id,
+                        "payload": fhir_payload
+                    },
+                    timeout=5.0
+                )
+                if response.status_code == 200:
+                    return response.json()
+                print(f"Signer service returned {response.status_code}")
+        except Exception as e:
+            print(f"Failed to call real signer service: {e}")
     return {
         "signature": f"SIM-SIGNATURE-{uuid.uuid4().hex[:32]}",
         "algorithm": "SHA256withRSA",
@@ -478,8 +556,30 @@ async def simulate_signing(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-async def simulate_nphies_submission(payload: Dict[str, Any]) -> Dict[str, Any]:
+async def simulate_nphies_submission(payload: Dict[str, Any], use_real_services: bool = False) -> Dict[str, Any]:
     """Simulate NPHIES submission response"""
+    if use_real_services:
+        try:
+            facility_id = payload.get("facility_id", 1)
+            fhir_payload = payload.get("fhir_payload", {})
+            signature = payload.get("signature", "debug-signature")
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{NPHIES_BRIDGE_URL}/submit-claim", 
+                    json={
+                        "facility_id": facility_id,
+                        "fhir_payload": fhir_payload,
+                        "signature": signature,
+                        "resource_type": "Claim"
+                    },
+                    timeout=30.0
+                )
+                if response.status_code == 200:
+                    return response.json()
+                print(f"NPHIES Bridge returned {response.status_code}: {response.text}")
+        except Exception as e:
+             print(f"Failed to call real NPHIES bridge: {e}")
     success = random.random() > 0.1  # 90% success rate
 
     if success:
