@@ -19,11 +19,29 @@ export function Sidebar({ currentView, setCurrentView }) {
             active={currentView === 'dashboard'} 
             onClick={() => setCurrentView('dashboard')}
         />
+        
+        {/* NPHIES Integration Section */}
+        <div className="mt-4 mb-2 px-3">
+          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">NPHIES Integration</p>
+        </div>
         <SidebarItem 
-            icon="hub" 
-            label="Mappings" 
-            active={currentView === 'mappings'} 
-            onClick={() => setCurrentView('mappings')}
+            icon="smart_toy" 
+            label="Smart Claim Builder" 
+            active={currentView === 'claim-builder'} 
+            onClick={() => setCurrentView('claim-builder')}
+            badge="NEW"
+        />
+        <SidebarItem 
+            icon="verified_user" 
+            label="Eligibility Check" 
+            active={currentView === 'eligibility'} 
+            onClick={() => setCurrentView('eligibility')}
+        />
+        <SidebarItem 
+            icon="approval" 
+            label="Prior Authorization" 
+            active={currentView === 'prior-auth'} 
+            onClick={() => setCurrentView('prior-auth')}
         />
         <SidebarItem 
             icon="description" 
@@ -31,12 +49,34 @@ export function Sidebar({ currentView, setCurrentView }) {
             active={currentView === 'claims'} 
             onClick={() => setCurrentView('claims')}
         />
+        
+        {/* Code Management Section */}
+        <div className="mt-4 mb-2 px-3">
+          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Code Management</p>
+        </div>
+        <SidebarItem 
+            icon="medical_information" 
+            label="SBS Code Browser" 
+            active={currentView === 'code-browser'} 
+            onClick={() => setCurrentView('code-browser')}
+        />
+        <SidebarItem 
+            icon="hub" 
+            label="SBS Mappings" 
+            active={currentView === 'mappings'} 
+            onClick={() => setCurrentView('mappings')}
+        />
         <SidebarItem 
             icon="fact_check" 
-            label="Worklist" 
+            label="Review Worklist" 
             active={currentView === 'review'} 
             onClick={() => setCurrentView('review')}
         />
+        
+        {/* System Section */}
+        <div className="mt-4 mb-2 px-3">
+          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">System</p>
+        </div>
         <SidebarItem 
             icon="tune" 
             label="Configuration" 
@@ -69,7 +109,7 @@ export function Sidebar({ currentView, setCurrentView }) {
   );
 }
 
-function SidebarItem({ icon, label, active, onClick }) {
+function SidebarItem({ icon, label, active, onClick, badge }) {
     return (
         <button 
             onClick={onClick}
@@ -82,7 +122,12 @@ function SidebarItem({ icon, label, active, onClick }) {
             <span className={`material-symbols-outlined ${active ? 'fill-1' : ''}`} style={active ? { fontVariationSettings: "'FILL' 1" } : {}}>
                 {icon}
             </span>
-            <span className="text-sm font-medium">{label}</span>
+            <span className="text-sm font-medium flex-1">{label}</span>
+            {badge && (
+                <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-gradient-to-r from-emerald-500 to-teal-500 text-white">
+                    {badge}
+                </span>
+            )}
         </button>
     )
 }

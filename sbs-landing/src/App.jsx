@@ -11,6 +11,10 @@ import { MappingRulesConfig } from './pages/MappingRulesConfig';
 import { DeveloperPortal } from './pages/DeveloperPortal';
 import { SettingsPage } from './pages/SettingsPage';
 import { ClaimsQueuePage } from './pages/ClaimsQueuePage';
+import { EligibilityPage } from './pages/EligibilityPage';
+import { PriorAuthPage } from './pages/PriorAuthPage';
+import { ClaimBuilderPage } from './pages/ClaimBuilderPage';
+import { SBSCodeBrowser } from './pages/SBSCodeBrowser';
 
 // Legacy logic imports if needed later, kept for reference or re-integration
 // import { normalizeCode, buildFHIRAndApplyRules } from './utils/middleware';
@@ -74,6 +78,26 @@ export default function App() {
             setSubtitle('Manage incoming healthcare claims');
             setBreadcrumbs(['Home', 'Claims']);
             break;
+        case 'eligibility':
+            setPageTitle('Eligibility Verification');
+            setSubtitle('Real-time coverage verification');
+            setBreadcrumbs(['Home', 'Eligibility']);
+            break;
+        case 'prior-auth':
+            setPageTitle('Prior Authorization');
+            setSubtitle('Request and track pre-approvals');
+            setBreadcrumbs(['Home', 'Prior Authorization']);
+            break;
+        case 'claim-builder':
+            setPageTitle('Smart Claim Builder');
+            setSubtitle('AI-powered claim creation');
+            setBreadcrumbs(['Home', 'Claim Builder']);
+            break;
+        case 'code-browser':
+            setPageTitle('SBS Code Catalogue');
+            setSubtitle('Browse official CHI codes');
+            setBreadcrumbs(['Home', 'Code Browser']);
+            break;
         default:
             setPageTitle('Dashboard');
     }
@@ -111,6 +135,10 @@ export default function App() {
             
             {currentView === 'claims' && <ClaimsQueuePage />}
             {currentView === 'settings' && <SettingsPage />}
+            {currentView === 'eligibility' && <EligibilityPage />}
+            {currentView === 'prior-auth' && <PriorAuthPage />}
+            {currentView === 'claim-builder' && <ClaimBuilderPage />}
+            {currentView === 'code-browser' && <SBSCodeBrowser />}
         </main>
       </div>
     </div>
