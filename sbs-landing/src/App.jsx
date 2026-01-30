@@ -15,6 +15,7 @@ import { EligibilityPage } from './pages/EligibilityPage';
 import { PriorAuthPage } from './pages/PriorAuthPage';
 import { ClaimBuilderPage } from './pages/ClaimBuilderPage';
 import { SBSCodeBrowser } from './pages/SBSCodeBrowser';
+import { UnifiedCodeBrowser } from './pages/UnifiedCodeBrowser';
 
 // Legacy logic imports if needed later, kept for reference or re-integration
 // import { normalizeCode, buildFHIRAndApplyRules } from './utils/middleware';
@@ -98,6 +99,11 @@ export default function App() {
             setSubtitle('Browse official CHI codes');
             setBreadcrumbs(['Home', 'Code Browser']);
             break;
+        case 'unified-browser':
+            setPageTitle('Unified Code Browser');
+            setSubtitle('Search across all healthcare code systems');
+            setBreadcrumbs(['Home', 'Unified Browser']);
+            break;
         default:
             setPageTitle('Dashboard');
     }
@@ -139,6 +145,7 @@ export default function App() {
             {currentView === 'prior-auth' && <PriorAuthPage />}
             {currentView === 'claim-builder' && <ClaimBuilderPage />}
             {currentView === 'code-browser' && <SBSCodeBrowser />}
+            {currentView === 'unified-browser' && <UnifiedCodeBrowser />}
         </main>
       </div>
     </div>

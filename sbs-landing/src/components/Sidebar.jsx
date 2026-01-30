@@ -55,6 +55,13 @@ export function Sidebar({ currentView, setCurrentView }) {
           <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Code Management</p>
         </div>
         <SidebarItem 
+            icon="hub" 
+            label="Unified Code Browser" 
+            active={currentView === 'unified-browser'} 
+            onClick={() => setCurrentView('unified-browser')}
+            badge="NEW"
+        />
+        <SidebarItem 
             icon="medical_information" 
             label="SBS Code Browser" 
             active={currentView === 'code-browser'} 
