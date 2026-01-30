@@ -6,6 +6,81 @@
     <title>SBS Integration Engine - BrainSAIT برينسايت</title>
     <meta name="description" content="The Ultimate Saudi Billing System Integration Engine - Powered by BrainSAIT">
     
+    <!-- Navigation & Quick Launch -->
+    <style>
+        /* Top Navigation Bar */
+        .top-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 9999;
+            background: rgba(2, 6, 23, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(16, 185, 129, 0.2);
+            padding: 12px 0;
+        }
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .nav-logo {
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .nav-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .nav-link {
+            color: #94a3b8;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+        .nav-link:hover {
+            color: #10b981;
+        }
+        .quick-launch-btn {
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            color: white;
+            padding: 10px 24px;
+            border-radius: 9999px;
+            font-weight: 600;
+            text-decoration: none;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        .quick-launch-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        }
+        .quick-launch-btn svg {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        /* Add padding to body to account for fixed nav */
+        body {
+            padding-top: 60px;
+        }
+    </style>
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -60,6 +135,24 @@
     </style>
 </head>
 <body class="bg-slate-950">
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+        <div class="nav-container">
+            <div class="nav-logo">BrainSAIT</div>
+            <div class="nav-actions">
+                <a href="#features" class="nav-link">Features</a>
+                <a href="#integration" class="nav-link">Integration</a>
+                <a href="#contact" class="nav-link">Contact</a>
+                <a href="/sbs/" class="quick-launch-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                    </svg>
+                    Launch App
+                </a>
+            </div>
+        </div>
+    </nav>
+    
     <div id="app"></div>
     
     <script>
