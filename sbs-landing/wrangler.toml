@@ -1,0 +1,25 @@
+name = "sbs-landing-api"
+main = "src/worker.ts"
+compatibility_date = "2024-04-01"
+
+[[containers]]
+image = "registry.cloudflare.com/d7b99530559ab4f2545e9bdc72a7ab9b/sbs-landing:v1"
+class_name = "SBSLanding"
+
+[[durable_objects.bindings]]
+name = "SBS_LANDING"
+class_name = "SBSLanding"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SBSLanding"]
+
+[vars]
+# Production deployment URLs
+NORMALIZER_URL = "https://sbs-normalizer.brainsait-fadil.workers.dev"
+# For testing integration, other URLs are mocked or point to localhost if not deployed
+SIGNER_URL = "http://localhost:8001" # Mock
+FINANCIAL_RULES_URL = "http://localhost:8002" # Mock
+NPHIES_BRIDGE_URL = "http://localhost:8003" # Mock
+NODE_ENV = "production"
+PORT = "3000"

@@ -370,22 +370,22 @@ async function triggerDirectSBS(claimData) {
     console.log('🔄 Fallback: Calling SBS services directly...');
     
     // Step 1: Normalize
-    const normalizeResponse = await axios.post('http://localhost:8000/normalize', {
+    const normalizeResponse = await axios.post((process.env.NORMALIZER_URL || 'http://localhost:8000') + '/normalize', {
       data: claimData
     });
     
     // Step 2: Apply Financial Rules
-    const rulesResponse = await axios.post('http://localhost:8002/apply-rules', {
+    const rulesResponse = await axios.post((process.env.FINANCIAL_RULES_URL || 'http://localhost:8002') + '/apply-rules', {
       data: normalizeResponse.data
     });
     
     // Step 3: Sign
-    const signResponse = await axios.post('http://localhost:8001/sign', {
+    const signResponse = await axios.post((process.env.SIGNER_URL || 'http://localhost:8001') + '/sign', {
       data: rulesResponse.data
     });
     
     // Step 4: Submit to NPHIES
-    const nphiesResponse = await axios.post('http://localhost:8003/submit', {
+    const nphiesResponse = await axios.post((process.env.NPHIES_BRIDGE_URL || 'http://localhost:8003') + '/submit', {
       data: signResponse.data,
       credentials: claimData.credentials
     });
@@ -438,10 +438,10 @@ app.get('/api/claim-status/:claimId', async (req, res) => {
 app.get('/api/services/status', async (req, res) => {
   try {
     const services = [
-      { name: 'normalizer', url: 'http://localhost:8000/health' },
-      { name: 'signer', url: 'http://localhost:8001/health' },
-      { name: 'financial-rules', url: 'http://localhost:8002/health' },
-      { name: 'nphies-bridge', url: 'http://localhost:8003/health' }
+      { name: 'normalizer', url: (process.env.NORMALIZER_URL || 'http://localhost:8000') + '/health' },
+      { name: 'signer', url: (process.env.SIGNER_URL || 'http://localhost:8001') + '/health' },
+      { name: 'financial-rules', url: (process.env.FINANCIAL_RULES_URL || 'http://localhost:8002') + '/health' },
+      { name: 'nphies-bridge', url: (process.env.NPHIES_BRIDGE_URL || 'http://localhost:8003') + '/health' }
     ];
 
     const statusChecks = await Promise.allSettled(
