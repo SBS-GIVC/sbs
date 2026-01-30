@@ -1,12 +1,93 @@
 // Middleware Logic - SBS Code Normalization and FHIR Processing
 import { callGemini } from '../services/geminiService';
 import { APIService } from '../services/apiService';
+import sbsCodesData from '../data/sbs_codes.json';
 
-// Local mapping database for quick lookups
+// Official CHI SBS Codes Database (V3.1)
+const SBS_OFFICIAL_CODES = sbsCodesData.codes;
+
+// Local mapping database for quick lookups (facility-specific codes to SBS codes)
+// This maps internal hospital codes to official SBS codes
 const MAPPING_DB = {
-  "LAB_001": { sbs_code: "SBS-LAB-102", desc: "Complete Blood Count (CBC)", fee: 150 },
-  "CONS_99": { sbs_code: "SBS-OP-500", desc: "Consultation - Consultant Physician", fee: 400 },
+  // Laboratory Services
+  "LAB_001": { sbs_code: "55707-01-00", desc: "Complete Blood Count (CBC)", fee: 150 },
+  "LAB_CBC": { sbs_code: "55707-01-00", desc: "Full blood examination - automated", fee: 150 },
+  "LAB_CMP": { sbs_code: "66500-00-00", desc: "Comprehensive Metabolic Panel", fee: 280 },
+  "LAB_LIPID": { sbs_code: "66503-00-00", desc: "Lipid Profile Panel", fee: 200 },
+  "LAB_HBA1C": { sbs_code: "66512-00-00", desc: "Glycated Haemoglobin (HbA1c)", fee: 120 },
+  "LAB_TSH": { sbs_code: "66716-00-00", desc: "Thyroid Stimulating Hormone", fee: 180 },
+  "LAB_FT4": { sbs_code: "66719-00-00", desc: "Free Thyroxine (FT4)", fee: 160 },
+  "LAB_UA": { sbs_code: "65993-00-00", desc: "Urinalysis", fee: 80 },
+  
+  // Consultation Services
+  "CONS_99": { sbs_code: "10954-01-00", desc: "Consultation - Consultant Physician", fee: 400 },
+  "CONS_GP": { sbs_code: "10951-00-00", desc: "General Practice Consultation", fee: 200 },
+  "CONS_SPEC": { sbs_code: "10954-00-00", desc: "Specialist Consultation", fee: 350 },
+  "CONS_FOLLOWUP": { sbs_code: "10953-00-00", desc: "Follow-up Consultation", fee: 150 },
+  
+  // Imaging Services
+  "RAD_XRAY_CHEST": { sbs_code: "58500-00-00", desc: "X-ray Chest PA", fee: 200 },
+  "RAD_CT_HEAD": { sbs_code: "56001-00-00", desc: "CT Scan Head without contrast", fee: 800 },
+  "RAD_MRI_BRAIN": { sbs_code: "56401-00-00", desc: "MRI Brain without contrast", fee: 1500 },
+  "RAD_US_ABD": { sbs_code: "55036-00-00", desc: "Ultrasound Abdomen Complete", fee: 400 },
+  
+  // Surgical Procedures
+  "SURG_APPY": { sbs_code: "30571-00-00", desc: "Appendectomy - Laparoscopic", fee: 8000 },
+  "SURG_CHOLE": { sbs_code: "30443-00-00", desc: "Cholecystectomy - Laparoscopic", fee: 10000 },
+  "SURG_HERNIA": { sbs_code: "30609-00-00", desc: "Hernia Repair - Inguinal", fee: 6000 },
+  
+  // Emergency Services
+  "ER_VISIT": { sbs_code: "10960-00-00", desc: "Emergency Department Visit", fee: 500 },
+  "ER_TRAUMA": { sbs_code: "10961-00-00", desc: "Emergency Trauma Assessment", fee: 800 },
+  
+  // Cardiology
+  "CARDIO_ECG": { sbs_code: "11700-00-00", desc: "Electrocardiogram (ECG)", fee: 150 },
+  "CARDIO_ECHO": { sbs_code: "55113-00-00", desc: "Echocardiography", fee: 600 },
+  "CARDIO_HOLTER": { sbs_code: "11709-00-00", desc: "Holter Monitor 24hr", fee: 400 },
+  
+  // Respiratory
+  "RESP_SPIROMETRY": { sbs_code: "11503-00-00", desc: "Spirometry", fee: 200 },
+  "RESP_PFT": { sbs_code: "11512-00-00", desc: "Pulmonary Function Test Complete", fee: 450 },
+  
+  // Dental (using official dental prices)
+  "DENTAL_EXAM": { sbs_code: "97011-00-00", desc: "Dental Examination", fee: 100 },
+  "DENTAL_CLEANING": { sbs_code: "97112-00-00", desc: "Dental Prophylaxis", fee: 150 },
+  "DENTAL_FILLING": { sbs_code: "97215-00-00", desc: "Dental Filling - Composite", fee: 200 },
+  "DENTAL_EXTRACT": { sbs_code: "97311-00-00", desc: "Tooth Extraction - Simple", fee: 180 },
+  
+  // Physiotherapy
+  "PT_INIT": { sbs_code: "95550-00-00", desc: "Physiotherapy Initial Assessment", fee: 250 },
+  "PT_FOLLOWUP": { sbs_code: "95551-00-00", desc: "Physiotherapy Follow-up", fee: 150 },
+  "PT_EXERCISE": { sbs_code: "95560-00-00", desc: "Therapeutic Exercise", fee: 120 },
 };
+
+/**
+ * Search for SBS code by keyword in official database
+ */
+export function searchSBSCodes(keyword, limit = 10) {
+  const results = [];
+  const keywordLower = keyword.toLowerCase();
+  
+  for (const [code, data] of Object.entries(SBS_OFFICIAL_CODES)) {
+    if (
+      code.toLowerCase().includes(keywordLower) ||
+      data.desc.toLowerCase().includes(keywordLower) ||
+      data.category.toLowerCase().includes(keywordLower)
+    ) {
+      results.push({ code, ...data });
+      if (results.length >= limit) break;
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * Get SBS code details from official database
+ */
+export function getSBSCodeDetails(sbsCode) {
+  return SBS_OFFICIAL_CODES[sbsCode] || null;
+}
 
 /**
  * Normalize internal hospital codes to SBS codes

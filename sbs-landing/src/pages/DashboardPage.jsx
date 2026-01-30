@@ -82,28 +82,28 @@ export function DashboardPage() {
                              <TableRow 
                                 code="CLM-2023-889"
                                 desc="Fracture of radius, closed"
-                                sbs="S52.501A"
+                                sbs="47903-00-00"
                                 confidence={98}
                                 status="mapped"
                              />
                              <TableRow 
                                 code="CLM-2023-890"
                                 desc="Chest pain, unspecified"
-                                sbs="R07.9"
+                                sbs="11700-00-00"
                                 confidence={72}
                                 status="pending"
                              />
                              <TableRow 
                                 code="CLM-2023-891"
                                 desc="Appendectomy, laparoscopic"
-                                sbs="--"
-                                confidence={0}
-                                status="error"
+                                sbs="30571-00-00"
+                                confidence={95}
+                                status="mapped"
                              />
                              <TableRow 
                                 code="CLM-2023-892"
                                 desc="Routine general medical exam"
-                                sbs="Z00.00"
+                                sbs="10951-00-00"
                                 confidence={95}
                                 status="mapped"
                              />
