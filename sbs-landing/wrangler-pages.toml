@@ -1,0 +1,42 @@
+# Cloudflare Pages Configuration for SBS Landing
+name = "sbs-landing-frontend"
+compatibility_date = "2024-04-01"
+
+# Build configuration
+[build]
+command = "npm run build"
+directory = "dist"
+
+[env.production]
+# Production environment variables
+vars = { 
+  NODE_ENV = "production",
+  VITE_API_URL = "https://api.brainsait.cloud",
+  VITE_N8N_WEBHOOK_URL = "https://n8n.brainsait.cloud/webhook/sbs-claim-submission"
+}
+
+[env.preview]
+# Preview/staging environment
+vars = { 
+  NODE_ENV = "preview",
+  VITE_API_URL = "https://api-preview.brainsait.cloud",
+  VITE_N8N_WEBHOOK_URL = "https://n8n-preview.brainsait.cloud/webhook/sbs-claim-submission"
+}
+
+# Custom domains
+[[routes]]
+pattern = "brainsait.cloud"
+custom_domain = true
+
+[[routes]]
+pattern = "www.brainsait.cloud"
+custom_domain = true
+
+# Headers for security and CORS
+[[headers]]
+for = "/*"
+[headers.values]
+X-Frame-Options = "DENY"
+X-Content-Type-Options = "nosniff"
+Referrer-Policy = "strict-origin-when-cross-origin"
+Permissions-Policy = "camera=(), microphone=(), geolocation=()"

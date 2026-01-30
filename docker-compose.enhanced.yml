@@ -1,0 +1,218 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: sbs-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:?DB_NAME is required}
+      POSTGRES_USER: ${DB_USER:?DB_USER is required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sbs-network
+    restart: unless-stopped
+
+  # Normalizer Service (Using GitHub Registry Image)
+  normalizer-service:
+    image: ghcr.io/fadil369/sbs-normalizer:main
+    container_name: sbs-normalizer
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      DB_PORT: 5432
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sbs-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Financial Rules Engine (Using GitHub Registry Image)
+  financial-rules-engine:
+    image: ghcr.io/fadil369/sbs-financial-rules:main
+    container_name: sbs-financial-rules
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      DB_PORT: 5432
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+    ports:
+      - "127.0.0.1:8002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sbs-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Signer Service (Using GitHub Registry Image)
+  signer-service:
+    image: ghcr.io/fadil369/sbs-signer:main
+    container_name: sbs-signer
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      DB_PORT: 5432
+      SIGNING_KEY: ${SIGNING_KEY:?SIGNING_KEY is required}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+    ports:
+      - "127.0.0.1:8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sbs-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # NPHIES Bridge (Using GitHub Registry Image)
+  nphies-bridge:
+    image: ghcr.io/fadil369/sbs-nphies-bridge:main
+    container_name: sbs-nphies-bridge
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      DB_PORT: 5432
+      NPHIES_BASE_URL: ${NPHIES_BASE_URL:-https://sandbox.nphies.sa/api/v1}
+      NPHIES_API_KEY: ${NPHIES_API_KEY:?NPHIES_API_KEY is required}
+      NPHIES_TIMEOUT: ${NPHIES_TIMEOUT:-30}
+      NPHIES_MAX_RETRIES: ${NPHIES_MAX_RETRIES:-3}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+    ports:
+      - "127.0.0.1:8003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sbs-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # n8n Workflow Engine (UNIFIED - No Duplicates, Public Access via Traefik)
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: sbs-n8n
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-changeme}
+      - N8N_HOST=n8n.brainsait.cloud
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=https://n8n.brainsait.cloud/
+      - GENERIC_TIMEZONE=${TIMEZONE:-Asia/Riyadh}
+      - N8N_EDITOR_BASE_URL=https://n8n.brainsait.cloud
+      - N8N_SECURE_COOKIE=true
+    ports:
+      - "127.0.0.1:5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n-workflows:/workflows:ro
+    depends_on:
+      - normalizer-service
+      - financial-rules-engine
+      - signer-service
+      - nphies-bridge
+    restart: unless-stopped
+    networks:
+      - sbs-network
+      - n8n_default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.n8n.rule=Host(`n8n.brainsait.cloud`)"
+      - "traefik.http.routers.n8n.entrypoints=websecure"
+      - "traefik.http.routers.n8n.tls=true"
+      - "traefik.http.routers.n8n.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.n8n.loadbalancer.server.port=5678"
+      - "traefik.docker.network=n8n_default"
+
+  # SBS Landing API (Using GitHub Registry Image)
+  sbs-landing:
+    image: ghcr.io/fadil369/sbs-landing:main
+    container_name: sbs-landing
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/sbs-claim-submission
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
+      - ENABLE_DIRECT_SBS=${ENABLE_DIRECT_SBS:-true}
+      - NORMALIZER_URL=http://normalizer-service:8000
+      - SIGNER_URL=http://signer-service:8001
+      - FINANCIAL_RULES_URL=http://financial-rules-engine:8002
+      - NPHIES_BRIDGE_URL=http://nphies-bridge:8003
+    ports:
+      - "0.0.0.0:3000:3000"
+    depends_on:
+      - n8n
+      - normalizer-service
+      - financial-rules-engine
+      - signer-service
+      - nphies-bridge
+    restart: unless-stopped
+    networks:
+      - sbs-network
+      - n8n_default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sbs.rule=Host(`brainsait.cloud`) || Host(`www.brainsait.cloud`) || Host(`sbs.brainsait.cloud`)"
+      - "traefik.http.routers.sbs.entrypoints=websecure"
+      - "traefik.http.routers.sbs.tls=true"
+      - "traefik.http.routers.sbs.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.sbs.loadbalancer.server.port=3000"
+      - "traefik.docker.network=n8n_default"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  n8n_data:
+    driver: local
+
+networks:
+  sbs-network:
+    driver: bridge
+  n8n_default:
+    external: true

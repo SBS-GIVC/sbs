@@ -7,15 +7,28 @@
     font-family: 'Inter', system-ui, sans-serif;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Manrope', 'Inter', system-ui, sans-serif;
     letter-spacing: -0.01em;
+    line-height: 1.2;
   }
 
   body {
     line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* Fix card text positioning */
+  * {
+    box-sizing: border-box;
+  }
+  
+  p, span, div {
+    position: relative;
+    z-index: 1;
   }
 }
 
@@ -196,11 +209,22 @@
 /* Card hover effects */
 .card-hover {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
 }
 
 .card-hover:hover {
   transform: translateY(-4px);
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Fix text overlay in cards */
+.card-hover > * {
+  position: relative;
+  z-index: 2;
+}
+
+.card-hover > .absolute {
+  z-index: 0;
 }
 
 /* Button ripple effect */

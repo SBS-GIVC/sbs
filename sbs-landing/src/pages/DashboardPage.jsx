@@ -171,20 +171,20 @@ function StatCard({ title, value, trend, trendUp, trendBad, icon, iconColor, ico
     const trendColor = trendBad ? 'text-red-500' : 'text-green-500';
     return (
         <div 
-            className="group p-6 rounded-2xl bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 shadow-soft hover:shadow-large transition-all duration-300 hover:-translate-y-1 card-hover"
+            className="group relative p-6 rounded-2xl bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 shadow-soft hover:shadow-large transition-all duration-300 hover:-translate-y-1 card-hover overflow-hidden"
             style={{ animationDelay: `${delay}ms` }}
         >
-            <div className="flex justify-between items-start mb-5">
+            <div className="relative z-10 flex justify-between items-start mb-5">
                 <div className="flex flex-col gap-1">
-                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 leading-snug">{title}</p>
                 </div>
                 <div className={`relative ${iconBg} p-2.5 rounded-xl shadow-sm group-hover:shadow-md transition-all duration-300 group-hover:scale-110`}>
                     <span className={`material-symbols-outlined ${iconColor} text-[24px]`}>{icon}</span>
                     <div className="absolute inset-0 rounded-xl bg-white dark:bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
                 </div>
             </div>
-            <div className="flex items-end gap-3">
-                <p className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">{value}</p>
+            <div className="relative z-10 flex items-end gap-3">
+                <p className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">{value}</p>
                 <div className={`text-xs font-semibold ${trendColor} mb-1.5 flex items-center gap-0.5 px-2 py-1 rounded-lg ${trendBad ? 'bg-red-50 dark:bg-red-500/10' : 'bg-green-50 dark:bg-green-500/10'}`}>
                     <span className="material-symbols-outlined text-[16px]">{trendUp ? 'trending_up' : 'trending_down'}</span>
                     <span>{trend}</span>
@@ -192,7 +192,7 @@ function StatCard({ title, value, trend, trendUp, trendBad, icon, iconColor, ico
             </div>
             
             {/* Subtle gradient overlay on hover */}
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-primary/0 to-primary/0 group-hover:from-primary/5 group-hover:to-transparent transition-all duration-500 pointer-events-none"></div>
+            <div className="absolute inset-0 z-0 rounded-2xl bg-gradient-to-br from-primary/0 to-primary/0 group-hover:from-primary/5 group-hover:to-transparent transition-all duration-500 pointer-events-none"></div>
         </div>
     )
 }
