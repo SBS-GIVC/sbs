@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "description": "SBS Landing - Healthcare Integration Gateway",
   "type": "module",
-  "main": "server.js",
+  "main": "server.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "server": "node server.js",
+    "server": "node server.cjs",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
