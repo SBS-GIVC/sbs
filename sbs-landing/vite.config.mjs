@@ -61,6 +61,10 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/health/, '/health')
+      },
+      '/api/gemini': {
+        target: 'http://localhost:3000',
+        changeOrigin: true
       }
     }
   },
