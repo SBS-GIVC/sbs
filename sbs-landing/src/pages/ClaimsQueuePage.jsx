@@ -1,8 +1,17 @@
 import React, { useState } from 'react';
+import { useToast } from '../components/Toast';
+import { Button } from '../components/ui/Button';
+import { Card, CardBody, CardHeader } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
 
 export function ClaimsQueuePage() {
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const toast = useToast();
+
+  const handleAction = (action) => {
+    toast.info(`${action} functionality is ready for integration.`);
+  };
 
   const claims = [
     {
@@ -76,22 +85,21 @@ export function ClaimsQueuePage() {
   return (
     <div className="flex-1 overflow-y-auto bg-background-light dark:bg-background-dark">
       {/* Header */}
-      <div className="px-8 py-6 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-surface-dark">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-surface-dark/90 backdrop-blur-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Claims Queue</h1>
-            <p className="text-slate-500 dark:text-slate-400 text-sm">Manage and process incoming healthcare claims</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Claims Queue</h1>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">Prioritize, triage, and resolve claims with smart filters.</p>
           </div>
-          <button className="px-4 py-2.5 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-medium shadow-lg shadow-blue-500/20 transition-colors flex items-center gap-2">
-            <span className="material-symbols-outlined text-lg">add</span>
+          <Button icon="add" onClick={() => handleAction('New Claim')}>
             New Claim
-          </button>
+          </Button>
         </div>
       </div>
 
-      <div className="p-8">
+      <div className="px-4 sm:px-6 lg:px-8 py-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
           <StatCard label="All Claims" count={statusCounts.all} active={filter === 'all'} onClick={() => setFilter('all')} color="primary" />
           <StatCard label="Pending" count={statusCounts.pending} active={filter === 'pending'} onClick={() => setFilter('pending')} color="yellow" />
           <StatCard label="Processing" count={statusCounts.processing} active={filter === 'processing'} onClick={() => setFilter('processing')} color="blue" />
@@ -99,31 +107,30 @@ export function ClaimsQueuePage() {
           <StatCard label="Rejected" count={statusCounts.rejected} active={filter === 'rejected'} onClick={() => setFilter('rejected')} color="red" />
         </div>
 
-        {/* Search and Actions */}
-        <div className="flex flex-wrap gap-4 mb-6">
-          <div className="relative flex-1 min-w-[200px]">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 material-symbols-outlined text-[20px]">search</span>
-            <input
-              type="text"
+        <Card className="mb-6">
+          <CardBody className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <Input
+              icon="search"
               placeholder="Search by claim ID or patient name..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
-          </div>
-          <button className="px-4 py-2 flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800">
-            <span className="material-symbols-outlined text-[18px]">filter_list</span>
-            Filters
-          </button>
-          <button className="px-4 py-2 flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800">
-            <span className="material-symbols-outlined text-[18px]">download</span>
-            Export
-          </button>
-        </div>
+            <Button variant="secondary" icon="filter_list" onClick={() => handleAction('Filters')}>
+              Filters
+            </Button>
+            <Button variant="secondary" icon="download" onClick={() => handleAction('Export')}>
+              Export
+            </Button>
+          </CardBody>
+        </Card>
 
-        {/* Claims Table */}
-        <div className="bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-          <table className="w-full text-left">
+        <Card>
+          <CardHeader
+            title="Claims Overview"
+            subtitle="Status, priority, and billing details for incoming requests"
+          />
+          <div className="w-full overflow-hidden">
+            <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50 dark:bg-[#111a22] border-b border-slate-200 dark:border-slate-800">
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Claim ID</th>
@@ -148,7 +155,8 @@ export function ClaimsQueuePage() {
               <p className="text-slate-500 dark:text-slate-400">No claims found matching your criteria</p>
             </div>
           )}
-        </div>
+          </div>
+        </Card>
       </div>
     </div>
   );
@@ -166,7 +174,7 @@ function StatCard({ label, count, active, onClick, color }) {
   return (
     <button
       onClick={onClick}
-      className={`p-4 rounded-xl border-2 transition-all ${
+      className={`p-4 rounded-xl border-2 transition-all hover:shadow-soft ${
         active 
           ? colors[color]
           : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-surface-dark hover:border-slate-300 dark:hover:border-slate-700'
@@ -193,7 +201,7 @@ function ClaimRow({ claim }) {
   };
 
   return (
-    <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+    <tr className="hover:bg-gradient-to-r hover:from-slate-50 hover:to-transparent dark:hover:from-slate-800/50 dark:hover:to-transparent transition-all">
       <td className="px-6 py-4">
         <div className="flex items-center gap-2">
           <span className={`size-2 rounded-full ${priorityDot[claim.priority]}`} />
@@ -218,7 +226,7 @@ function ClaimRow({ claim }) {
         </span>
       </td>
       <td className="px-6 py-4 text-right">
-        <button className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-primary transition-colors">
+        <button className="p-2 rounded-lg hover:bg-primary/10 text-slate-400 hover:text-primary transition-all">
           <span className="material-symbols-outlined text-[20px]">more_vert</span>
         </button>
       </td>

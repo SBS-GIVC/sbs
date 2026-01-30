@@ -26,6 +26,7 @@ export default function App() {
   const [pageTitle, setPageTitle] = useState('Active Integration Status');
   const [breadcrumbs, setBreadcrumbs] = useState(['Home', 'Data Ingestion & Normalization']);
   const [subtitle, setSubtitle] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Update header based on view
   useEffect(() => {
@@ -110,16 +111,39 @@ export default function App() {
   }, [currentView]);
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-white">
+    <div className="flex h-screen w-full overflow-hidden bg-gradient-to-br from-background-light via-slate-50 to-background-light dark:from-background-dark dark:via-slate-950 dark:to-background-dark font-body text-slate-900 dark:text-white">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 md:hidden"
+        />
+      )}
+
       {/* Sidebar */}
-      <Sidebar currentView={currentView} setCurrentView={setCurrentView} />
+      <Sidebar 
+        currentView={currentView} 
+        setCurrentView={(view) => {
+          setCurrentView(view);
+          setSidebarOpen(false);
+        }} 
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
         {/* Helper function to determine if we show the standard TopHeader or if the page has its own headers */}
         {/* For now, we will use the standard TopHeader for most pages except DeveloperPortal which might look better full screen or handled differently */}
         {['dashboard', 'mappings'].includes(currentView) && (
-            <TopHeader title={pageTitle} subtitle={subtitle} breadcrumbs={breadcrumbs} />
+            <TopHeader 
+              title={pageTitle} 
+              subtitle={subtitle} 
+              breadcrumbs={breadcrumbs} 
+              onMenuClick={() => setSidebarOpen(true)}
+            />
         )}
         
         {/* Some new pages like FacilityUsage have their own headers built-in, so we might want to hide TopHeader for them 

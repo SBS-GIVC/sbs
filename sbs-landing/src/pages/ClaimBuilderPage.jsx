@@ -302,7 +302,7 @@ export function ClaimBuilderPage() {
   return (
     <div className="flex-1 overflow-y-auto bg-background-light dark:bg-background-dark">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 px-8 py-8">
+      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-700 px-4 sm:px-6 lg:px-8 py-8">
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center gap-4 mb-8">
             <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
@@ -353,7 +353,7 @@ export function ClaimBuilderPage() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-8 py-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Step 1: Patient Verification */}
         {step === 1 && (
           <div className="bg-white dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 p-8">

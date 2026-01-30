@@ -63,22 +63,22 @@ export function EligibilityPage() {
   return (
     <div className="flex-1 overflow-y-auto bg-background-light dark:bg-background-dark">
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-teal-600 to-cyan-700 px-8 py-12">
+      <div className="relative overflow-hidden bg-gradient-to-br from-emerald-700 via-teal-700 to-cyan-800 px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHoiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4xIi8+PC9nPjwvc3ZnPg==')] opacity-30"></div>
         
         <div className="relative max-w-4xl mx-auto">
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
             <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
               <span className="material-symbols-rounded text-3xl text-white">verified_user</span>
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-white">Eligibility Verification</h1>
-              <p className="text-emerald-100">Real-time coverage verification via NPHIES</p>
+              <h1 className="text-3xl sm:text-4xl font-bold text-white">Eligibility Verification</h1>
+              <p className="text-emerald-100">Validate coverage, benefits, and limits in real time.</p>
             </div>
           </div>
 
           {/* Search Card */}
-          <div className="mt-8 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
+          <div className="mt-6 sm:mt-8 bg-white/10 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-white/20">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-emerald-100 mb-2">Patient ID / National ID</label>
@@ -87,7 +87,7 @@ export function EligibilityPage() {
                   value={patientId}
                   onChange={(e) => setPatientId(e.target.value)}
                   placeholder="Enter patient ID..."
-                  className="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
+                  className="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
                 />
               </div>
               <div>
@@ -109,7 +109,7 @@ export function EligibilityPage() {
                 <button
                   onClick={handleVerify}
                   disabled={loading}
-                  className="w-full px-6 py-3 rounded-xl bg-white text-emerald-600 font-semibold hover:bg-emerald-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full px-6 py-3 rounded-xl bg-white text-emerald-700 font-semibold hover:bg-emerald-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-medium hover:shadow-glow"
                 >
                   {loading ? (
                     <>

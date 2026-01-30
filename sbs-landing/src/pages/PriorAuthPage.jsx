@@ -179,7 +179,7 @@ export function PriorAuthPage() {
   return (
     <div className="flex-1 overflow-y-auto bg-background-light dark:bg-background-dark">
       {/* Header */}
-      <div className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-700 px-8 py-8">
+      <div className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-700 px-4 sm:px-6 lg:px-8 py-8">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center gap-4 mb-6">
             <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
@@ -224,7 +224,7 @@ export function PriorAuthPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* New Request Form */}
         {activeTab === 'new' && (
           <form onSubmit={handleSubmit} className="space-y-6">
