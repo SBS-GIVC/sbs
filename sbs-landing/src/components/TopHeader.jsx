@@ -28,6 +28,7 @@ export function TopHeader({ title, subtitle, breadcrumbs, onMenuClick }) {
           <span className="inline-block size-2 bg-green-500 rounded-full animate-pulse"></span>
           {subtitle}
         </p>}
+        </div>
       </div>
       <div className="hidden md:block w-full max-w-sm">
         <label className="relative flex items-center group">
