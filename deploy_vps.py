@@ -50,7 +50,7 @@ def deploy(client):
         print("Stopping existing containers...")
         run_command(client, f"cd {REMOTE_DIR} && docker compose down --remove-orphans || true")
         # Aggressively remove all possible containers to ensure clean state
-        run_command(client, f"docker rm -f sbs-postgres sbs-normalizer sbs-financial-rules sbs-signer sbs-nphies-bridge sbs-n8n sbs-landing sbs-pgadmin n8n-n8n-1 || true")
+        run_command(client, f"docker rm -f sbs-postgres sbs-normalizer sbs-financial-rules sbs-signer sbs-nphies-bridge sbs-n8n sbs-landing sbs-pgadmin n8n-n8n-1 brainsait-landing-main || true")
 
         print("Building and starting containers...")
         success = run_command(client, f"cd {REMOTE_DIR} && docker compose up --build -d")

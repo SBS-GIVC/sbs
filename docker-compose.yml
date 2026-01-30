@@ -186,6 +186,14 @@ services:
     restart: unless-stopped
     networks:
       - sbs-network
+      - n8n_default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sbs.rule=Host(`brainsait.cloud`) || Host(`www.brainsait.cloud`)"
+      - "traefik.http.routers.sbs.entrypoints=websecure"
+      - "traefik.http.routers.sbs.tls=true"
+      - "traefik.http.routers.sbs.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.sbs.loadbalancer.server.port=3000"
     security_opt:
       - no-new-privileges:true
 
@@ -220,3 +228,5 @@ volumes:
 networks:
   sbs-network:
     driver: bridge
+  n8n_default:
+    external: true
