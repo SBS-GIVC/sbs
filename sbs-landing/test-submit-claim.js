@@ -9,6 +9,7 @@ const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000';
 const ENDPOINT = `${API_BASE_URL}/api/submit-claim`;
@@ -64,23 +65,24 @@ async function testSubmitClaim() {
 
   // Test 3: POST request with dummy file
   console.log('\nTest 3: POST request with file upload');
+  
+  // Create a dummy test file
+  const testFileContent = 'This is a test claim document';
+  const testFilePath = path.join(os.tmpdir(), 'test-claim.txt');
+  
+  try {
+    fs.writeFileSync(testFilePath, testFileContent);
+  } catch (error) {
+    console.log('❌ Failed to create test file:', error.message);
+    return;
+  }
+
   try {
     const formData = new FormData();
     formData.append('patientName', 'Test Patient With File');
     formData.append('patientId', '9876543210');
     formData.append('claimType', 'institutional');
     formData.append('userEmail', 'test-file@example.com');
-
-    // Create a dummy test file
-    const testFileContent = 'This is a test claim document';
-    const testFilePath = path.join(require('os').tmpdir(), 'test-claim.txt');
-    
-    try {
-      fs.writeFileSync(testFilePath, testFileContent);
-    } catch (error) {
-      console.log('❌ Failed to create test file:', error.message);
-      return;
-    }
 
     formData.append('claimFile', fs.createReadStream(testFilePath), {
       filename: 'test-claim.txt',
@@ -95,19 +97,19 @@ async function testSubmitClaim() {
     console.log('✅ POST request with file successful');
     console.log('   Status:', response.status);
     console.log('   Response:', JSON.stringify(response.data, null, 2));
-
-    // Cleanup
-    try {
-      fs.unlinkSync(testFilePath);
-    } catch (error) {
-      console.log('⚠️ Failed to cleanup test file:', error.message);
-    }
   } catch (error) {
     if (error.response) {
       console.log('❌ POST request with file failed with status:', error.response.status);
       console.log('   Response:', JSON.stringify(error.response.data, null, 2));
     } else {
       console.log('❌ POST request with file failed:', error.message);
+    }
+  } finally {
+    // Cleanup
+    try {
+      fs.unlinkSync(testFilePath);
+    } catch (error) {
+      console.log('⚠️ Failed to cleanup test file:', error.message);
     }
   }
 
