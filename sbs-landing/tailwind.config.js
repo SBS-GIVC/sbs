@@ -13,6 +13,13 @@ export default {
         "surface-dark": "#182430",
         "surface-light": "#ffffff",
         "surface-lighter": "#233648",
+        "surface-darker": "#0d1218",
+        "error": "#ef4444",
+        "success": "#22c55e",
+        "warning": "#f59e0b",
+        "text-secondary": "#94a3b8",
+        "secondary-text": "#92adc9",
+        "border-dark": "#233648",
         slate: {
           950: '#0f172a',
         }

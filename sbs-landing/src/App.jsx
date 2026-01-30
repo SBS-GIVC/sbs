@@ -9,6 +9,8 @@ import { FacilityPerformanceReport } from './pages/FacilityPerformanceReport';
 import { FacilityUsagePage } from './pages/FacilityUsagePage';
 import { MappingRulesConfig } from './pages/MappingRulesConfig';
 import { DeveloperPortal } from './pages/DeveloperPortal';
+import { SettingsPage } from './pages/SettingsPage';
+import { ClaimsQueuePage } from './pages/ClaimsQueuePage';
 
 // Legacy logic imports if needed later, kept for reference or re-integration
 // import { normalizeCode, buildFHIRAndApplyRules } from './utils/middleware';
@@ -62,6 +64,16 @@ export default function App() {
             setPageTitle('Developer Portal');
             setBreadcrumbs(['Home', 'Developers']);
             break;
+        case 'settings':
+            setPageTitle('Settings');
+            setSubtitle('Manage application preferences');
+            setBreadcrumbs(['Home', 'Settings']);
+            break;
+        case 'claims':
+            setPageTitle('Claims Queue');
+            setSubtitle('Manage incoming healthcare claims');
+            setBreadcrumbs(['Home', 'Claims']);
+            break;
         default:
             setPageTitle('Dashboard');
     }
@@ -97,20 +109,8 @@ export default function App() {
             {currentView === 'mapping_rules' && <MappingRulesConfig />}
             {currentView === 'developer' && <DeveloperPortal />}
             
-            {/* Fallbacks or "Under Construction" for other views */}
-            {['claims', 'settings'].includes(currentView) && (
-                <div className="flex flex-col items-center justify-center h-full text-slate-500">
-                    <span className="material-symbols-outlined text-4xl mb-2">construction</span>
-                    <p>Module Under Construction</p>
-                    <button className="mt-4 text-primary hover:underline" onClick={() => setCurrentView('dashboard')}>Return to Dashboard</button>
-                    
-                    {/* Dev Links for Demo */}
-                    <div className="mt-8 flex gap-4 text-xs">
-                        <button className="text-secondary-text hover:text-white" onClick={() => setCurrentView('review')}>Demo: Review Page</button>
-                        <button className="text-secondary-text hover:text-white" onClick={() => setCurrentView('error')}>Demo: Error Detail</button>
-                    </div>
-                </div>
-            )}
+            {currentView === 'claims' && <ClaimsQueuePage />}
+            {currentView === 'settings' && <SettingsPage />}
         </main>
       </div>
     </div>

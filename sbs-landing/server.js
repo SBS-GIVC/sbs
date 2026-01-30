@@ -139,6 +139,74 @@ app.get('/api/metrics', (req, res) => {
   });
 });
 
+// Gemini API Proxy endpoint - proxies requests to Google Gemini to avoid exposing API key
+app.post('/api/gemini/generate', async (req, res) => {
+  try {
+    const { prompt, systemInstruction } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({
+        success: false,
+        error: 'Prompt is required'
+      });
+    }
+
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    
+    if (!GEMINI_API_KEY) {
+      // Return a mock response for development when no API key is configured
+      console.warn('⚠️ GEMINI_API_KEY not configured, returning mock response');
+      return res.json({
+        success: true,
+        text: JSON.stringify({
+          code: "SBS-MOCK-001",
+          desc: "Mock response - Gemini API key not configured",
+          confidence: 0.75,
+          rationale: "This is a development mock response. Configure GEMINI_API_KEY for live AI normalization."
+        })
+      });
+    }
+
+    // Call Gemini API
+    const geminiResponse = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        systemInstruction: systemInstruction ? {
+          parts: [{ text: systemInstruction }]
+        } : undefined,
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 1024
+        }
+      },
+      {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 30000
+      }
+    );
+
+    const text = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    
+    res.json({
+      success: true,
+      text: text
+    });
+
+  } catch (error) {
+    console.error('❌ Gemini API error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to generate AI response',
+      message: error.message
+    });
+  }
+});
+
 // Main claim submission endpoint
 app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
   try {

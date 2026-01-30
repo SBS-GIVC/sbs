@@ -1,7 +1,8 @@
 {
   "name": "sbs-landing",
   "version": "1.0.0",
-  "description": "",
+  "description": "SBS Landing - Healthcare Integration Gateway",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "dev": "vite",
