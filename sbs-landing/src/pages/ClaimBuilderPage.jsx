@@ -1,11 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { nphiesService } from '../services/nphiesService';
-import { searchSBSCodes, getSBSCodeDetails } from '../utils/middleware';
+import { aiAssistant } from '../services/aiAssistantService';
 import { useToast } from '../components/Toast';
 
 /**
  * Smart Claim Builder
- * Intelligent claim creation with bundle detection, prior auth checking, and real-time validation
+ * AI-powered claim creation with bundle detection, validation, and real-time assistance
  */
 export function ClaimBuilderPage() {
   const [step, setStep] = useState(1);
@@ -22,9 +22,13 @@ export function ClaimBuilderPage() {
   const [currentItem, setCurrentItem] = useState({ sbsCode: '', description: '', quantity: 1, unitPrice: 0 });
   const [sbsSuggestions, setSbsSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [aiInsights, setAiInsights] = useState(null);
   const [eligibility, setEligibility] = useState(null);
   const [bundleInfo, setBundleInfo] = useState(null);
   const [priorAuthRequired, setPriorAuthRequired] = useState([]);
+  const [validation, setValidation] = useState(null);
+  const [isValidating, setIsValidating] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
@@ -61,17 +65,35 @@ export function ClaimBuilderPage() {
     }
   };
 
-  // Search SBS codes
-  const handleSbsSearch = useCallback((query) => {
+  // AI-powered SBS code search
+  const handleSbsSearch = useCallback(async (query) => {
     setCurrentItem(prev => ({ ...prev, sbsCode: query }));
     
     if (query.length >= 2) {
-      const results = searchSBSCodes(query, 10);
-      setSbsSuggestions(results);
-      setShowSuggestions(true);
+      setIsSearching(true);
+      try {
+        const results = await aiAssistant.smartSearch(query, {
+          limit: 15,
+          includeAI: true
+        });
+        setSbsSuggestions(results.results);
+        setShowSuggestions(true);
+        if (results.aiInsights) {
+          setAiInsights(results.aiInsights);
+        }
+      } catch (error) {
+        console.error('Search error:', error);
+        // Fallback to local search
+        const localResults = aiAssistant.localSearch(query, null, 10);
+        setSbsSuggestions(localResults);
+        setShowSuggestions(true);
+      } finally {
+        setIsSearching(false);
+      }
     } else {
       setSbsSuggestions([]);
       setShowSuggestions(false);
+      setAiInsights(null);
     }
   }, []);
 
@@ -84,6 +106,7 @@ export function ClaimBuilderPage() {
       unitPrice: item.fee || 250
     });
     setShowSuggestions(false);
+    setAiInsights(null);
   };
 
   // Add item to claim
@@ -99,19 +122,23 @@ export function ClaimBuilderPage() {
       netPrice: currentItem.quantity * currentItem.unitPrice
     };
 
+    const newItems = [...claim.items, newItem];
     setClaim(prev => ({
       ...prev,
-      items: [...prev.items, newItem]
+      items: newItems
     }));
 
     // Reset current item
     setCurrentItem({ sbsCode: '', description: '', quantity: 1, unitPrice: 0 });
     
     // Check for bundles after adding
-    checkBundles([...claim.items, newItem]);
+    checkBundles(newItems);
     
     // Check if prior auth is required
     checkPriorAuth(newItem);
+    
+    // Trigger AI validation
+    validateClaimWithAI(newItems);
     
     toast.success('Service added to claim');
   };
@@ -121,6 +148,11 @@ export function ClaimBuilderPage() {
     const newItems = claim.items.filter((_, i) => i !== index);
     setClaim(prev => ({ ...prev, items: newItems }));
     checkBundles(newItems);
+    if (newItems.length > 0) {
+      validateClaimWithAI(newItems);
+    } else {
+      setValidation(null);
+    }
   };
 
   // Check for applicable bundles
@@ -148,6 +180,33 @@ export function ClaimBuilderPage() {
     }
   };
 
+  // AI-powered claim validation
+  const validateClaimWithAI = async (items) => {
+    if (items.length === 0) return;
+    
+    setIsValidating(true);
+    try {
+      const claimData = {
+        ...claim,
+        items,
+        totalAmount: items.reduce((sum, item) => sum + item.netPrice, 0)
+      };
+      
+      const result = await aiAssistant.validateClaim(claimData);
+      setValidation(result);
+      
+      if (result.errors?.length > 0) {
+        toast.error(`Validation issues found: ${result.errors[0]}`);
+      } else if (result.suggestions?.length > 0) {
+        toast.info('AI has suggestions to improve your claim');
+      }
+    } catch (error) {
+      console.warn('AI validation failed:', error);
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
   // Apply bundle pricing
   const applyBundle = () => {
     if (bundleInfo && bundleInfo.recommendedBundle) {
@@ -157,6 +216,30 @@ export function ClaimBuilderPage() {
         bundleApplied: true,
         bundleId: bundleInfo.recommendedBundle.id
       }));
+    }
+  };
+
+  // Apply AI suggestion
+  const applySuggestion = async (suggestion) => {
+    if (suggestion.type === 'add' && suggestion.code) {
+      const code = aiAssistant.getCode(suggestion.code);
+      if (code) {
+        const newItem = {
+          sbsCode: code.code,
+          description: code.desc,
+          quantity: 1,
+          unitPrice: code.fee || 250,
+          sequence: claim.items.length + 1,
+          netPrice: code.fee || 250,
+          aiSuggested: true
+        };
+        const newItems = [...claim.items, newItem];
+        setClaim(prev => ({ ...prev, items: newItems }));
+        toast.success(`Added AI-suggested: ${code.desc}`);
+        validateClaimWithAI(newItems);
+      }
+    } else if (suggestion.type === 'bundle') {
+      applyBundle();
     }
   };
 
@@ -173,6 +256,14 @@ export function ClaimBuilderPage() {
     if (claim.items.length === 0) {
       toast.warning('Please add at least one service');
       return;
+    }
+
+    // Check validation errors
+    if (validation?.errors?.length > 0) {
+      const proceed = window.confirm(
+        `There are validation issues:\n\n${validation.errors.join('\n')}\n\nProceed anyway?`
+      );
+      if (!proceed) return;
     }
 
     // Check for required prior auths
@@ -220,6 +311,12 @@ export function ClaimBuilderPage() {
             <div>
               <h1 className="text-3xl font-bold text-white">Smart Claim Builder</h1>
               <p className="text-blue-100">AI-powered claim creation with automatic validation</p>
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-violet-500 to-purple-500 text-white flex items-center gap-1">
+                <span className="material-symbols-rounded text-sm">auto_awesome</span>
+                AI Assisted
+              </span>
             </div>
           </div>
 
@@ -362,7 +459,13 @@ export function ClaimBuilderPage() {
 
             {/* Add Service Form */}
             <div className="bg-white dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 p-6">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Add Service</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Add Service</h3>
+                <span className="flex items-center gap-1 text-xs text-violet-500">
+                  <span className="material-symbols-rounded text-sm">auto_awesome</span>
+                  AI-powered search
+                </span>
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="md:col-span-2 relative">
@@ -371,20 +474,43 @@ export function ClaimBuilderPage() {
                     value={currentItem.sbsCode}
                     onChange={(e) => handleSbsSearch(e.target.value)}
                     onFocus={() => sbsSuggestions.length > 0 && setShowSuggestions(true)}
-                    placeholder="Search SBS code or description..."
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary"
+                    placeholder="Search SBS code, description, or type your needs..."
+                    className="w-full pl-4 pr-10 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary"
                   />
+                  {isSearching && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-rounded text-violet-500 animate-spin">
+                      progress_activity
+                    </span>
+                  )}
                   
                   {showSuggestions && sbsSuggestions.length > 0 && (
-                    <div className="absolute z-20 w-full mt-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl max-h-64 overflow-y-auto">
+                    <div className="absolute z-20 w-full mt-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl max-h-80 overflow-y-auto">
+                      {aiInsights && (
+                        <div className="px-4 py-2 bg-violet-50 dark:bg-violet-900/20 border-b border-violet-100 dark:border-violet-800">
+                          <div className="flex items-center gap-2 text-xs text-violet-600 dark:text-violet-400">
+                            <span className="material-symbols-rounded text-sm">auto_awesome</span>
+                            {aiInsights}
+                          </div>
+                        </div>
+                      )}
                       {sbsSuggestions.map((item, index) => (
                         <button
                           key={index}
                           onClick={() => selectSbsCode(item)}
                           className="w-full px-4 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 border-b border-slate-100 dark:border-slate-700 last:border-0"
                         >
-                          <span className="font-mono text-sm text-primary">{item.code}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm text-primary">{item.code}</span>
+                            {item.source === 'ai' && (
+                              <span className="material-symbols-rounded text-xs text-violet-500" title="AI Suggested">
+                                auto_awesome
+                              </span>
+                            )}
+                          </div>
                           <span className="text-sm text-slate-600 dark:text-slate-400 flex-1 truncate">{item.desc}</span>
+                          {item.confidence && (
+                            <span className="text-xs text-violet-500">{Math.round(item.confidence * 100)}%</span>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -418,6 +544,90 @@ export function ClaimBuilderPage() {
                 </p>
               )}
             </div>
+
+            {/* AI Validation Panel */}
+            {(validation || isValidating) && (
+              <div className={`rounded-2xl border p-6 ${
+                isValidating ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700' :
+                validation?.valid ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' :
+                'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+              }`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className={`material-symbols-rounded ${isValidating ? 'animate-spin text-violet-500' : validation?.valid ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    {isValidating ? 'progress_activity' : validation?.valid ? 'check_circle' : 'warning'}
+                  </span>
+                  <h4 className="font-semibold text-slate-900 dark:text-white">
+                    {isValidating ? 'AI Validating...' : 'AI Claim Analysis'}
+                  </h4>
+                </div>
+
+                {validation && (
+                  <>
+                    {validation.summary && (
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">{validation.summary}</p>
+                    )}
+
+                    {validation.errors?.length > 0 && (
+                      <div className="mb-3">
+                        <p className="text-xs font-semibold text-red-600 uppercase mb-1">Issues</p>
+                        <ul className="space-y-1">
+                          {validation.errors.map((err, i) => (
+                            <li key={i} className="text-sm text-red-600 flex items-center gap-2">
+                              <span className="material-symbols-rounded text-sm">error</span>
+                              {err}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {validation.warnings?.length > 0 && (
+                      <div className="mb-3">
+                        <p className="text-xs font-semibold text-amber-600 uppercase mb-1">Warnings</p>
+                        <ul className="space-y-1">
+                          {validation.warnings.map((warn, i) => (
+                            <li key={i} className="text-sm text-amber-600 flex items-center gap-2">
+                              <span className="material-symbols-rounded text-sm">warning</span>
+                              {warn}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {validation.suggestions?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-violet-600 uppercase mb-2">AI Suggestions</p>
+                        <div className="space-y-2">
+                          {validation.suggestions.map((sug, i) => (
+                            <div key={i} className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <span className="material-symbols-rounded text-violet-500 text-sm">
+                                  {sug.type === 'add' ? 'add_circle' : sug.type === 'bundle' ? 'inventory_2' : 'approval'}
+                                </span>
+                                <span className="text-sm text-slate-700 dark:text-slate-300">
+                                  {sug.type === 'add' && `Add ${sug.code}: ${sug.reason}`}
+                                  {sug.type === 'bundle' && `${sug.name} - Save ${formatCurrency(sug.savings || 0)}`}
+                                  {sug.type === 'priorAuth' && `Prior auth recommended: ${sug.reason}`}
+                                </span>
+                              </div>
+                              {sug.type !== 'priorAuth' && (
+                                <button
+                                  onClick={() => applySuggestion(sug)}
+                                  className="px-3 py-1 text-xs font-medium text-violet-600 hover:bg-violet-100 dark:hover:bg-violet-900/30 rounded-lg"
+                                >
+                                  Apply
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Bundle Detection Alert */}
             {bundleInfo && bundleInfo.recommendedBundle && !claim.bundleApplied && (
@@ -465,8 +675,9 @@ export function ClaimBuilderPage() {
             {/* Items List */}
             {claim.items.length > 0 && (
               <div className="bg-white dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
                   <h3 className="font-bold text-slate-900 dark:text-white">Claim Items ({claim.items.length})</h3>
+                  <span className="text-lg font-bold text-primary">{formatCurrency(calculateTotal())}</span>
                 </div>
                 <table className="w-full">
                   <thead className="bg-slate-50 dark:bg-slate-800/30">
@@ -484,7 +695,16 @@ export function ClaimBuilderPage() {
                     {claim.items.map((item, index) => (
                       <tr key={index} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
                         <td className="px-6 py-4 text-sm text-slate-500">{index + 1}</td>
-                        <td className="px-6 py-4 font-mono text-sm text-primary">{item.sbsCode}</td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm text-primary">{item.sbsCode}</span>
+                            {item.aiSuggested && (
+                              <span className="material-symbols-rounded text-xs text-violet-500" title="AI Suggested">
+                                auto_awesome
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-6 py-4 text-sm text-slate-900 dark:text-white">{item.description}</td>
                         <td className="px-6 py-4 text-sm text-slate-500 text-right">{item.quantity}</td>
                         <td className="px-6 py-4 text-sm text-slate-500 text-right">{formatCurrency(item.unitPrice)}</td>
@@ -539,7 +759,15 @@ export function ClaimBuilderPage() {
         {step === 3 && (
           <div className="space-y-6">
             <div className="bg-white dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 p-6">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Review Claim</h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">Review Claim</h2>
+                {validation?.valid && (
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700 flex items-center gap-1">
+                    <span className="material-symbols-rounded text-sm">check_circle</span>
+                    AI Validated
+                  </span>
+                )}
+              </div>
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
                 <div>
@@ -569,7 +797,12 @@ export function ClaimBuilderPage() {
                         {index + 1}
                       </span>
                       <div>
-                        <p className="font-mono text-sm text-primary">{item.sbsCode}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-mono text-sm text-primary">{item.sbsCode}</p>
+                          {item.aiSuggested && (
+                            <span className="material-symbols-rounded text-xs text-violet-500">auto_awesome</span>
+                          )}
+                        </div>
                         <p className="text-sm text-slate-600 dark:text-slate-400">{item.description}</p>
                       </div>
                     </div>
@@ -632,6 +865,7 @@ export function ClaimBuilderPage() {
                   setEligibility(null);
                   setBundleInfo(null);
                   setPriorAuthRequired([]);
+                  setValidation(null);
                   setStep(1);
                 }}
                 className="px-6 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary/90"

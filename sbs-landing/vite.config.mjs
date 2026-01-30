@@ -11,9 +11,16 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: true,
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html')
+      },
+      output: {
+        manualChunks: {
+          'sbs-codes': ['./src/data/sbs_codes_full.json'],
+          'vendor': ['react', 'react-dom']
+        }
       }
     }
   },
