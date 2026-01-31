@@ -137,7 +137,7 @@ export default function App() {
   }, [currentView]);
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-gradient-to-br from-background-light via-slate-50 to-background-light dark:from-background-dark dark:via-slate-950 dark:to-background-dark font-body text-slate-900 dark:text-white">
+    <div className="flex h-screen w-full overflow-hidden bg-background-light dark:bg-background-dark font-body text-slate-900 dark:text-white antialiased">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <button

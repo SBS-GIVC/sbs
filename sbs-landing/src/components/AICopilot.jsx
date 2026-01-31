@@ -1,12 +1,12 @@
 /**
- * AI Copilot - Intelligent Healthcare Assistant
+ * AI Copilot - DeepSeek Powered Healthcare Assistant
  * Provides real-time AI assistance for claims, coding, and clinical decisions
  */
 
 import React, { useState, useRef, useEffect } from 'react';
 import { callGemini } from '../services/geminiService';
 
-const SYSTEM_CONTEXT = `You are an expert Saudi healthcare AI assistant named "SBS Copilot". You help with:
+const SYSTEM_CONTEXT = `You are an expert Saudi healthcare AI assistant named "SBS Copilot" powered by DeepSeek. You help with:
 - SBS (Saudi Billing System) code lookups and explanations
 - NPHIES eligibility and prior authorization guidance
 - Healthcare claim validation and optimization
@@ -15,21 +15,21 @@ const SYSTEM_CONTEXT = `You are an expert Saudi healthcare AI assistant named "S
 - Clinical documentation best practices
 
 Always be concise, professional, and cite relevant Saudi healthcare regulations when applicable.
-Format responses with markdown for readability.`;
+Format responses with markdown for readability. Use bullet points and headers for clarity.`;
 
 const QUICK_PROMPTS = [
   { icon: '🔍', label: 'Find SBS Code', prompt: 'Help me find the SBS code for' },
   { icon: '✅', label: 'Validate Claim', prompt: 'Validate this claim for NPHIES submission:' },
-  { icon: '📋', label: 'Prior Auth Help', prompt: 'Help me prepare prior authorization for' },
+  { icon: '📋', label: 'Prior Auth', prompt: 'Help me prepare prior authorization for' },
   { icon: '🔄', label: 'Map Code', prompt: 'Map this internal code to SBS:' },
-  { icon: '💡', label: 'Optimize Claim', prompt: 'How can I optimize this claim for better reimbursement:' },
+  { icon: '💡', label: 'Optimize', prompt: 'How can I optimize this claim:' },
 ];
 
 export function AICopilot({ isOpen, onClose, context = {} }) {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: `👋 Hello! I'm your **SBS Copilot** - your AI-powered healthcare billing assistant.
+      content: `👋 **Hello!** I'm your **SBS Copilot** - powered by DeepSeek AI.
 
 I can help you with:
 - 🔍 Finding and explaining SBS codes
@@ -130,7 +130,7 @@ ${recentHistory}
 
 User: ${messageText}
 
-Provide a helpful, concise response. Use markdown formatting.`;
+Provide a helpful, concise response. Use markdown formatting for readability.`;
 
       const response = await callGemini(fullPrompt, SYSTEM_CONTEXT);
 
@@ -172,32 +172,39 @@ Provide a helpful, concise response. Use markdown formatting.`;
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full sm:w-[420px] z-50 flex flex-col bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 animate-slide-in-right">
+    <div className="fixed inset-y-0 right-0 w-full sm:w-[440px] z-50 flex flex-col bg-white dark:bg-slate-900 shadow-2xl border-l border-slate-200 dark:border-slate-800 animate-slide-in-right">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-primary/10 to-blue-500/10">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-primary/5 via-blue-500/5 to-purple-500/5">
         <div className="flex items-center gap-3">
           <div className="relative">
-            <div className="size-10 rounded-xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center shadow-lg">
+            <div className="size-11 rounded-xl bg-gradient-to-br from-primary via-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-primary/25">
               <span className="material-symbols-outlined text-white text-xl">psychology</span>
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 size-3 bg-green-500 rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse"></div>
+            <div className="absolute -bottom-0.5 -right-0.5 size-3.5 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-slate-900">
+              <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75"></span>
+            </div>
           </div>
           <div>
-            <h2 className="font-bold text-slate-900 dark:text-white">SBS Copilot</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">AI Healthcare Assistant</p>
+            <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              SBS Copilot
+              <span className="px-1.5 py-0.5 text-[10px] font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-md">
+                AI
+              </span>
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Powered by DeepSeek</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button
             onClick={clearChat}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-all"
             title="Clear chat"
           >
             <span className="material-symbols-outlined text-lg">refresh</span>
           </button>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors"
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-all"
           >
             <span className="material-symbols-outlined text-lg">close</span>
           </button>
@@ -205,13 +212,13 @@ Provide a helpful, concise response. Use markdown formatting.`;
       </div>
 
       {/* Quick Prompts */}
-      <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 overflow-x-auto">
+      <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 overflow-x-auto scrollbar-hide">
         <div className="flex gap-2">
           {QUICK_PROMPTS.map((qp, idx) => (
             <button
               key={idx}
               onClick={() => setInput(qp.prompt + ' ')}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary/10 hover:text-primary transition-all whitespace-nowrap"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary/10 hover:text-primary border border-transparent hover:border-primary/20 transition-all whitespace-nowrap"
             >
               <span>{qp.icon}</span>
               {qp.label}
@@ -225,21 +232,22 @@ Provide a helpful, concise response. Use markdown formatting.`;
         {messages.map((msg, idx) => (
           <div
             key={idx}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
+            style={{ animationDelay: `${idx * 50}ms` }}
           >
             <div
               className={`max-w-[85%] rounded-2xl px-4 py-3 ${
                 msg.role === 'user'
-                  ? 'bg-gradient-to-r from-primary to-blue-600 text-white rounded-br-md'
+                  ? 'bg-gradient-to-r from-primary to-blue-600 text-white rounded-br-md shadow-lg shadow-primary/20'
                   : msg.isError
                   ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 rounded-bl-md'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-bl-md'
+                  : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-bl-md border border-slate-100 dark:border-slate-700'
               }`}
             >
-              <div className="text-sm whitespace-pre-wrap prose prose-sm dark:prose-invert max-w-none">
+              <div className="text-sm prose-ai whitespace-pre-wrap">
                 {msg.content}
               </div>
-              <p className={`text-[10px] mt-1 ${msg.role === 'user' ? 'text-white/60' : 'text-slate-400'}`}>
+              <p className={`text-[10px] mt-2 ${msg.role === 'user' ? 'text-white/60' : 'text-slate-400'}`}>
                 {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
@@ -248,14 +256,14 @@ Provide a helpful, concise response. Use markdown formatting.`;
         
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl rounded-bl-md px-4 py-3">
-              <div className="flex items-center gap-2">
+            <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl rounded-bl-md px-4 py-3 border border-slate-100 dark:border-slate-700">
+              <div className="flex items-center gap-3">
                 <div className="flex gap-1">
                   <span className="size-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
                   <span className="size-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
                   <span className="size-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                 </div>
-                <span className="text-xs text-slate-500">Thinking...</span>
+                <span className="text-xs text-slate-500">DeepSeek is thinking...</span>
               </div>
             </div>
           </div>
@@ -265,7 +273,7 @@ Provide a helpful, concise response. Use markdown formatting.`;
       </div>
 
       {/* Input Area */}
-      <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+      <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
         <div className="flex items-end gap-2">
           <div className="flex-1 relative">
             <textarea
@@ -273,16 +281,16 @@ Provide a helpful, concise response. Use markdown formatting.`;
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask me anything about SBS, claims, or coding..."
-              className="w-full px-4 py-3 pr-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary resize-none text-sm"
+              placeholder="Ask about SBS codes, claims, or compliance..."
+              className="w-full px-4 py-3 pr-12 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none text-sm transition-all"
               rows={1}
               style={{ minHeight: '48px', maxHeight: '120px' }}
             />
             <button
               onClick={startListening}
-              className={`absolute right-3 bottom-3 p-1.5 rounded-lg transition-colors ${
+              className={`absolute right-3 bottom-3 p-1.5 rounded-lg transition-all ${
                 isListening 
-                  ? 'bg-red-500 text-white animate-pulse' 
+                  ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30' 
                   : 'text-slate-400 hover:text-primary hover:bg-primary/10'
               }`}
               title="Voice input"
@@ -295,12 +303,13 @@ Provide a helpful, concise response. Use markdown formatting.`;
           <button
             onClick={() => handleSend()}
             disabled={!input.trim() || isLoading}
-            className="flex items-center justify-center size-12 rounded-xl bg-gradient-to-r from-primary to-blue-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            className="flex items-center justify-center size-12 rounded-xl bg-gradient-to-r from-primary to-blue-600 text-white shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none"
           >
             <span className="material-symbols-outlined">send</span>
           </button>
         </div>
-        <p className="text-[10px] text-slate-400 text-center mt-2">
+        <p className="text-[10px] text-slate-400 text-center mt-3 flex items-center justify-center gap-2">
+          <span className="size-1.5 bg-emerald-500 rounded-full"></span>
           Powered by DeepSeek AI • SBS V3.1 Compliant
         </p>
       </div>
@@ -317,23 +326,33 @@ export function AICopilotFAB({ onClick, hasNotification = false }) {
       title="Open AI Copilot"
     >
       <div className="relative">
-        <div className="size-14 rounded-full bg-gradient-to-br from-primary via-blue-600 to-purple-600 shadow-xl flex items-center justify-center transition-all group-hover:scale-110 group-hover:shadow-2xl group-hover:shadow-primary/30">
-          <span className="material-symbols-outlined text-white text-2xl group-hover:animate-pulse">
+        {/* Glow Effect */}
+        <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary via-blue-500 to-purple-600 blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
+        
+        {/* Button */}
+        <div className="relative size-14 rounded-full bg-gradient-to-br from-primary via-blue-500 to-purple-600 shadow-xl flex items-center justify-center transition-all group-hover:scale-110 group-hover:shadow-2xl">
+          <span className="material-symbols-outlined text-white text-2xl group-hover:scale-110 transition-transform">
             psychology
           </span>
         </div>
-        {/* Pulse animation */}
-        <div className="absolute inset-0 rounded-full bg-primary animate-ping opacity-30"></div>
+        
+        {/* Pulse Ring */}
+        <div className="absolute inset-0 rounded-full border-2 border-primary animate-ping opacity-30"></div>
+        
         {/* Notification dot */}
         {hasNotification && (
-          <div className="absolute -top-1 -right-1 size-4 bg-red-500 rounded-full ring-2 ring-white dark:ring-slate-900 flex items-center justify-center">
+          <div className="absolute -top-1 -right-1 size-5 bg-red-500 rounded-full ring-2 ring-white dark:ring-slate-900 flex items-center justify-center shadow-lg">
             <span className="text-[10px] text-white font-bold">!</span>
           </div>
         )}
       </div>
+      
       {/* Tooltip */}
-      <div className="absolute bottom-full right-0 mb-2 px-3 py-1.5 bg-slate-900 dark:bg-slate-700 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-        AI Copilot
+      <div className="absolute bottom-full right-0 mb-3 px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-all transform translate-y-1 group-hover:translate-y-0 whitespace-nowrap shadow-lg">
+        <span className="flex items-center gap-1.5">
+          <span className="size-2 bg-emerald-400 rounded-full"></span>
+          AI Copilot Ready
+        </span>
         <div className="absolute top-full right-4 border-4 border-transparent border-t-slate-900 dark:border-t-slate-700"></div>
       </div>
     </button>

@@ -88,35 +88,46 @@ export function AIHubPage() {
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
       {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary via-blue-600 to-purple-600 p-8 text-white">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRoLTJ2LTRoMnY0em0wLTZ2LTRoLTJ2NGgyem0tNC00di00aC0ydjRoMnptLTQgMHYtNGgtMnY0aDJ6bTQgMHYtNGgtMnY0aDJ6bTQgMHYtNGgtMnY0aDJ6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30"></div>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 p-8 text-white">
+        {/* Animated gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-purple-500/20 to-pink-500/20 animate-gradient"></div>
         
-        <div className="relative flex items-center justify-between">
-          <div className="max-w-2xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="size-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                <span className="material-symbols-outlined text-3xl">auto_awesome</span>
+        {/* Grid pattern overlay */}
+        <div className="absolute inset-0 opacity-10" style={{ 
+          backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
+          backgroundSize: '24px 24px'
+        }}></div>
+        
+        <div className="relative flex items-center justify-between gap-8">
+          <div className="flex-1 max-w-2xl">
+            <div className="flex items-center gap-3 mb-5">
+              <div className="size-14 rounded-2xl bg-gradient-to-br from-primary via-blue-500 to-purple-600 flex items-center justify-center shadow-xl shadow-primary/30">
+                <span className="material-symbols-outlined text-3xl">psychology</span>
               </div>
               <div>
-                <h1 className="text-3xl font-bold">AI-Powered Healthcare Billing</h1>
-                <p className="text-white/80">Intelligent automation for NPHIES & SBS compliance</p>
+                <h1 className="text-3xl font-bold tracking-tight">AI-Powered Healthcare</h1>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-white/70">Powered by</span>
+                  <span className="px-2 py-0.5 text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 rounded-md">DeepSeek AI</span>
+                </div>
               </div>
             </div>
-            <p className="text-lg text-white/90 mb-6">
+            <p className="text-lg text-white/80 mb-6 leading-relaxed">
               Leverage cutting-edge AI to streamline your healthcare billing workflow. 
-              Get instant code suggestions, validate claims, and predict approvals with over 94% accuracy.
+              Get instant SBS code suggestions, validate claims against NPHIES standards, 
+              and predict approvals with <span className="text-emerald-400 font-semibold">94%+ accuracy</span>.
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => setCopilotOpen(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-white text-primary font-semibold rounded-xl hover:bg-white/90 transition-all shadow-lg hover:shadow-xl"
+                className="flex items-center gap-2 px-6 py-3 bg-white text-slate-900 font-semibold rounded-xl hover:bg-white/90 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-100"
               >
                 <span className="material-symbols-outlined">psychology</span>
                 Open AI Copilot
               </button>
               <button
                 onClick={() => setAnalyzerOpen(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-white/20 backdrop-blur-sm font-semibold rounded-xl hover:bg-white/30 transition-all"
+                className="flex items-center gap-2 px-6 py-3 bg-white/10 backdrop-blur-sm border border-white/20 font-semibold rounded-xl hover:bg-white/20 transition-all"
               >
                 <span className="material-symbols-outlined">analytics</span>
                 Analyze Claim
@@ -124,15 +135,25 @@ export function AIHubPage() {
             </div>
           </div>
           
-          <div className="hidden lg:block">
+          {/* Decorative AI Visualization */}
+          <div className="hidden lg:flex items-center justify-center">
             <div className="relative">
-              <div className="size-48 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center animate-pulse">
-                <div className="size-36 rounded-full bg-white/10 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-7xl text-white/80">smart_toy</span>
+              {/* Outer glow ring */}
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary to-purple-500 blur-xl opacity-50 animate-pulse"></div>
+              
+              {/* Main circle */}
+              <div className="relative size-48 rounded-full bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 flex items-center justify-center">
+                <div className="size-32 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/30 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-6xl text-white/90 animate-float">smart_toy</span>
                 </div>
               </div>
-              <div className="absolute -top-4 -right-4 size-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center animate-bounce">
-                <span className="material-symbols-outlined text-xl">check_circle</span>
+              
+              {/* Floating badges */}
+              <div className="absolute -top-2 -right-2 size-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg animate-bounce" style={{ animationDelay: '0.5s' }}>
+                <span className="material-symbols-outlined text-white">check_circle</span>
+              </div>
+              <div className="absolute -bottom-2 -left-2 size-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg animate-bounce" style={{ animationDelay: '0.8s' }}>
+                <span className="material-symbols-outlined text-white text-sm">auto_awesome</span>
               </div>
             </div>
           </div>
