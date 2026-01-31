@@ -111,6 +111,14 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose }) {
             onClick={() => setCurrentView('claim-optimizer')}
             badge="NEW"
         />
+        <SidebarItem 
+            icon="analytics" 
+            label="Predictive Analytics" 
+            active={currentView === 'predictive-analytics'} 
+            onClick={() => setCurrentView('predictive-analytics')}
+            badge="ML"
+            badgeColor="blue"
+        />
         
         {/* System Section */}
         <div className="mt-4 mb-2 px-3">

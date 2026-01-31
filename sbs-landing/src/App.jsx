@@ -1,27 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
 import { AICopilot, AICopilotFAB } from './components/AICopilot';
-import { DashboardPage } from './pages/DashboardPage';
-import { MappingsPage } from './pages/MappingsPage';
-import { MappingReviewPage } from './pages/MappingReviewPage';
-import { ErrorDetailPage } from './pages/ErrorDetailPage';
-import { FacilityPerformanceReport } from './pages/FacilityPerformanceReport';
-import { FacilityUsagePage } from './pages/FacilityUsagePage';
-import { MappingRulesConfig } from './pages/MappingRulesConfig';
-import { DeveloperPortal } from './pages/DeveloperPortal';
-import { SettingsPage } from './pages/SettingsPage';
-import { ClaimsQueuePage } from './pages/ClaimsQueuePage';
-import { EligibilityPage } from './pages/EligibilityPage';
-import { PriorAuthPage } from './pages/PriorAuthPage';
-import { ClaimBuilderPage } from './pages/ClaimBuilderPage';
-import { SBSCodeBrowser } from './pages/SBSCodeBrowser';
-import { UnifiedCodeBrowser } from './pages/UnifiedCodeBrowser';
-import { AIHubPage } from './pages/AIHubPage';
 
-// Legacy logic imports if needed later, kept for reference or re-integration
-// import { normalizeCode, buildFHIRAndApplyRules } from './utils/middleware';
-// import { callGemini } from './services/geminiService';
+// Lazy load pages for better code splitting
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then(m => ({ default: m.DashboardPage })));
+const MappingsPage = lazy(() => import('./pages/MappingsPage').then(m => ({ default: m.MappingsPage })));
+const MappingReviewPage = lazy(() => import('./pages/MappingReviewPage').then(m => ({ default: m.MappingReviewPage })));
+const ErrorDetailPage = lazy(() => import('./pages/ErrorDetailPage').then(m => ({ default: m.ErrorDetailPage })));
+const FacilityPerformanceReport = lazy(() => import('./pages/FacilityPerformanceReport').then(m => ({ default: m.FacilityPerformanceReport })));
+const FacilityUsagePage = lazy(() => import('./pages/FacilityUsagePage').then(m => ({ default: m.FacilityUsagePage })));
+const MappingRulesConfig = lazy(() => import('./pages/MappingRulesConfig').then(m => ({ default: m.MappingRulesConfig })));
+const DeveloperPortal = lazy(() => import('./pages/DeveloperPortal').then(m => ({ default: m.DeveloperPortal })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
+const ClaimsQueuePage = lazy(() => import('./pages/ClaimsQueuePage').then(m => ({ default: m.ClaimsQueuePage })));
+const EligibilityPage = lazy(() => import('./pages/EligibilityPage').then(m => ({ default: m.EligibilityPage })));
+const PriorAuthPage = lazy(() => import('./pages/PriorAuthPage').then(m => ({ default: m.PriorAuthPage })));
+const ClaimBuilderPage = lazy(() => import('./pages/ClaimBuilderPage').then(m => ({ default: m.ClaimBuilderPage })));
+const SBSCodeBrowser = lazy(() => import('./pages/SBSCodeBrowser').then(m => ({ default: m.SBSCodeBrowser })));
+const UnifiedCodeBrowser = lazy(() => import('./pages/UnifiedCodeBrowser').then(m => ({ default: m.UnifiedCodeBrowser })));
+const AIHubPage = lazy(() => import('./pages/AIHubPage').then(m => ({ default: m.AIHubPage })));
+const PredictiveAnalyticsPage = lazy(() => import('./pages/PredictiveAnalyticsPage').then(m => ({ default: m.PredictiveAnalyticsPage })));
+
+// Loading component for Suspense
+function PageLoader() {
+  return (
+    <div className="flex-1 flex items-center justify-center">
+      <div className="text-center">
+        <div className="size-12 mx-auto mb-4 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
+        <p className="text-slate-500 dark:text-slate-400 text-sm">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
 
 export default function App() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -114,6 +126,11 @@ export default function App() {
             setSubtitle('AI-powered healthcare billing tools');
             setBreadcrumbs(['Home', 'AI Tools']);
             break;
+        case 'predictive-analytics':
+            setPageTitle('Predictive Analytics');
+            setSubtitle('AI-powered insights and forecasting');
+            setBreadcrumbs(['Home', 'Analytics', 'Predictions']);
+            break;
         default:
             setPageTitle('Dashboard');
     }
@@ -162,6 +179,7 @@ export default function App() {
         */}
 
         <main className="flex-1 overflow-hidden relative flex flex-col">
+          <Suspense fallback={<PageLoader />}>
             {currentView === 'dashboard' && <DashboardPage />}
             {currentView === 'mappings' && <MappingsPage />}
             {currentView === 'review' && <MappingReviewPage />}
@@ -180,6 +198,8 @@ export default function App() {
             {currentView === 'code-browser' && <SBSCodeBrowser />}
             {currentView === 'unified-browser' && <UnifiedCodeBrowser />}
             {(currentView === 'ai-copilot' || currentView === 'claim-optimizer') && <AIHubPage />}
+            {currentView === 'predictive-analytics' && <PredictiveAnalyticsPage />}
+          </Suspense>
         </main>
       </div>
 
