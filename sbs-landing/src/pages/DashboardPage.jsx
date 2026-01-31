@@ -7,55 +7,267 @@ import { SectionHeader } from '../components/ui/SectionHeader';
 export function DashboardPage() {
   const toast = useToast();
 
+  const stats = [
+    {
+      title: 'Total Claims Processed',
+      value: '1,240',
+      trend: '12%',
+      trendUp: true,
+      icon: 'dataset',
+      iconColor: 'text-primary',
+      iconBg: 'bg-gradient-to-br from-primary/20 to-primary/10',
+      delay: '0',
+    },
+    {
+      title: 'Auto-Mapped Rate',
+      value: '94%',
+      trend: '2%',
+      trendUp: true,
+      icon: 'auto_fix_high',
+      iconColor: 'text-emerald-500',
+      iconBg: 'bg-gradient-to-br from-emerald-500/20 to-emerald-500/10',
+      delay: '100',
+    },
+    {
+      title: 'Pending Validation',
+      value: '45',
+      trend: '5%',
+      trendUp: false,
+      icon: 'hourglass_top',
+      iconColor: 'text-orange-500',
+      iconBg: 'bg-gradient-to-br from-orange-500/20 to-orange-500/10',
+      delay: '200',
+    },
+    {
+      title: 'Critical Errors',
+      value: '3',
+      trend: '1%',
+      trendUp: true,
+      trendBad: true,
+      icon: 'error',
+      iconColor: 'text-red-500',
+      iconBg: 'bg-gradient-to-br from-red-500/20 to-red-500/10',
+      delay: '300',
+    },
+  ];
+  const commandInsights = [
+    {
+      title: 'Adaptive Routing',
+      description: 'Rebalances traffic across payers with a 97% success rate.',
+      icon: 'route',
+      highlight: '97% success',
+    },
+    {
+      title: 'AI Confidence Fabric',
+      description: 'Learns from live edits and re-trains in 4 minutes.',
+      icon: 'neurology',
+      highlight: '4 min cycle',
+    },
+    {
+      title: 'Predictive Denials',
+      description: 'Flags high-risk claims before submission.',
+      icon: 'radar',
+      highlight: '−42% denials',
+    },
+  ];
+  const deploymentStages = [
+    {
+      title: 'Preflight',
+      detail: 'Schema + payer contract validation',
+      status: 'complete',
+      icon: 'fact_check',
+    },
+    {
+      title: 'Staging Sync',
+      detail: 'Replay 1,204 claims in sandbox',
+      status: 'active',
+      icon: 'swap_horiz',
+    },
+    {
+      title: 'Go-Live',
+      detail: 'Auto-cutover window in 2h 18m',
+      status: 'queued',
+      icon: 'rocket_launch',
+    },
+  ];
+  const aiPowerTools = [
+    {
+      title: 'Agentic Claim Builder',
+      description: 'Generates compliant claims with payer-specific rules baked in.',
+      icon: 'construction',
+      tone: 'from-indigo-500/20 via-indigo-500/10 to-transparent',
+      badge: 'Autonomous',
+    },
+    {
+      title: 'Denial Defense Grid',
+      description: 'Simulates adjudication paths and patches risk hotspots.',
+      icon: 'shield',
+      tone: 'from-emerald-500/20 via-emerald-500/10 to-transparent',
+      badge: 'Live defense',
+    },
+    {
+      title: 'Revenue Forecast Studio',
+      description: 'Predicts cashflow impact with scenario intelligence.',
+      icon: 'query_stats',
+      tone: 'from-sky-500/20 via-sky-500/10 to-transparent',
+      badge: 'Predictive',
+    },
+  ];
+
   const handleAction = (action) => {
     toast.info(`${action} is ready for integration.`);
   };
 
   return (
     <>
+        <section className="px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-2">
+            <div className="relative overflow-hidden rounded-3xl border border-slate-200/70 dark:border-slate-800/60 bg-white/80 dark:bg-[#0f1722]/80 shadow-soft">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.2),_transparent_55%)]"></div>
+                <div className="absolute -top-10 -right-12 size-40 rounded-full bg-gradient-to-br from-indigo-500/20 via-primary/20 to-transparent blur-2xl"></div>
+                <div className="absolute bottom-0 left-0 h-24 w-full bg-gradient-to-r from-primary/10 via-transparent to-emerald-500/10"></div>
+                <div className="relative p-6 sm:p-8 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+                    <div>
+                        <SectionHeader
+                            title="AI Command Center"
+                            subtitle="Orchestrate the entire revenue cycle with adaptive intelligence."
+                        />
+                        <p className="mt-2 text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-xl">
+                            A living control plane that fuses claim intake, payer intelligence, and real-time safeguards into a single cinematic view.
+                        </p>
+                        <div className="mt-6 flex flex-wrap gap-3">
+                            <Button icon="bolt" onClick={() => handleAction('Launch orchestration')}>
+                                Launch Orchestration
+                            </Button>
+                            <Button variant="secondary" icon="auto_awesome" onClick={() => handleAction('Generate insights')}>
+                                Generate Insights
+                            </Button>
+                            <Button variant="secondary" icon="share" onClick={() => handleAction('Share workspace')}>
+                                Share Workspace
+                            </Button>
+                        </div>
+                        <div className="mt-6 flex flex-wrap gap-4">
+                            {['Unified SLA view', 'Live payer sentiment', 'Auto-remediation loops'].map((item) => (
+                                <div key={item} className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                    <span className="material-symbols-outlined text-[16px] text-primary">task_alt</span>
+                                    {item}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="space-y-4">
+                        {commandInsights.map((insight) => (
+                            <div
+                                key={insight.title}
+                                className="relative overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white/90 dark:bg-[#15202b]/90 px-4 py-4 shadow-soft"
+                            >
+                                <div className="absolute right-0 top-0 h-full w-24 bg-gradient-to-l from-primary/10 to-transparent"></div>
+                                <div className="relative flex items-start gap-3">
+                                    <span className="material-symbols-outlined text-[22px] text-primary">{insight.icon}</span>
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{insight.title}</h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{insight.description}</p>
+                                        <span className="mt-2 inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                                            {insight.highlight}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-0 animate-slide-up">
-            <StatCard 
-                title="Total Claims Processed" 
-                value="1,240" 
-                trend="12%" 
-                trendUp={true} 
-                icon="dataset" 
-                iconColor="text-primary" 
-                iconBg="bg-gradient-to-br from-primary/20 to-primary/10" 
-                delay="0"
-            />
-            <StatCard 
-                title="Auto-Mapped Rate" 
-                value="94%" 
-                trend="2%" 
-                trendUp={true} 
-                icon="auto_fix_high" 
-                iconColor="text-emerald-500" 
-                iconBg="bg-gradient-to-br from-emerald-500/20 to-emerald-500/10" 
-                delay="100"
-            />
-            <StatCard 
-                title="Pending Validation" 
-                value="45" 
-                trend="5%" 
-                trendUp={false} 
-                icon="hourglass_top" 
-                iconColor="text-orange-500" 
-                iconBg="bg-gradient-to-br from-orange-500/20 to-orange-500/10" 
-                delay="200"
-            />
-            <StatCard 
-                title="Critical Errors" 
-                value="3" 
-                trend="1%" 
-                trendUp={true} 
-                trendBad={true}
-                icon="error" 
-                iconColor="text-red-500" 
-                iconBg="bg-gradient-to-br from-red-500/20 to-red-500/10" 
-                delay="300"
-            />
+            {stats.map((stat) => (
+                <StatCard key={stat.title} {...stat} />
+            ))}
         </div>
+
+        <section className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+            <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr] gap-4 sm:gap-6">
+                <Card className="relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-transparent to-transparent dark:from-slate-900/60"></div>
+                    <CardBody className="relative">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Deployment Readiness</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">Automated cutover orchestration</p>
+                            </div>
+                            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                <span className="size-2 rounded-full bg-emerald-500"></span>
+                                Ready
+                            </span>
+                        </div>
+                        <div className="mt-6 space-y-4">
+                            {deploymentStages.map((stage) => {
+                                const isActive = stage.status === 'active';
+                                const isComplete = stage.status === 'complete';
+                                return (
+                                    <div key={stage.title} className="flex items-start gap-3">
+                                        <div className={`size-10 rounded-xl flex items-center justify-center border ${isComplete ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-500' : isActive ? 'bg-primary/10 border-primary/40 text-primary' : 'bg-slate-100 border-slate-200 text-slate-400 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500'}`}>
+                                            <span className="material-symbols-outlined text-[20px]">{stage.icon}</span>
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">{stage.title}</p>
+                                                <span className={`text-[11px] font-semibold ${isComplete ? 'text-emerald-500' : isActive ? 'text-primary' : 'text-slate-400'}`}>
+                                                    {isComplete ? 'Complete' : isActive ? 'In progress' : 'Queued'}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">{stage.detail}</p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="mt-6 flex flex-wrap gap-2">
+                            <Button variant="secondary" icon="rocket_launch" onClick={() => handleAction('Deploy to production')}>
+                                Deploy Now
+                            </Button>
+                            <Button variant="secondary" icon="visibility" onClick={() => handleAction('View release plan')}>
+                                View Release Plan
+                            </Button>
+                        </div>
+                    </CardBody>
+                </Card>
+                <Card className="relative overflow-hidden">
+                    <CardBody>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">AI Power Tools</h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">Autonomous agents running on live claims</p>
+                            </div>
+                            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Supercharged</span>
+                        </div>
+                        <div className="mt-5 space-y-3">
+                            {aiPowerTools.map((tool) => (
+                                <div key={tool.title} className={`rounded-2xl border border-slate-200 dark:border-slate-800 bg-gradient-to-r ${tool.tone} px-4 py-4`}>
+                                    <div className="flex items-start gap-3">
+                                        <span className="material-symbols-outlined text-[22px] text-primary">{tool.icon}</span>
+                                        <div className="flex-1">
+                                            <div className="flex items-center justify-between">
+                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">{tool.title}</p>
+                                                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{tool.badge}</span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{tool.description}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="mt-6 flex flex-wrap gap-2">
+                            <Button icon="smart_toy" onClick={() => handleAction('Open AI fabric')}>
+                                Open AI Fabric
+                            </Button>
+                            <Button variant="secondary" icon="bolt" onClick={() => handleAction('Boost agents')}>
+                                Boost Agents
+                            </Button>
+                        </div>
+                    </CardBody>
+                </Card>
+            </div>
+        </section>
 
         <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 mb-6">
@@ -194,18 +406,6 @@ function StatCard({ title, value, trend, trendUp, trendBad, icon, iconColor, ico
             {/* Subtle gradient overlay on hover */}
             <div className="absolute inset-0 z-0 rounded-2xl bg-gradient-to-br from-primary/0 to-primary/0 group-hover:from-primary/5 group-hover:to-transparent transition-all duration-500 pointer-events-none"></div>
         </div>
-    )
-}
-
-function ActionButton({ icon, label, onClick }) {
-    return (
-        <button
-            onClick={onClick}
-            className="group flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-[#1c2630] border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-gradient-to-r hover:from-slate-50 hover:to-white dark:hover:from-[#253240] dark:hover:to-[#1c2630] hover:border-primary/30 hover:shadow-soft transition-all duration-300 hover:scale-105"
-        >
-            <span className="material-symbols-outlined text-[20px] group-hover:scale-110 transition-transform duration-300">{icon}</span>
-            {label}
-        </button>
     )
 }
 
