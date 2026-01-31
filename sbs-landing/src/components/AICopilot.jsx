@@ -45,6 +45,7 @@ How can I assist you today?`,
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [lastFailedPrompt, setLastFailedPrompt] = useState('');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -141,14 +142,16 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      setLastFailedPrompt('');
     } catch (error) {
       console.error('AI Copilot error:', error);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: '❌ I encountered an error. Please check your connection and try again.',
+        content: '❌ I could not reach DeepSeek right now. You can retry or continue with another prompt.',
         timestamp: new Date(),
         isError: true
       }]);
+      setLastFailedPrompt(messageText);
     } finally {
       setIsLoading(false);
     }
@@ -274,6 +277,17 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
 
       {/* Input Area */}
       <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+        {lastFailedPrompt && (
+          <div className="mb-3 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+            <span>DeepSeek connection paused. Retry your last message?</span>
+            <button
+              onClick={() => handleSend(lastFailedPrompt)}
+              className="rounded-lg bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-amber-700 transition"
+            >
+              Retry
+            </button>
+          </div>
+        )}
         <div className="flex items-end gap-2">
           <div className="flex-1 relative">
             <textarea
