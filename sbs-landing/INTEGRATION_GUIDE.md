@@ -15,7 +15,7 @@ This guide explains how the GIVC Health React frontend is integrated with the SB
 2. **Configure Environment**
    ```bash
    cp .env.example .env
-   # Edit .env and add your GEMINI_API_KEY
+   # Edit .env and add your DEEPSEEK_API_KEY (Gemini optional)
    ```
 
 3. **Run Development Servers**
@@ -49,7 +49,7 @@ sbs-landing/
 │   │   ├── ValidatorTab.jsx    # Validation & appeals
 │   │   └── PipelineStep.jsx    # Pipeline status indicator
 │   ├── services/               # API integration
-│   │   ├── geminiService.js    # Gemini AI proxy
+│   │   ├── geminiService.js    # AI proxy (DeepSeek backend)
 │   │   └── apiService.js       # Backend API client
 │   ├── utils/                  # Utilities
 │   │   ├── i18n.js            # Translations (EN/AR)
@@ -93,7 +93,7 @@ sbs-landing/
 
 ## 🔌 API Integration
 
-### 1. Gemini AI Service
+### 1. AI Service (DeepSeek Primary)
 
 **Frontend**: `src/services/geminiService.js`
 ```javascript
@@ -105,10 +105,10 @@ const response = await callGemini(
 );
 ```
 
-**Backend**: `server.js:371-420`
+**Backend**: `server.cjs` (AI proxy)
 ```javascript
 app.post('/api/gemini/generate', async (req, res) => {
-  // Proxies requests to Google Gemini API
+  // Proxies requests to DeepSeek via backend
   // Hides API key from frontend
 });
 ```
@@ -151,6 +151,8 @@ const result = await APIService.submitClaim({
 
 Create `.env` file in `sbs-landing/`:
 ```bash
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+DEEPSEEK_MODEL=deepseek-chat
 GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-2.0-flash-exp
 PORT=3000
@@ -189,7 +191,7 @@ docker build -t givc-health .
 
 # Run container
 docker run -p 3000:3000 \
-  -e GEMINI_API_KEY=your_key \
+  -e DEEPSEEK_API_KEY=your_key \
   -e SBS_NORMALIZER_URL=http://normalizer:8000 \
   givc-health
 ```
@@ -215,7 +217,7 @@ PAGES_API_BASE_URL=https://your-api-domain.com
 
 ## 🧪 Testing Integration
 
-### Test Gemini Proxy
+### Test AI Proxy
 
 ```bash
 curl -X POST http://localhost:3000/api/gemini/generate \
@@ -253,12 +255,12 @@ curl http://localhost:3000/health
 ALLOWED_ORIGINS=http://localhost:3001,http://localhost:3000
 ```
 
-### Issue: Gemini API errors
+### Issue: AI API errors
 
 **Solution**:
-1. Verify `GEMINI_API_KEY` is set in `.env`
-2. Check quota limits at https://makersuite.google.com/
-3. Check model name (`GEMINI_MODEL`)
+1. Verify `DEEPSEEK_API_KEY` is set in `.env`
+2. Check quota limits at https://platform.deepseek.com/
+3. Check model name (`DEEPSEEK_MODEL`)
 
 ### Issue: Build fails
 
@@ -315,7 +317,7 @@ import { Layers } from 'lucide-react';
 
 ## 🔐 Security Considerations
 
-1. **API Key Protection**: Never expose `GEMINI_API_KEY` in frontend
+1. **API Key Protection**: Never expose `DEEPSEEK_API_KEY` in frontend
 2. **CORS**: Restrict `ALLOWED_ORIGINS` in production
 3. **Input Validation**: All user inputs sanitized
 4. **Rate Limiting**: Backend enforces rate limits
@@ -326,6 +328,7 @@ import { Layers } from 'lucide-react';
 - [Vite Documentation](https://vitejs.dev/)
 - [React Documentation](https://react.dev/)
 - [Tailwind CSS](https://tailwindcss.com/)
+- [DeepSeek API Docs](https://platform.deepseek.com/docs)
 - [Gemini API Docs](https://ai.google.dev/docs)
 - [FHIR R4 Standard](https://hl7.org/fhir/R4/)
 

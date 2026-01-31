@@ -14,7 +14,9 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-chat}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - NPHIES_API_KEY=${NPHIES_API_KEY}
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
       - ALLOWED_ORIGINS=https://app.brainsait.cloud,https://brainsait.cloud

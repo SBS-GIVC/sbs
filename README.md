@@ -17,7 +17,7 @@ This solution implements a decoupled, microservices-based architecture with the 
 
 1. **Normalizer Service** (AI-Powered)
    - Translates internal hospital codes to official SBS codes
-   - Uses local mapping database + Gemini AI for dynamic lookup
+   - Uses local mapping database (Gemini legacy optional)
    - Port: 8000
 
 2. **Financial Rules Engine**

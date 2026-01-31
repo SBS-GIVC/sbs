@@ -181,7 +181,7 @@ dist/assets/main-*.js                   ~16 KB (4 KB gzip)
 
 ## 🔧 API Endpoint Testing
 
-### Test Gemini AI Endpoint
+### Test AI Endpoint (DeepSeek)
 
 ```bash
 # Test SBS code lookup
@@ -267,7 +267,7 @@ npm run preview
 
 ## ❌ Known Issues & Fixes
 
-### Issue: Gemini API Returns 403
+### Issue: AI API Returns 403/Unavailable
 **Status:** ✅ Fixed with intelligent mock responses
 **Solution:** Application gracefully falls back to smart mock responses
 **Indicator:** Look for `"isMock": true` in API response

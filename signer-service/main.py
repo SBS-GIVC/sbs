@@ -185,6 +185,29 @@ def load_private_key(key_path: str) -> rsa.RSAPrivateKey:
             detail=f"Error loading private key: {str(e)}"
         )
 
+def load_private_key_from_env() -> rsa.RSAPrivateKey | None:
+    """
+    Load RSA private key from environment (Cloudflare Secrets Store).
+    Supports either base64-encoded or raw PEM.
+    """
+    pem_b64 = os.getenv("SIGNER_PRIVATE_KEY_B64")
+    pem_raw = os.getenv("SIGNER_PRIVATE_KEY_PEM")
+
+    if not pem_b64 and not pem_raw:
+        return None
+
+    try:
+        pem_data = base64.b64decode(pem_b64).decode("utf-8") if pem_b64 else pem_raw
+        return serialization.load_pem_private_key(
+            pem_data.encode("utf-8"),
+            password=os.getenv("CERT_PASSWORD", "").encode() if os.getenv("CERT_PASSWORD") else None,
+            backend=default_backend()
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error loading private key from secrets store: {str(e)}"
+        )
 
 def canonicalize_payload(payload: Dict[str, Any]) -> str:
     """
@@ -310,11 +333,17 @@ def sign_claim(request: SignRequest):
     6. Return Base64-encoded signature
     """
     
-    # Get facility certificate
-    cert_info = get_facility_certificate(request.facility_id)
-    
-    # Load private key
-    private_key = load_private_key(cert_info['private_key_path'])
+    # Prefer secrets-store key when available
+    private_key = load_private_key_from_env()
+    cert_serial = os.getenv("SIGNER_CERT_SERIAL")
+
+    if not private_key:
+        # Get facility certificate
+        cert_info = get_facility_certificate(request.facility_id)
+        private_key = load_private_key(cert_info['private_key_path'])
+        cert_serial = cert_info['serial_number']
+    elif not cert_serial:
+        cert_serial = "ENV-SIGNER"
     
     # Canonicalize payload
     canonical_string = canonicalize_payload(request.payload)
@@ -327,7 +356,7 @@ def sign_claim(request: SignRequest):
         signature=signature,
         algorithm="SHA256withRSA",
         timestamp=datetime.utcnow().isoformat() + "Z",
-        certificate_serial=cert_info['serial_number']
+        certificate_serial=cert_serial
     )
 
 

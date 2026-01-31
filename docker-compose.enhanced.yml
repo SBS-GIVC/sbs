@@ -82,7 +82,13 @@ services:
       DB_USER: ${DB_USER:?DB_USER is required}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       DB_PORT: 5432
-      SIGNING_KEY: ${SIGNING_KEY:?SIGNING_KEY is required}
+      CERT_BASE_PATH: /certs
+      CERT_PASSWORD: ${CERT_PASSWORD:-}
+      SIGNER_PRIVATE_KEY_B64: ${SIGNER_PRIVATE_KEY_B64:-}
+      SIGNER_PRIVATE_KEY_PEM: ${SIGNER_PRIVATE_KEY_PEM:-}
+      SIGNER_CERT_SERIAL: ${SIGNER_CERT_SERIAL:-}
+      NPHIES_ENV: ${NPHIES_ENV:-sandbox}
+      ENABLE_TEST_CERTIFICATES: ${ENABLE_TEST_CERTIFICATES:-false}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
     ports:
       - "127.0.0.1:8001:8001"
@@ -92,6 +98,8 @@ services:
     restart: unless-stopped
     networks:
       - sbs-network
+    volumes:
+      - ./certs:/certs:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s

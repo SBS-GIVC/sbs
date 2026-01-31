@@ -12,7 +12,7 @@ cp .env.example .env
 
 ```bash
 # Essential: Add these keys
-GEMINI_API_KEY=your_api_key
+DEEPSEEK_API_KEY=your_api_key
 DB_PASSWORD=secure_password
 N8N_PASSWORD=secure_password
 ```

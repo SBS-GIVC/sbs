@@ -20,7 +20,9 @@ For CI/CD pipelines to work properly, configure these secrets in your GitHub rep
 - `N8N_ENCRYPTION_KEY` - n8n encryption key (generate: `openssl rand -hex 32`)
 
 ## Optional Secrets
-- `GEMINI_API_KEY` - Google Gemini AI API key (for AI features)
+- `DEEPSEEK_API_KEY` - DeepSeek AI API key (primary)
+- `DEEPSEEK_MODEL` - DeepSeek model name (optional)
+- `GEMINI_API_KEY` - Google Gemini AI API key (legacy/optional)
 - `SLACK_WEBHOOK_URL` - Slack notifications webhook
 
 ## Environment Variables (in .env)
@@ -29,5 +31,7 @@ Create `.env` file in project root with:
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 JWT_SECRET=${JWT_SECRET}
 N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+DEEPSEEK_MODEL=${DEEPSEEK_MODEL}
 GEMINI_API_KEY=${GEMINI_API_KEY}
 ```

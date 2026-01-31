@@ -60,7 +60,9 @@ nano .env
 # Database - Use strong passwords
 DB_PASSWORD=<generate-strong-password>
 
-# Gemini AI
+# DeepSeek AI (primary) + Gemini (legacy optional)
+DEEPSEEK_API_KEY=<your-actual-api-key>
+DEEPSEEK_MODEL=deepseek-chat
 GEMINI_API_KEY=<your-actual-api-key>
 
 # NPHIES Production

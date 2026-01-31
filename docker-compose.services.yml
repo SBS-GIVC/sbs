@@ -91,6 +91,9 @@ services:
       DB_PORT: 5432
       CERT_BASE_PATH: /certs
       CERT_PASSWORD: ${CERT_PASSWORD:-}
+      SIGNER_PRIVATE_KEY_B64: ${SIGNER_PRIVATE_KEY_B64:-}
+      SIGNER_PRIVATE_KEY_PEM: ${SIGNER_PRIVATE_KEY_PEM:-}
+      SIGNER_CERT_SERIAL: ${SIGNER_CERT_SERIAL:-}
       NPHIES_ENV: ${NPHIES_ENV:-sandbox}
     volumes:
       - ./certs:/certs
