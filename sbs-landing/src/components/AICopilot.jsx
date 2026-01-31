@@ -6,7 +6,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { callGemini } from '../services/geminiService';
 
-const SYSTEM_CONTEXT = `You are an expert Saudi healthcare AI assistant named "SBS Copilot" powered by DeepSeek. You help with:
+const SYSTEM_CONTEXT = `You are an expert Saudi healthcare AI assistant named "GIVC-SBS Copilot" powered by DeepSeek. You help with:
 - SBS (Saudi Billing System) code lookups and explanations
 - NPHIES eligibility and prior authorization guidance
 - Healthcare claim validation and optimization
@@ -29,7 +29,7 @@ export function AICopilot({ isOpen, onClose, context = {} }) {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: `👋 **Hello!** I'm your **SBS Copilot** - powered by DeepSeek AI.
+      content: `👋 **Hello!** I'm your **GIVC-SBS Copilot** - powered by DeepSeek AI.
 
 I can help you with:
 - 🔍 Finding and explaining SBS codes
@@ -186,12 +186,12 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
           </div>
           <div>
             <h2 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              SBS Copilot
+              GIVC-SBS Copilot
               <span className="px-1.5 py-0.5 text-[10px] font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-md">
                 AI
               </span>
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Powered by DeepSeek</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Powered by DeepSeek · BrainSAIT</p>
           </div>
         </div>
         <div className="flex items-center gap-1">

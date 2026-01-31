@@ -56,7 +56,7 @@ export function ClinicianTab({
             <div className={`flex-1 ${isRTL ? 'ml-4' : 'mr-4'}`}>
               {clinicalInsights && (
                 <div className="p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl animate-in slide-in-from-left-2">
-                  <p className="text-[10px] font-black text-indigo-400 uppercase mb-2">✨ GIVC Intelligence</p>
+                  <p className="text-[10px] font-black text-indigo-400 uppercase mb-2">✨ GIVC-SBS Intelligence</p>
                   <p className="text-xs text-indigo-100 leading-relaxed italic" dir={isRTL ? 'rtl' : 'ltr'}>
                     {clinicalInsights}
                   </p>

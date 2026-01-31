@@ -20,15 +20,15 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose }) {
       </div>
       
       {/* Logo Section */}
-      <div className="px-4 py-5 flex items-center gap-3 relative border-b border-slate-100 dark:border-slate-800">
-        <div className="relative flex items-center justify-center size-11 rounded-xl bg-gradient-to-br from-primary to-blue-600 shadow-lg shadow-primary/20 transition-all duration-300 group-hover/sidebar:shadow-glow flex-shrink-0">
-          <span className="material-symbols-outlined text-white text-2xl">local_hospital</span>
-          <div className="absolute inset-0 rounded-xl bg-white opacity-0 group-hover/sidebar:opacity-20 transition-opacity duration-300"></div>
-        </div>
-        <div className="flex flex-col overflow-hidden transition-all duration-300 opacity-0 group-hover/sidebar:opacity-100 md:group-hover/sidebar:translate-x-0 md:opacity-0 translate-x-2 group-hover/sidebar:translate-x-0">
-          <h1 className="text-base font-bold text-slate-900 dark:text-white tracking-tight whitespace-nowrap">GIVC Health</h1>
-          <p className="text-slate-500 dark:text-slate-400 text-xs font-medium whitespace-nowrap">Integration Platform</p>
-        </div>
+        <div className="px-4 py-5 flex items-center gap-3 relative border-b border-slate-100 dark:border-slate-800">
+          <div className="relative flex items-center justify-center size-11 rounded-xl bg-gradient-to-br from-primary to-blue-600 shadow-lg shadow-primary/20 transition-all duration-300 group-hover/sidebar:shadow-glow flex-shrink-0">
+            <span className="material-symbols-outlined text-white text-2xl">local_hospital</span>
+            <div className="absolute inset-0 rounded-xl bg-white opacity-0 group-hover/sidebar:opacity-20 transition-opacity duration-300"></div>
+          </div>
+          <div className="flex flex-col overflow-hidden transition-all duration-300 opacity-0 group-hover/sidebar:opacity-100 md:group-hover/sidebar:translate-x-0 md:opacity-0 translate-x-2 group-hover/sidebar:translate-x-0">
+            <h1 className="text-base font-bold text-slate-900 dark:text-white tracking-tight whitespace-nowrap">GIVC-SBS</h1>
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-medium whitespace-nowrap">Saudi Billing System</p>
+          </div>
         
         {/* Close button (mobile only) */}
         <button
@@ -157,7 +157,9 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose }) {
       {/* User Profile */}
       <div className="p-3 border-t border-slate-100 dark:border-slate-800">
         <a 
-          href="#" 
+          href="https://fadil369.github.io/profile" 
+          target="_blank"
+          rel="noreferrer"
           className="group/user flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200"
         >
           <div className="relative flex-shrink-0">
@@ -171,8 +173,8 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose }) {
             </div>
           </div>
           <div className="flex-1 min-w-0 overflow-hidden transition-all duration-300 opacity-0 group-hover/sidebar:opacity-100 md:opacity-0 md:group-hover/sidebar:opacity-100">
-            <p className="text-sm font-semibold text-slate-900 dark:text-white truncate group-hover/user:text-primary transition-colors">Dr. Sarah Chen</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">System Admin</p>
+            <p className="text-sm font-semibold text-slate-900 dark:text-white truncate group-hover/user:text-primary transition-colors">Dr. Mohamed El Fadil</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">Founder & Medical Director</p>
           </div>
           <span className="material-symbols-outlined text-slate-300 dark:text-slate-600 text-base opacity-0 group-hover/sidebar:opacity-100 group-hover/user:text-primary transition-all">
             chevron_right

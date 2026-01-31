@@ -3,8 +3,9 @@
 @tailwind utilities;
 
 /* ===================================== */
-/* GIVC HEALTH - Premium Design System  */
-/* Version 2.0 - DeepSeek AI Powered    */
+/* GIVC-SBS - Premium Design System      */
+/* Global Integrated Virtual Care        */
+/* Saudi Billing System (SBS)            */
 /* ===================================== */
 
 @layer base {
@@ -77,6 +78,11 @@
     background-size: 32px 32px;
     pointer-events: none;
     z-index: -1;
+  }
+
+  .dark body::before {
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.06) 1px, transparent 0);
   }
 
   /* Global Box Sizing */

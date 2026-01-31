@@ -102,7 +102,7 @@ export function TopHeader({ title, subtitle, breadcrumbs, onMenuClick }) {
                   : 'hover:bg-white dark:hover:bg-slate-800 hover:shadow-soft'
                 }
               `}
-              placeholder="Search claims, patients, codes..." 
+              placeholder="Search claims, patients, SBS codes..." 
               type="text"
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}

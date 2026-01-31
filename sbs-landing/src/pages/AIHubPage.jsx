@@ -11,8 +11,8 @@ const AI_FEATURES = [
   {
     id: 'copilot',
     icon: 'psychology',
-    title: 'SBS Copilot',
-    description: 'Your AI healthcare billing assistant. Get instant answers about SBS codes, claim validation, and compliance.',
+    title: 'GIVC-SBS Copilot',
+    description: 'Premium AI healthcare billing assistant for SBS codes, claim validation, and CHI/NPHIES compliance.',
     color: 'from-primary to-blue-600',
     stats: { label: 'Queries Handled', value: '2,450+' },
     badge: 'POPULAR'
@@ -88,7 +88,7 @@ export function AIHubPage() {
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
       {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 p-8 text-white">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-8 text-white">
         {/* Animated gradient background */}
         <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-purple-500/20 to-pink-500/20 animate-gradient"></div>
         
@@ -105,7 +105,7 @@ export function AIHubPage() {
                 <span className="material-symbols-outlined text-3xl">psychology</span>
               </div>
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">AI-Powered Healthcare</h1>
+                <h1 className="text-3xl font-bold tracking-tight">GIVC-SBS AI Platform</h1>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-white/70">Powered by</span>
                   <span className="px-2 py-0.5 text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 rounded-md">DeepSeek AI</span>
@@ -113,7 +113,7 @@ export function AIHubPage() {
               </div>
             </div>
             <p className="text-lg text-white/80 mb-6 leading-relaxed">
-              Leverage cutting-edge AI to streamline your healthcare billing workflow. 
+              Leverage cutting-edge AI to streamline your Saudi healthcare billing workflow. 
               Get instant SBS code suggestions, validate claims against NPHIES standards, 
               and predict approvals with <span className="text-emerald-400 font-semibold">94%+ accuracy</span>.
             </p>

@@ -43,7 +43,7 @@
     },
     {
       "parameters": {
-        "url": "http://sbs-financial-rules:8002/apply-rules",
+        "url": "http://sbs-financial-rules:8002/validate",
         "method": "POST",
         "jsonParameters": true,
         "options": {

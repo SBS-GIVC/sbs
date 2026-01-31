@@ -1,9 +1,9 @@
 // Internationalization (i18n) - English and Arabic translations
 export const i18n = {
   en: {
-    title: "GIVC HEALTH",
-    tagline: "Global Integrated Virtual Care Health",
-    subtitle: "Automated Virtual Care Intelligence",
+    title: "GIVC-SBS",
+    tagline: "Global Integrated Virtual Care · Saudi Billing System",
+    subtitle: "Powered by BrainSAIT برينسايت · Dr. Mohamed El Fadil",
     clinician: "Clinician",
     coder: "Medical Coder",
     validator: "Origin Validator",
@@ -27,16 +27,16 @@ export const i18n = {
     archive: "Secure Submission Archive",
     accepted: "ACCEPTED",
     verified: "Verified Origin",
-    sbsEngine: "SBS V3.0 Engine",
+    sbsEngine: "Saudi Billing System (SBS)",
     liveSync: "NPHIES Live Sync",
     errorPipeline: "System Error: Pipeline execution interrupted.",
     waitingData: "Awaiting ambient dialogue input...",
     processEncounter: "Finalize doctor encounter to trigger coding pipeline.",
-    poweredBy: "Powered by BrainSAIT برينسايت"
+    poweredBy: "Powered by BrainSAIT برينسايت · Dr. Mohamed El Fadil"
   },
   ar: {
-    title: "GIVC HEALTH",
-    tagline: "Global Integrated Virtual Care Health",
+    title: "GIVC-SBS",
+    tagline: "الرعاية الافتراضية المتكاملة عالمياً · نظام الفوترة السعودي",
     subtitle: "ذكاء الرعاية الافتراضية المتكامل",
     clinician: "الممارس الصحي",
     coder: "الترميز الطبي",
@@ -61,11 +61,11 @@ export const i18n = {
     archive: "أرشيف المطالبات الموثق",
     accepted: "تم القبول",
     verified: "منشأ موثق",
-    sbsEngine: "محرك معايرة SBS",
+    sbsEngine: "نظام الفوترة السعودي (SBS)",
     liveSync: "مزامنة نفيس الحية",
     errorPipeline: "خطأ في النظام: تعذر إكمال المعالجة.",
     waitingData: "في انتظار الحوار السريري...",
     processEncounter: "قم بإنهاء معاينة الطبيب لبدء عملية الترميز.",
-    poweredBy: "Powered by BrainSAIT برينسايت"
+    poweredBy: "Powered by BrainSAIT برينسايت · Dr. Mohamed El Fadil"
   }
 };

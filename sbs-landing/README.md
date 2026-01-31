@@ -169,7 +169,7 @@ Save this as a new workflow in n8n:
       "type": "n8n-nodes-base.httpRequest",
       "position": [650, 300],
       "parameters": {
-        "url": "http://sbs-financial-rules:8002/apply-rules",
+        "url": "http://sbs-financial-rules:8002/validate",
         "method": "POST",
         "jsonParameters": true,
         "bodyParametersJson": "={{ $json }}"

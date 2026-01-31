@@ -8,7 +8,7 @@ export function Footer({ t, isRTL }) {
         <div className={`flex gap-8 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
           <span className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></div>
-            GIVC CLOUD CORE
+            GIVC-SBS CLOUD CORE
           </span>
           <span className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
@@ -23,9 +23,18 @@ export function Footer({ t, isRTL }) {
           <div className="w-6 h-6 bg-indigo-900/50 rounded-lg flex items-center justify-center group-hover:bg-indigo-600 transition-colors">
             <BrainCircuit size={14} className="text-indigo-400 group-hover:text-white" />
           </div>
-          <p className="group-hover:text-indigo-400 transition-colors tracking-[0.1em]">{t.poweredBy}</p>
+          <a
+            className="group-hover:text-indigo-400 transition-colors tracking-[0.1em]"
+            href="https://fadil369.github.io/brainsait-docs"
+            target="_blank"
+            rel="noreferrer"
+          >
+            {t.poweredBy}
+          </a>
         </div>
-        <p dir="ltr" className="opacity-40 tracking-widest">© 2026 GIVC HEALTH SYSTEMS</p>
+        <p dir="ltr" className="opacity-40 tracking-widest">
+          © 2026 GIVC-SBS · Brainsait · Dr. Mohamed El Fadil
+        </p>
       </div>
     </footer>
   );

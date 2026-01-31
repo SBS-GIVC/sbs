@@ -469,7 +469,7 @@ async function triggerDirectSBS(claimData) {
     });
     
     // Step 2: Apply Financial Rules
-    const rulesResponse = await axios.post((process.env.FINANCIAL_RULES_URL || 'http://localhost:8002') + '/apply-rules', {
+    const rulesResponse = await axios.post((process.env.FINANCIAL_RULES_URL || 'http://localhost:8002') + '/validate', {
       data: normalizeResponse.data
     });
     

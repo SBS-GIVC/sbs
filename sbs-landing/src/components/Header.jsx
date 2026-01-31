@@ -36,8 +36,8 @@ export function Header({ lang, setLang, activeTab, setActiveTab, t, isRTL }) {
           >
             <Languages size={18}/> {lang.toUpperCase()}
           </button>
-          <div className="w-10 h-10 rounded-2xl bg-indigo-900/40 border border-indigo-500/30 flex items-center justify-center text-white font-black shadow-inner">
-            GIVC
+          <div className="w-12 h-10 rounded-2xl bg-indigo-900/40 border border-indigo-500/30 flex items-center justify-center text-white font-black shadow-inner text-xs tracking-[0.12em]">
+            GIVC‑SBS
           </div>
         </div>
       </div>

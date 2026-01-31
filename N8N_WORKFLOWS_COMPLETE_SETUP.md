@@ -148,7 +148,7 @@ Timeout: 30000
 ```
 Type: HTTP Request
 Method: POST
-URL: http://sbs-financial-rules:8002/apply-rules
+URL: http://sbs-financial-rules:8002/validate
 Body: JSON
 Body Parameters: {{ $json }}
 Timeout: 30000
@@ -464,4 +464,3 @@ docker logs n8n-n8n-1 -f
 
 **Powered by BrainSAIT برينسايت**  
 **Author**: Dr. Mohamed El Fadil
-

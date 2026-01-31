@@ -8,9 +8,9 @@ export function CoderTab({ t, isRTL, pipelineStatus, submissionData }) {
       <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl">
         <div className={`flex justify-between items-center mb-8 px-4 ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
           <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">{t.subtitle}</h3>
-          <div className="flex items-center gap-2 text-indigo-400 text-[10px] font-bold">
-            <BrainCircuit size={12}/> BrainSAIT AI Verified ✨
-          </div>
+            <div className="flex items-center gap-2 text-indigo-400 text-[10px] font-bold">
+              <BrainCircuit size={12}/> BrainSAIT Verified ✨
+            </div>
         </div>
 
         <div className={`flex justify-between max-w-2xl mx-auto ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -89,7 +89,7 @@ export function CoderTab({ t, isRTL, pipelineStatus, submissionData }) {
 
         <div className="lg:col-span-5 bg-slate-950 border border-slate-800 rounded-3xl p-6">
           <h4 className={`text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4 ${isRTL ? 'text-right' : 'text-left'}`}>
-            GIVC-FHIR Payload Preview
+            GIVC-SBS FHIR Payload Preview
           </h4>
           <pre className="text-[9px] font-mono text-indigo-300/80 overflow-auto max-h-[500px] leading-tight" dir="ltr">
             {submissionData ? JSON.stringify(submissionData, null, 2) : "// Waiting for data normalization..."}

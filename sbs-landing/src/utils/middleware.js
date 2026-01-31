@@ -197,12 +197,12 @@ export async function normalizeCode(internalCode, description, lang = 'en') {
  * Build FHIR R4 Claim resource and apply financial rules
  */
 export function buildFHIRAndApplyRules(items) {
-  const accreditationMarkup = 1.15; // 15% Markup for GIVC standard
+  const accreditationMarkup = 1.15; // 15% Markup for GIVC-SBS standard
   const total = items.reduce((acc, curr) => acc + (curr.fee * accreditationMarkup), 0);
 
   return {
     resourceType: "Claim",
-    id: `givc-clm-${Date.now()}`,
+    id: `givc-sbs-clm-${Date.now()}`,
     status: "active",
     type: {
       coding: [{
@@ -216,7 +216,7 @@ export function buildFHIRAndApplyRules(items) {
     },
     created: new Date().toISOString(),
     provider: {
-      reference: "Organization/GIVC"
+      reference: "Organization/GIVC-SBS"
     },
     priority: {
       coding: [{

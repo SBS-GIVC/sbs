@@ -74,7 +74,7 @@ export function ValidatorTab({
                     </div>
                     <div className={isRTL ? 'text-right' : 'text-left'}>
                       <p className="text-xs font-mono text-slate-400 uppercase tracking-tighter">
-                        #GIVC-AUTH-{8800 + i}
+                        #GIVC-SBS-AUTH-{8800 + i}
                       </p>
                       <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">
                         Verified Origin Gateway ({t.verified})

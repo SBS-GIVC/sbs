@@ -102,14 +102,14 @@ export function DeveloperPortal() {
                 <div className="mb-10">
                     <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-4">Upload Claim Data</h1>
                     <p className="text-lg text-slate-600 dark:text-[#92adc9] leading-relaxed">
-                        Submit raw claim data for AI-driven normalization and coding. This endpoint processes unstructured clinical notes and returns standardized ICD-10 and CPT codes.
+                         Submit raw claim data for AI-driven normalization and coding. This endpoint processes unstructured clinical notes and returns standardized SBS, ICD-10, and CPT codes.
                     </p>
                 </div>
 
                 <div className="mb-10">
                     <div className="flex items-center gap-4 p-4 rounded-lg bg-slate-100 dark:bg-[#1e293b] border border-slate-200 dark:border-border-dark font-mono text-sm overflow-x-auto">
                         <span className="px-2.5 py-1 rounded text-xs font-bold bg-primary text-white uppercase tracking-wide">POST</span>
-                        <span className="text-slate-600 dark:text-slate-300">https://api.healthgateway.io/v1/claims/upload</span>
+                        <span className="text-slate-600 dark:text-slate-300">https://api.brainsait.cloud/v1/claims/upload</span>
                         <button className="ml-auto text-slate-400 hover:text-white transition-colors">
                             <span className="material-symbols-outlined text-[18px]">content_copy</span>
                         </button>
