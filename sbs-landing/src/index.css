@@ -297,3 +297,68 @@
   opacity: 0;
   transition: opacity 300ms;
 }
+
+/* AI Copilot slide-in animation */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-out-right {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-slide-out-right {
+  animation: slide-out-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* AI Copilot specific styles */
+.prose-sm {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.prose-sm p {
+  margin-bottom: 0.75em;
+}
+
+.prose-sm ul, .prose-sm ol {
+  padding-left: 1.25em;
+  margin-bottom: 0.75em;
+}
+
+.prose-sm li {
+  margin-bottom: 0.25em;
+}
+
+.prose-sm code {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 0.125em 0.25em;
+  border-radius: 0.25em;
+  font-size: 0.85em;
+}
+
+.prose-sm strong {
+  font-weight: 600;
+}
+
+.dark .prose-invert code {
+  background: rgba(255, 255, 255, 0.1);
+}

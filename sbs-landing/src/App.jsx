@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
+import { AICopilot, AICopilotFAB } from './components/AICopilot';
 import { DashboardPage } from './pages/DashboardPage';
 import { MappingsPage } from './pages/MappingsPage';
 import { MappingReviewPage } from './pages/MappingReviewPage';
@@ -16,6 +17,7 @@ import { PriorAuthPage } from './pages/PriorAuthPage';
 import { ClaimBuilderPage } from './pages/ClaimBuilderPage';
 import { SBSCodeBrowser } from './pages/SBSCodeBrowser';
 import { UnifiedCodeBrowser } from './pages/UnifiedCodeBrowser';
+import { AIHubPage } from './pages/AIHubPage';
 
 // Legacy logic imports if needed later, kept for reference or re-integration
 // import { normalizeCode, buildFHIRAndApplyRules } from './utils/middleware';
@@ -27,6 +29,7 @@ export default function App() {
   const [breadcrumbs, setBreadcrumbs] = useState(['Home', 'Data Ingestion & Normalization']);
   const [subtitle, setSubtitle] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [copilotOpen, setCopilotOpen] = useState(false);
 
   // Update header based on view
   useEffect(() => {
@@ -105,6 +108,12 @@ export default function App() {
             setSubtitle('Search across all healthcare code systems');
             setBreadcrumbs(['Home', 'Unified Browser']);
             break;
+        case 'ai-copilot':
+        case 'claim-optimizer':
+            setPageTitle('AI Hub');
+            setSubtitle('AI-powered healthcare billing tools');
+            setBreadcrumbs(['Home', 'AI Tools']);
+            break;
         default:
             setPageTitle('Dashboard');
     }
@@ -170,8 +179,21 @@ export default function App() {
             {currentView === 'claim-builder' && <ClaimBuilderPage />}
             {currentView === 'code-browser' && <SBSCodeBrowser />}
             {currentView === 'unified-browser' && <UnifiedCodeBrowser />}
+            {(currentView === 'ai-copilot' || currentView === 'claim-optimizer') && <AIHubPage />}
         </main>
       </div>
+
+      {/* AI Copilot */}
+      <AICopilot 
+        isOpen={copilotOpen} 
+        onClose={() => setCopilotOpen(false)}
+        context={{ currentPage: currentView }}
+      />
+      
+      {/* AI Copilot FAB */}
+      {!copilotOpen && (
+        <AICopilotFAB onClick={() => setCopilotOpen(true)} />
+      )}
     </div>
   );
 }

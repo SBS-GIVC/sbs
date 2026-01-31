@@ -92,6 +92,26 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose }) {
             onClick={() => setCurrentView('review')}
         />
         
+        {/* AI Tools Section */}
+        <div className="mt-4 mb-2 px-3">
+          <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300">AI Tools</p>
+        </div>
+        <SidebarItem 
+            icon="psychology" 
+            label="AI Copilot" 
+            active={currentView === 'ai-copilot'} 
+            onClick={() => setCurrentView('ai-copilot')}
+            badge="AI"
+            badgeColor="purple"
+        />
+        <SidebarItem 
+            icon="auto_awesome" 
+            label="Claim Optimizer" 
+            active={currentView === 'claim-optimizer'} 
+            onClick={() => setCurrentView('claim-optimizer')}
+            badge="NEW"
+        />
+        
         {/* System Section */}
         <div className="mt-4 mb-2 px-3">
           <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300">System</p>
@@ -132,7 +152,14 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose }) {
   );
 }
 
-function SidebarItem({ icon, label, active, onClick, badge }) {
+function SidebarItem({ icon, label, active, onClick, badge, badgeColor = 'emerald' }) {
+    const badgeColors = {
+        emerald: 'from-emerald-500 to-teal-500',
+        purple: 'from-purple-500 to-pink-500',
+        blue: 'from-blue-500 to-cyan-500',
+        amber: 'from-amber-500 to-orange-500',
+    };
+    
     return (
         <button 
             onClick={onClick}
@@ -152,7 +179,7 @@ function SidebarItem({ icon, label, active, onClick, badge }) {
             </span>
             <span className={`text-sm font-medium flex-1 transition-all duration-300 ${active ? 'font-semibold' : ''} opacity-0 group-hover:opacity-100 md:group-hover:opacity-100 md:opacity-0`}>{label}</span>
             {badge && (
-                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-sm animate-pulse-glow">
+                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full bg-gradient-to-r ${badgeColors[badgeColor] || badgeColors.emerald} text-white shadow-sm animate-pulse-glow`}>
                     {badge}
                 </span>
             )}
