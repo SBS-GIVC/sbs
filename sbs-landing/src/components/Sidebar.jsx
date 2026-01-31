@@ -173,8 +173,8 @@ function SidebarItem({ icon, label, active, onClick, badge, badgeColor = 'emeral
             onClick={onClick}
             className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-300 w-full text-left relative overflow-hidden ${
                 active 
-                ? 'bg-gradient-to-r from-primary/15 to-primary/10 text-primary shadow-soft border border-primary/20' 
-                : 'text-slate-600 dark:text-slate-400 hover:bg-gradient-to-r hover:from-slate-100 hover:to-slate-50 dark:hover:from-slate-800/50 dark:hover:to-slate-800/30 hover:shadow-soft hover:scale-[1.02]'
+                ? 'bg-gradient-to-r from-primary/10 to-blue-500/10 text-primary shadow-sm border border-primary/10 backdrop-blur-sm' 
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white hover:scale-[1.02] active:scale-[0.98]'
             }`}
         >
             {/* Active indicator */}

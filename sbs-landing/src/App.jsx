@@ -20,7 +20,7 @@ const ClaimBuilderPage = lazy(() => import('./pages/ClaimBuilderPage').then(m =>
 const SBSCodeBrowser = lazy(() => import('./pages/SBSCodeBrowser').then(m => ({ default: m.SBSCodeBrowser })));
 const UnifiedCodeBrowser = lazy(() => import('./pages/UnifiedCodeBrowser').then(m => ({ default: m.UnifiedCodeBrowser })));
 const AIHubPage = lazy(() => import('./pages/AIHubPage').then(m => ({ default: m.AIHubPage })));
-const PredictiveAnalyticsPage = lazy(() => import('./pages/PredictiveAnalyticsPage').then(m => ({ default: m.PredictiveAnalyticsPage })));
+const PredictiveAnalyticsPage = lazy(() => import('./pages/PredictiveAnalyticsPage').then(m => ({ default: m.PredictiveAnalyticsDashboard })));
 
 // Loading component for Suspense
 function PageLoader() {
