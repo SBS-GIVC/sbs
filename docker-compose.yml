@@ -184,9 +184,10 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - PORT=3000
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://n8n:5678/webhook/sbs-claim-submission}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
-      - ENABLE_DIRECT_SBS=${ENABLE_DIRECT_SBS:-false}
+      - ENABLE_DIRECT_SBS=${ENABLE_DIRECT_SBS:-true}
       - NORMALIZER_URL=http://normalizer-service:8000
       - SIGNER_URL=http://signer-service:8001
       - FINANCIAL_RULES_URL=http://financial-rules-engine:8002

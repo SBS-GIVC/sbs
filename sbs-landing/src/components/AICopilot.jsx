@@ -301,7 +301,7 @@ Provide a helpful, concise response. Use markdown formatting.`;
           </button>
         </div>
         <p className="text-[10px] text-slate-400 text-center mt-2">
-          Powered by Google Gemini AI • SBS V3.1 Compliant
+          Powered by DeepSeek AI • SBS V3.1 Compliant
         </p>
       </div>
     </div>
