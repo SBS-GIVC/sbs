@@ -227,7 +227,7 @@ async def health_check():
             cursor = conn.cursor()
             cursor.execute("SELECT 1")
             cursor.close()
-            
+
         return {
             "status": "healthy",
             "database": "connected",
@@ -240,6 +240,33 @@ async def health_check():
             status_code=503,
             content={
                 "status": "unhealthy",
+                "database": "disconnected",
+                "error": str(e)
+            }
+        )
+
+
+@app.get("/ready")
+async def ready_check():
+    """Readiness probe endpoint for Kubernetes"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.close()
+
+        return {
+            "status": "ready",
+            "database": "connected",
+            "pool_available": db_pool is not None,
+            "version": "2.0.0",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "not_ready",
                 "database": "disconnected",
                 "error": str(e)
             }

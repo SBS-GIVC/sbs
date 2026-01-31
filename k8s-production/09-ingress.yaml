@@ -1,0 +1,150 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sbs-ingress
+  namespace: sbs-prod
+  labels:
+    app: sbs
+    component: ingress
+    environment: production
+  annotations:
+    # Traefik specific annotations
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.middlewares: sbs-prod-security-headers@kubernetescrd,sbs-prod-rate-limit@kubernetescrd
+    # SSL/TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # Timeout settings
+    traefik.ingress.kubernetes.io/router.timeout: "300s"
+    # Description
+    description: "SBS Production Ingress - Main entry point"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - brainsait-pi.taile21830.ts.net
+      secretName: sbs-tls-cert
+  rules:
+    - host: brainsait-pi.taile21830.ts.net
+      http:
+        paths:
+          # Frontend - Main application
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+          
+          # API Routes - Microservices
+          - path: /api/normalizer
+            pathType: Prefix
+            backend:
+              service:
+                name: normalizer-service
+                port:
+                  number: 8000
+          
+          - path: /api/signer
+            pathType: Prefix
+            backend:
+              service:
+                name: signer-service
+                port:
+                  number: 8001
+          
+          - path: /api/financial
+            pathType: Prefix
+            backend:
+              service:
+                name: financial-service
+                port:
+                  number: 8002
+          
+          - path: /api/nphies
+            pathType: Prefix
+            backend:
+              service:
+                name: nphies-service
+                port:
+                  number: 8003
+
+---
+# Middleware for security headers
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: security-headers
+  namespace: sbs-prod
+  labels:
+    app: sbs
+    component: middleware
+spec:
+  headers:
+    customFrameOptionsValue: "SAMEORIGIN"
+    customResponseHeaders:
+      X-Content-Type-Options: "nosniff"
+      X-Frame-Options: "SAMEORIGIN"
+      X-XSS-Protection: "1; mode=block"
+      Referrer-Policy: "strict-origin-when-cross-origin"
+      Permissions-Policy: "geolocation=(), microphone=(), camera=()"
+    sslRedirect: true
+    stsSeconds: 31536000
+    stsIncludeSubdomains: true
+    stsPreload: true
+
+---
+# Middleware for rate limiting
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: rate-limit
+  namespace: sbs-prod
+  labels:
+    app: sbs
+    component: middleware
+spec:
+  rateLimit:
+    average: 100
+    burst: 50
+    period: 1m
+
+---
+# Middleware for compression
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: compression
+  namespace: sbs-prod
+  labels:
+    app: sbs
+    component: middleware
+spec:
+  compress: {}
+
+---
+# Middleware for CORS (if needed)
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: cors
+  namespace: sbs-prod
+  labels:
+    app: sbs
+    component: middleware
+spec:
+  headers:
+    accessControlAllowMethods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+      - OPTIONS
+    accessControlAllowOriginList:
+      - https://brainsait-pi.taile21830.ts.net
+    accessControlAllowHeaders:
+      - "*"
+    accessControlMaxAge: 3600
+    addVaryHeader: true

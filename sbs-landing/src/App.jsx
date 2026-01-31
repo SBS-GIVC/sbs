@@ -21,6 +21,7 @@ const SBSCodeBrowser = lazy(() => import('./pages/SBSCodeBrowser').then(m => ({ 
 const UnifiedCodeBrowser = lazy(() => import('./pages/UnifiedCodeBrowser').then(m => ({ default: m.UnifiedCodeBrowser })));
 const AIHubPage = lazy(() => import('./pages/AIHubPage').then(m => ({ default: m.AIHubPage })));
 const PredictiveAnalyticsPage = lazy(() => import('./pages/PredictiveAnalyticsPage').then(m => ({ default: m.PredictiveAnalyticsDashboard })));
+const AIAnalyticsHub = lazy(() => import('./pages/AIAnalyticsHub').then(m => ({ default: m.default })));
 
 // Loading component for Suspense
 function PageLoader() {
@@ -131,6 +132,11 @@ export default function App() {
             setSubtitle('AI-powered insights and forecasting');
             setBreadcrumbs(['Home', 'Analytics', 'Predictions']);
             break;
+        case 'ai-analytics':
+            setPageTitle('AI Analytics Hub');
+            setSubtitle('Comprehensive AI-powered claim analytics');
+            setBreadcrumbs(['Home', 'AI Tools', 'Analytics Hub']);
+            break;
         default:
             setPageTitle('Dashboard');
     }
@@ -199,6 +205,7 @@ export default function App() {
             {currentView === 'unified-browser' && <UnifiedCodeBrowser />}
             {(currentView === 'ai-copilot' || currentView === 'claim-optimizer') && <AIHubPage />}
             {currentView === 'predictive-analytics' && <PredictiveAnalyticsPage />}
+            {currentView === 'ai-analytics' && <AIAnalyticsHub />}
           </Suspense>
         </main>
       </div>

@@ -177,6 +177,30 @@ services:
     networks:
       - sbs-network
 
+  ai-prediction-service:
+    build:
+      context: ./ai-prediction-service
+      dockerfile: Dockerfile
+    container_name: sbs-ai-prediction
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+    ports:
+      - "127.0.0.1:8004:8004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sbs-network
+
   sbs-landing:
     build:
       context: ./sbs-landing
@@ -193,6 +217,7 @@ services:
       SIGNER_URL: http://signer-service:8001
       FINANCIAL_RULES_URL: http://financial-rules-engine:8002
       NPHIES_BRIDGE_URL: http://nphies-bridge:8003
+      AI_PREDICTION_URL: http://ai-prediction-service:8004
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
@@ -207,6 +232,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ai-prediction-service:
+        condition: service_started
     restart: unless-stopped
     networks:
       - sbs-network
@@ -225,7 +252,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
     ports:
-      - "0.0.0.0:8004:8004"
+      - "0.0.0.0:8005:8005"
     depends_on:
       redis:
         condition: service_healthy
@@ -266,6 +293,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      ai-prediction-service:
+        condition: service_started
     restart: unless-stopped
     networks:
       - sbs-network

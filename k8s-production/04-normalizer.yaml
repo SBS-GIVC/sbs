@@ -1,0 +1,147 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: normalizer-service
+  namespace: sbs-prod
+  labels:
+    app: sbs-normalizer
+    component: microservice
+    environment: production
+  annotations:
+    description: "Normalizer Service - Data Normalization"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app: sbs-normalizer
+    component: microservice
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: normalizer
+  namespace: sbs-prod
+  labels:
+    app: sbs-normalizer
+    component: microservice
+    environment: production
+  annotations:
+    description: "Normalizer Microservice Deployment"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: sbs-normalizer
+      component: microservice
+  template:
+    metadata:
+      labels:
+        app: sbs-normalizer
+        component: microservice
+        environment: production
+        version: "1.0"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - sbs-normalizer
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: normalizer
+          image: docker.io/sbs/normalizer:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: sbs-config
+                  key: NORMALIZER_PORT
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: sbs-config
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: sbs-config
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: sbs-config
+                  key: DB_NAME
+            - name: DB_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: sbs-config
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sbs-secrets
+                  key: DB_PASSWORD
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: sbs-config
+                  key: LOG_LEVEL
+            - name: ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: sbs-config
+                  key: ENVIRONMENT
+            - name: WORKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: sbs-config
+                  key: WORKERS
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 10"]

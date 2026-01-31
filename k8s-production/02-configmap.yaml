@@ -1,0 +1,50 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sbs-config
+  namespace: sbs-prod
+  labels:
+    app: sbs
+    environment: production
+  annotations:
+    description: "SBS Production Configuration"
+data:
+  # Database Configuration
+  DB_HOST: "postgres-service.sbs-prod.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "sbs_production"
+  DB_USER: "sbs_user"
+  
+  # Application Configuration
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  DEBUG: "false"
+  
+  # Service URLs (internal)
+  NORMALIZER_URL: "http://normalizer-service.sbs-prod.svc.cluster.local:8000"
+  SIGNER_URL: "http://signer-service.sbs-prod.svc.cluster.local:8001"
+  FINANCIAL_URL: "http://financial-service.sbs-prod.svc.cluster.local:8002"
+  NPHIES_URL: "http://nphies-service.sbs-prod.svc.cluster.local:8003"
+  
+  # Service Ports
+  NORMALIZER_PORT: "8000"
+  SIGNER_PORT: "8001"
+  FINANCIAL_PORT: "8002"
+  NPHIES_PORT: "8003"
+  
+  # External URLs
+  EXTERNAL_NPHIES_API: "https://api.nphies.sa"
+  
+  # Performance Tuning
+  WORKERS: "4"
+  MAX_CONNECTIONS: "100"
+  TIMEOUT: "300"
+  
+  # Feature Flags
+  ENABLE_METRICS: "true"
+  ENABLE_TRACING: "true"
+  ENABLE_AUDIT_LOG: "true"
+  
+  # Timezone
+  TZ: "Asia/Riyadh"

@@ -319,6 +319,20 @@ def health_check():
         )
 
 
+@app.get("/ready")
+def ready_check():
+    """Readiness probe endpoint for Kubernetes"""
+    try:
+        conn = get_db_connection()
+        conn.close()
+        return {"status": "ready", "database": "connected"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database connection failed: {str(e)}"
+        )
+
+
 @app.post("/sign", response_model=SignResponse)
 def sign_claim(request: SignRequest):
     """
