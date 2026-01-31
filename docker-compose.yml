@@ -21,6 +21,13 @@ services:
     networks:
       - sbs-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          memory: 128M
 
   # Normalizer Service (AI-Powered)
   normalizer-service:
@@ -42,6 +49,13 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          memory: 256M
     networks:
       - sbs-network
     read_only: true
@@ -69,6 +83,13 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 256M
+        reservations:
+          memory: 128M
     networks:
       - sbs-network
     read_only: true
@@ -102,6 +123,13 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+        reservations:
+          memory: 128M
     networks:
       - sbs-network
     security_opt:
@@ -130,6 +158,13 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+        reservations:
+          memory: 192M
     networks:
       - sbs-network
     read_only: true
@@ -138,30 +173,7 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  # n8n Workflow Engine
-  n8n:
-    image: n8nio/n8n:latest
-    container_name: sbs-n8n
-    environment:
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_USER:?N8N_USER is required}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:?N8N_PASSWORD is required - use a strong password}
-      - N8N_HOST=${N8N_HOST:-localhost}
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=${N8N_PROTOCOL:-https}
-      - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE:-true}
-      - WEBHOOK_URL=${WEBHOOK_URL:-http://n8n:5678/}
-      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-}
-    ports:
-      - "127.0.0.1:5678:5678"  # Bind to localhost only
-    volumes:
-      - n8n_data:/home/node/.n8n
-      - ./n8n-workflows:/workflows:ro  # Mount workflows as read-only
-    restart: unless-stopped
-    networks:
-      - sbs-network
-    security_opt:
-      - no-new-privileges:true
+
 
   # SBS Landing API
   sbs-landing:

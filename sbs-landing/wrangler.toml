@@ -1,36 +1,35 @@
 name = "sbs-api-worker"
 main = "server.cjs"
 compatibility_date = "2024-04-01"
-node_compat = true
+compatibility_flags = ["nodejs_compat"]
 
 # Workers configuration
 workers_dev = false
-route = "api.brainsait.cloud/*"
 
 [env.production]
 name = "sbs-api-worker-production"
-vars = { 
-  NODE_ENV = "production",
-  PORT = "8787",
-  NORMALIZER_URL = "https://sbs-normalizer.brainsait.cloud",
-  SIGNER_URL = "https://sbs-signer.brainsait.cloud",
-  FINANCIAL_RULES_URL = "https://sbs-financial.brainsait.cloud",
-  NPHIES_BRIDGE_URL = "https://sbs-nphies.brainsait.cloud",
-  N8N_WEBHOOK_URL = "https://n8n.brainsait.cloud/webhook/sbs-claim-submission",
-  DOMAIN_NAME = "brainsait.cloud",
-  ALLOWED_ORIGINS = "https://brainsait.cloud,https://www.brainsait.cloud"
-}
+
+[env.production.vars]
+NODE_ENV = "production"
+PORT = "8787"
+NORMALIZER_URL = "https://sbs-normalizer.brainsait.cloud"
+SIGNER_URL = "https://sbs-signer.brainsait.cloud"
+FINANCIAL_RULES_URL = "https://sbs-financial.brainsait.cloud"
+NPHIES_BRIDGE_URL = "https://sbs-nphies.brainsait.cloud"
+N8N_WEBHOOK_URL = "https://n8n.brainsait.cloud/webhook/sbs-claim-submission"
+DOMAIN_NAME = "brainsait.cloud"
+ALLOWED_ORIGINS = "https://brainsait.cloud,https://www.brainsait.cloud"
 
 [env.preview]
 name = "sbs-api-worker-preview"
-vars = { 
-  NODE_ENV = "preview",
-  PORT = "8787",
-  NORMALIZER_URL = "https://sbs-normalizer-preview.brainsait.cloud",
-  N8N_WEBHOOK_URL = "https://n8n-preview.brainsait.cloud/webhook/sbs-claim-submission",
-  DOMAIN_NAME = "preview.brainsait.cloud",
-  ALLOWED_ORIGINS = "https://preview.brainsait.cloud"
-}
+
+[env.preview.vars]
+NODE_ENV = "preview"
+PORT = "8787"
+NORMALIZER_URL = "https://sbs-normalizer-preview.brainsait.cloud"
+N8N_WEBHOOK_URL = "https://n8n-preview.brainsait.cloud/webhook/sbs-claim-submission"
+DOMAIN_NAME = "preview.brainsait.cloud"
+ALLOWED_ORIGINS = "https://preview.brainsait.cloud"
 
 # KV Namespaces for caching
 [[kv_namespaces]]

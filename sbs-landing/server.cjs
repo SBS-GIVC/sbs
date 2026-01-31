@@ -11,9 +11,11 @@ const fs = require('fs').promises;
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const compression = require('compression');
 require('dotenv').config();
 
 const app = express();
+app.use(compression()); // Compress all responses
 const PORT = process.env.PORT || 3000;
 
 // Security middleware with proper CSP
