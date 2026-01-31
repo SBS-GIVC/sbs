@@ -138,7 +138,7 @@ services:
       ENABLE_TEST_CERTIFICATES: ${ENABLE_TEST_CERTIFICATES:-false}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
     volumes:
-      - ./certs:/certs:ro
+      - ./certs:/certs:rw
     ports:
       - "127.0.0.1:8001:8001"
     depends_on:
