@@ -45,8 +45,3 @@ npm-debug.log*
 *.db
 *.sqlite
 postgres_data/
-
-# Test dependencies
-package.json
-package-lock.json
-node_modules/
