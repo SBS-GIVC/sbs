@@ -37,6 +37,14 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Generated artifacts
+deployment.tar.gz
+**/deployment.tar.gz
+
+# macOS resource forks
+._*
+**/._*
+
 # Node
 node_modules/
 npm-debug.log*
