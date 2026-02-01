@@ -273,6 +273,12 @@ async def validate_claim(request: Request):
         claim_data = body["claim"]
     else:
         claim_data = body
+
+    # Backwards-compatible facility_id location (some clients/tests send it under extensions)
+    if "facility_id" not in claim_data:
+        extensions = claim_data.get("extensions") if isinstance(claim_data, dict) else None
+        if isinstance(extensions, dict) and "facility_id" in extensions:
+            claim_data = {**claim_data, "facility_id": extensions["facility_id"]}
     
     # Validate the claim data using Pydantic
     try:

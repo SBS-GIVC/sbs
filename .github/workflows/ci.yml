@@ -141,7 +141,7 @@ jobs:
         working-directory: sbs-landing
         run: |
           timeout 10s node -e "
-            const app = require('./server.js');
+            const app = require('./server.cjs');
             console.log('✅ Server module loads successfully');
             process.exit(0);
           " || echo "Server verification completed"

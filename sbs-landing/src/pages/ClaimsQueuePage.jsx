@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useToast } from '../components/Toast';
 import { Button } from '../components/ui/Button';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
@@ -7,78 +7,79 @@ import { Input } from '../components/ui/Input';
 export function ClaimsQueuePage() {
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [claims, setClaims] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const toast = useToast();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadClaims = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/claims?limit=50&page=1');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) {
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+
+        const mapped = (data.claims || []).map((c) => ({
+          id: c.claimId,
+          patient: c.patientName || c.patientId || 'Unknown',
+          facility: c.facilityId || '—',
+          type: c.claimType ? `${String(c.claimType).slice(0, 1).toUpperCase()}${String(c.claimType).slice(1)}` : '—',
+          submittedAt: c.createdAt,
+          status: c.status || 'processing',
+          priority: c.status === 'failed' ? 'urgent' : 'normal',
+          amount: '—'
+        }));
+
+        if (!cancelled) {
+          setClaims(mapped);
+          setLoadError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setClaims([]);
+          setLoadError(e.message || 'Failed to load claims');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadClaims();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleAction = (action) => {
     toast.info(`${action} functionality is ready for integration.`);
   };
 
-  const claims = [
-    {
-      id: 'CLM-2024-001',
-      patient: 'Ahmed Al-Rashid',
-      facility: 'Mercy General Hospital',
-      type: 'Inpatient',
-      submittedAt: '2024-01-28 10:30',
-      status: 'pending',
-      priority: 'high',
-      amount: '12,500 SAR'
-    },
-    {
-      id: 'CLM-2024-002',
-      patient: 'Sarah Hassan',
-      facility: 'Central Health Clinic',
-      type: 'Outpatient',
-      submittedAt: '2024-01-28 09:15',
-      status: 'processing',
-      priority: 'normal',
-      amount: '850 SAR'
-    },
-    {
-      id: 'CLM-2024-003',
-      patient: 'Mohammed Ali',
-      facility: 'St. Jude Medical Center',
-      type: 'Emergency',
-      submittedAt: '2024-01-28 08:45',
-      status: 'approved',
-      priority: 'urgent',
-      amount: '6,200 SAR'
-    },
-    {
-      id: 'CLM-2024-004',
-      patient: 'Fatima Khalid',
-      facility: 'Valley Heights Medical',
-      type: 'Outpatient',
-      submittedAt: '2024-01-27 16:20',
-      status: 'rejected',
-      priority: 'normal',
-      amount: '1,800 SAR'
-    },
-    {
-      id: 'CLM-2024-005',
-      patient: 'Omar Youssef',
-      facility: 'Mercy General Hospital',
-      type: 'Inpatient',
-      submittedAt: '2024-01-27 14:00',
-      status: 'pending',
-      priority: 'normal',
-      amount: '4,500 SAR'
-    }
-  ];
 
   const statusCounts = {
     all: claims.length,
     pending: claims.filter(c => c.status === 'pending').length,
-    processing: claims.filter(c => c.status === 'processing').length,
-    approved: claims.filter(c => c.status === 'approved').length,
-    rejected: claims.filter(c => c.status === 'rejected').length
+    processing: claims.filter(c => ['processing', 'submitted'].includes(c.status)).length,
+    approved: claims.filter(c => ['approved', 'completed'].includes(c.status)).length,
+    rejected: claims.filter(c => ['rejected', 'failed'].includes(c.status)).length
   };
 
   const filteredClaims = claims.filter(claim => {
-    const matchesFilter = filter === 'all' || claim.status === filter;
-    const matchesSearch = searchQuery === '' || 
+    const matchesFilter =
+      filter === 'all' ||
+      (filter === 'processing' ? ['processing', 'submitted'].includes(claim.status) :
+        filter === 'approved' ? ['approved', 'completed'].includes(claim.status) :
+          filter === 'rejected' ? ['rejected', 'failed'].includes(claim.status) :
+            claim.status === filter);
+
+    const matchesSearch = searchQuery === '' ||
       claim.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       claim.patient.toLowerCase().includes(searchQuery.toLowerCase());
+
     return matchesFilter && matchesSearch;
   });
 
@@ -130,31 +131,47 @@ export function ClaimsQueuePage() {
             subtitle="Status, priority, and billing details for incoming requests"
           />
           <div className="w-full overflow-hidden">
-            <table className="w-full text-left">
-            <thead>
-              <tr className="bg-slate-50 dark:bg-[#111a22] border-b border-slate-200 dark:border-slate-800">
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Claim ID</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Patient</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Facility</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Amount</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-              {filteredClaims.map((claim) => (
-                <ClaimRow key={claim.id} claim={claim} />
-              ))}
-            </tbody>
-          </table>
+            {loading && (
+              <div className="p-12 text-center">
+                <p className="text-slate-500 dark:text-slate-400">Loading claims…</p>
+              </div>
+            )}
 
-          {filteredClaims.length === 0 && (
-            <div className="p-12 text-center">
-              <span className="material-symbols-outlined text-slate-400 text-4xl mb-2">inbox</span>
-              <p className="text-slate-500 dark:text-slate-400">No claims found matching your criteria</p>
-            </div>
-          )}
+            {!loading && loadError && (
+              <div className="p-12 text-center">
+                <p className="text-amber-600">{loadError}</p>
+              </div>
+            )}
+
+            {!loading && !loadError && (
+              <>
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-[#111a22] border-b border-slate-200 dark:border-slate-800">
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Claim ID</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Patient</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Facility</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Type</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Amount</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {filteredClaims.map((claim) => (
+                      <ClaimRow key={claim.id} claim={claim} />
+                    ))}
+                  </tbody>
+                </table>
+
+                {filteredClaims.length === 0 && (
+                  <div className="p-12 text-center">
+                    <span className="material-symbols-outlined text-slate-400 text-4xl mb-2">inbox</span>
+                    <p className="text-slate-500 dark:text-slate-400">No claims found matching your criteria</p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </Card>
       </div>
@@ -194,6 +211,12 @@ function ClaimRow({ claim }) {
     rejected: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400'
   };
 
+  const statusKey =
+    claim.status === 'submitted' ? 'processing' :
+      claim.status === 'completed' ? 'approved' :
+        claim.status === 'failed' ? 'rejected' :
+          claim.status;
+
   const priorityDot = {
     urgent: 'bg-red-500',
     high: 'bg-orange-500',
@@ -221,7 +244,7 @@ function ClaimRow({ claim }) {
         <span className="text-sm font-medium text-slate-900 dark:text-white">{claim.amount}</span>
       </td>
       <td className="px-6 py-4">
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize ${statusStyles[claim.status]}`}>
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize ${statusStyles[statusKey] || statusStyles.processing}`}>
           {claim.status}
         </span>
       </td>

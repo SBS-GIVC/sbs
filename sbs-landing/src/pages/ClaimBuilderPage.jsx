@@ -33,6 +33,8 @@ export function ClaimBuilderPage() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submissionResult, setSubmissionResult] = useState(null);
+  const [claimStatus, setClaimStatus] = useState(null);
+  const [statusError, setStatusError] = useState(null);
   const toast = useToast();
 
   // Step 1: Verify patient eligibility
@@ -253,6 +255,34 @@ export function ClaimBuilderPage() {
     return claim.items.reduce((sum, item) => sum + item.netPrice, 0);
   };
 
+  // Poll claim status (best-effort)
+  useEffect(() => {
+    let timer;
+    const claimId = submissionResult?.claimId;
+    if (step !== 4 || !claimId) return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/claim-status/${claimId}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.success === false) {
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+        setClaimStatus(data);
+        setStatusError(null);
+        if (!data.isComplete) {
+          timer = window.setTimeout(poll, 2000);
+        }
+      } catch (e) {
+        setStatusError(e.message || 'Failed to fetch claim status');
+        timer = window.setTimeout(poll, 4000);
+      }
+    };
+
+    poll();
+    return () => timer && window.clearTimeout(timer);
+  }, [step, submissionResult?.claimId]);
+
   // Submit claim
   const submitClaim = async () => {
     if (!claim.patientName) {
@@ -460,7 +490,6 @@ export function ClaimBuilderPage() {
                 >
                   <option value="institutional">Institutional (Inpatient)</option>
                   <option value="professional">Professional (Outpatient)</option>
-                  <option value="oral">Oral (Dental)</option>
                   <option value="pharmacy">Pharmacy</option>
                   <option value="vision">Vision (Optical)</option>
                 </select>
@@ -904,15 +933,17 @@ export function ClaimBuilderPage() {
             <p className="text-slate-500 mb-8">Your claim has been submitted for processing.</p>
 
             {submissionResult && (
-              <div className="max-w-md mx-auto mb-8 p-4 rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 text-left">
+              <div className="max-w-md mx-auto mb-6 p-4 rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 text-left">
                 {submissionResult.claimId && (
                   <p className="text-sm text-slate-600 dark:text-slate-300">
-                    <span className="font-semibold">Claim ID:</span> <span className="font-mono">{submissionResult.claimId}</span>
+                    <span className="font-semibold">Claim ID:</span>{' '}
+                    <span className="font-mono font-bold">{submissionResult.claimId}</span>
                   </p>
                 )}
                 {submissionResult.submissionId && (
                   <p className="text-sm text-slate-600 dark:text-slate-300">
-                    <span className="font-semibold">Submission ID:</span> <span className="font-mono">{submissionResult.submissionId}</span>
+                    <span className="font-semibold">Submission ID:</span>{' '}
+                    <span className="font-mono">{submissionResult.submissionId}</span>
                   </p>
                 )}
                 {submissionResult.trackingUrl && (
@@ -924,6 +955,45 @@ export function ClaimBuilderPage() {
                   >
                     Tracking URL
                   </a>
+                )}
+              </div>
+            )}
+
+            {claimStatus && (
+              <div className="max-w-md mx-auto mb-8 p-4 rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 text-left">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">Claim Tracking</p>
+                  <span className="text-xs text-slate-500">{claimStatus.statusLabel || claimStatus.status}</span>
+                </div>
+
+                {claimStatus.progress && (
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                      <span>Progress</span>
+                      <span>{claimStatus.progress.percentage}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                      <div
+                        className="h-2 bg-primary"
+                        style={{ width: `${claimStatus.progress.percentage || 0}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {claimStatus.stages && (
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {Object.entries(claimStatus.stages).map(([key, val]) => (
+                      <div key={key} className="flex items-center justify-between rounded-lg bg-slate-50 dark:bg-slate-800/50 px-2 py-1">
+                        <span className="text-slate-600 dark:text-slate-300">{val.label || key}</span>
+                        <span className="font-mono text-slate-500">{String(val.status || '')}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {statusError && (
+                  <p className="mt-3 text-xs text-amber-600">{statusError}</p>
                 )}
               </div>
             )}
