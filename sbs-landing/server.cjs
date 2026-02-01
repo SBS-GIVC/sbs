@@ -313,25 +313,28 @@ How can I assist you today?`;
 // Main claim submission endpoint
 app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
   try {
-    const {
-      patientName,
-      patientId,
-      memberId,
-      payerId,
-      providerId,
-      claimType,
-      userEmail,
-      // Optional: direct SBS processing inputs (used when n8n is unavailable)
-      facility_id,
-      internal_code,
-      description,
-      quantity,
-      unit_price,
-      // Compatibility aliases (some clients send these)
-      service_code,
-      service_desc
-      // Note: userCredentials removed for security - authenticate server-side
-    } = req.body;
+    const body = (req.body && typeof req.body === 'object' && req.body.claim && typeof req.body.claim === 'object')
+      ? { ...req.body.claim, userEmail: req.body.userEmail ?? req.body.claim.userEmail }
+      : (req.body || {});
+
+    const firstItem = Array.isArray(body.items) ? body.items[0] : null;
+
+    const patientName = body.patientName || body.patient?.name;
+    const patientId = body.patientId || body.patient?.id || body.patient_id;
+    const memberId = body.memberId || body.member_id || body.patient?.memberId;
+    const payerId = body.payerId || body.payer_id;
+    const providerId = body.providerId || body.provider_id;
+    const claimType = body.claimType || body.claim_type;
+    const userEmail = body.userEmail || body.email;
+
+    const facility_id = body.facility_id || body.facilityId || body.facilityID;
+    const service_code = body.service_code || body.serviceCode || firstItem?.service_code || firstItem?.sbsCode;
+    const service_desc = body.service_desc || body.serviceDesc || firstItem?.service_desc || firstItem?.description;
+
+    const internal_code = body.internal_code || body.internalCode || body.service_code || body.serviceCode || firstItem?.internal_code || firstItem?.internalCode || service_code;
+    const description = body.description || body.service_desc || body.serviceDesc || service_desc;
+    const quantity = body.quantity || firstItem?.quantity;
+    const unit_price = body.unit_price || body.unitPrice || firstItem?.unitPrice;
 
     // Validate required fields
     if (!patientName || !patientId || !claimType || !userEmail) {
@@ -350,10 +353,16 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
         memberId: memberId || patientId
       },
 
+      // Compatibility (common n8n workflow fields)
+      patient_id: patientId,
+      service_code,
+      service_desc,
+      items: body.items,
+
       // Optional: direct SBS processing inputs (used when n8n is unavailable)
       facility_id,
-      internal_code: internal_code || service_code,
-      description: description || service_desc,
+      internal_code,
+      description,
       quantity,
       unit_price,
       
@@ -421,6 +430,8 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       success: true,
       message: 'Claim submitted successfully',
       claimId: n8nResponse.claimId || `CLAIM-${Date.now()}`,
+      submissionId: n8nResponse.submissionId,
+      trackingUrl: n8nResponse.trackingUrl,
       status: 'processing',
       data: {
         patientId,
