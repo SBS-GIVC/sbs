@@ -19,7 +19,7 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -221,7 +221,7 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      N8N_WEBHOOK_URL: http://n8n:5678/webhook/sbs-claim-submission
+      N8N_WEBHOOK_URL: http://n8n:5678/webhook/sbs-gateway
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       NODE_ENV: production
       ENABLE_DIRECT_SBS: "true"
