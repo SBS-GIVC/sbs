@@ -12,6 +12,7 @@ export function ClaimBuilderPage() {
   const [claim, setClaim] = useState({
     patientId: '',
     patientName: '',
+    userEmail: '',
     facilityId: 'FAC001',
     policyNumber: '',
     serviceDate: new Date().toISOString().split('T')[0],
@@ -31,6 +32,7 @@ export function ClaimBuilderPage() {
   const [isValidating, setIsValidating] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submissionResult, setSubmissionResult] = useState(null);
   const toast = useToast();
 
   // Step 1: Verify patient eligibility
@@ -253,6 +255,16 @@ export function ClaimBuilderPage() {
 
   // Submit claim
   const submitClaim = async () => {
+    if (!claim.patientName) {
+      toast.warning('Please enter patient name');
+      return;
+    }
+
+    if (!claim.userEmail) {
+      toast.warning('Please enter your email');
+      return;
+    }
+
     if (claim.items.length === 0) {
       toast.warning('Please add at least one service');
       return;
@@ -276,13 +288,43 @@ export function ClaimBuilderPage() {
 
     setSubmitting(true);
     try {
-      const result = await nphiesService.submitClaim({
-        ...claim,
-        claimNumber: `CLM-${Date.now()}`,
-        totalAmount: calculateTotal()
+      const firstItem = claim.items[0] || {};
+      const facilityIdNum = Number(String(claim.facilityId || '').replace(/\D/g, '')) || 1;
+
+      const response = await fetch('/api/submit-claim', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          claim: {
+            ...claim,
+            claimNumber: `CLM-${Date.now()}`,
+            totalAmount: calculateTotal(),
+            facility_id: facilityIdNum,
+            service_code: firstItem.sbsCode,
+            service_desc: firstItem.description
+          }
+        })
       });
 
-      toast.success(`Claim ${result.nphiesReference} submitted successfully!`);
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || result.success === false) {
+        throw new Error(result.error || result.message || `HTTP ${response.status}`);
+      }
+
+      const claimId = result.claimId || result.data?.claimId;
+      const submissionId = result.submissionId || result.data?.submissionId;
+
+      setSubmissionResult({
+        claimId,
+        submissionId,
+        trackingUrl: result.trackingUrl || result.data?.trackingUrl,
+        status: result.status
+      });
+
+      toast.success(`Claim submitted${claimId ? `: ${claimId}` : ''}`);
       setStep(4);
     } catch (error) {
       toast.error('Claim submission failed');
@@ -381,6 +423,18 @@ export function ClaimBuilderPage() {
                   value={claim.patientName}
                   onChange={(e) => setClaim(prev => ({ ...prev, patientName: e.target.value }))}
                   placeholder="Enter patient name..."
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Submitter Email *
+                </label>
+                <input
+                  type="email"
+                  value={claim.userEmail}
+                  onChange={(e) => setClaim(prev => ({ ...prev, userEmail: e.target.value }))}
+                  placeholder="name@domain.com"
                   className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary"
                 />
               </div>
@@ -847,7 +901,32 @@ export function ClaimBuilderPage() {
               <span className="material-symbols-rounded text-5xl text-emerald-600">check_circle</span>
             </div>
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Claim Submitted Successfully!</h2>
-            <p className="text-slate-500 mb-8">Your claim has been sent to NPHIES for processing.</p>
+            <p className="text-slate-500 mb-8">Your claim has been submitted for processing.</p>
+
+            {submissionResult && (
+              <div className="max-w-md mx-auto mb-8 p-4 rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 text-left">
+                {submissionResult.claimId && (
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                    <span className="font-semibold">Claim ID:</span> <span className="font-mono">{submissionResult.claimId}</span>
+                  </p>
+                )}
+                {submissionResult.submissionId && (
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                    <span className="font-semibold">Submission ID:</span> <span className="font-mono">{submissionResult.submissionId}</span>
+                  </p>
+                )}
+                {submissionResult.trackingUrl && (
+                  <a
+                    className="text-sm text-primary hover:underline break-all"
+                    href={submissionResult.trackingUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Tracking URL
+                  </a>
+                )}
+              </div>
+            )}
             
             <div className="inline-flex gap-4">
               <button
@@ -855,6 +934,7 @@ export function ClaimBuilderPage() {
                   setClaim({
                     patientId: '',
                     patientName: '',
+                    userEmail: '',
                     facilityId: 'FAC001',
                     policyNumber: '',
                     serviceDate: new Date().toISOString().split('T')[0],
@@ -866,6 +946,7 @@ export function ClaimBuilderPage() {
                   setBundleInfo(null);
                   setPriorAuthRequired([]);
                   setValidation(null);
+                  setSubmissionResult(null);
                   setStep(1);
                 }}
                 className="px-6 py-3 rounded-xl bg-primary text-white font-medium hover:bg-primary/90"
