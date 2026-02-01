@@ -259,7 +259,7 @@ class SBSLandingPage {
           </p>
 
           <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto animate-fade-in" style="animation-delay: 0.6s;">
-            <a href="/sbs/" class="px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-400 hover:to-cyan-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-emerald-900/40 transition-all transform hover:scale-105 text-center">
+            <a href="https://sbs.brainsait.cloud/" class="px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-400 hover:to-cyan-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-emerald-900/40 transition-all transform hover:scale-105 text-center">
               ${t.hero.cta_launch}
             </a>
             <button onclick="app.openClaimModal()" class="px-8 py-4 bg-slate-800/50 hover:bg-slate-800 text-white border border-slate-700 rounded-xl font-bold text-lg backdrop-blur-sm transition-all">
