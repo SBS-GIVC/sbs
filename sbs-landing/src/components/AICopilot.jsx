@@ -1,12 +1,12 @@
 /**
- * AI Copilot - DeepSeek Powered Healthcare Assistant
+ * AI Copilot - AI-Powered Healthcare Assistant
  * Provides real-time AI assistance for claims, coding, and clinical decisions
  */
 
 import React, { useState, useRef, useEffect } from 'react';
 import { callGemini } from '../services/geminiService';
 
-const SYSTEM_CONTEXT = `You are an expert Saudi healthcare AI assistant named "GIVC-SBS Copilot" powered by DeepSeek. You help with:
+const SYSTEM_CONTEXT = `You are an expert Saudi healthcare AI assistant named "GIVC-SBS Copilot". You help with:
 - SBS (Saudi Billing System) code lookups and explanations
 - NPHIES eligibility and prior authorization guidance
 - Healthcare claim validation and optimization
@@ -29,7 +29,7 @@ export function AICopilot({ isOpen, onClose, context = {} }) {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: `👋 **Hello!** I'm your **GIVC-SBS Copilot** - powered by DeepSeek AI.
+      content: `👋 **Hello!** I'm your **GIVC-SBS Copilot** - your AI healthcare assistant.
 
 I can help you with:
 - 🔍 Finding and explaining SBS codes
@@ -147,7 +147,7 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
       console.error('AI Copilot error:', error);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: '❌ I could not reach DeepSeek right now. You can retry or continue with another prompt.',
+        content: '❌ AI service is currently unavailable. You can retry or continue with another prompt.',
         timestamp: new Date(),
         isError: true
       }]);
@@ -194,7 +194,7 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
                 AI
               </span>
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Powered by DeepSeek · BrainSAIT</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">AI Assistant · BrainSAIT</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -266,7 +266,7 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
                   <span className="size-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
                   <span className="size-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                 </div>
-                <span className="text-xs text-slate-500">DeepSeek is thinking...</span>
+                <span className="text-xs text-slate-500">AI is thinking...</span>
               </div>
             </div>
           </div>
@@ -279,9 +279,15 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
       <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
         {lastFailedPrompt && (
           <div className="mb-3 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-            <span>DeepSeek connection paused. Retry your last message?</span>
+            <span>AI service connection paused. Retry your last message?</span>
             <button
-              onClick={() => handleSend(lastFailedPrompt)}
+              onClick={() => {
+                const currentInput = input;
+                handleSend(lastFailedPrompt);
+                if (currentInput) {
+                  setInput(currentInput);
+                }
+              }}
               className="rounded-lg bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-amber-700 transition"
             >
               Retry
@@ -324,7 +330,7 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
         </div>
         <p className="text-[10px] text-slate-400 text-center mt-3 flex items-center justify-center gap-2">
           <span className="size-1.5 bg-emerald-500 rounded-full"></span>
-          Powered by DeepSeek AI • SBS V3.1 Compliant
+          AI-Powered Assistant • SBS V3.1 Compliant
         </p>
       </div>
     </div>
