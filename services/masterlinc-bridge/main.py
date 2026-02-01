@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Any
+from contextlib import asynccontextmanager
 import os
 import sys
 import uvicorn
@@ -36,10 +37,78 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Initialize components
+redis_url = os.getenv("REDIS_URL", "redis://redis:6379")
+agent_registry = AgentRegistry()
+event_bus = RedisEventBus(redis_url)
+workflow_orchestrator = WorkflowOrchestrator(agent_registry, event_bus)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup and shutdown"""
+    # Startup
+    logger.info("MasterLinc Bridge starting up...")
+    
+    # Pre-register known agents
+    known_agents = {
+        "ClaimLinc": {
+            "oid": "1.3.6.1.4.1.61026.3.3.1",
+            "capabilities": ["process_claim", "track_status", "handle_denial"],
+            "endpoint": os.getenv("CLAIMLINC_URL", "http://claimlinc-agent:4001"),
+            "port": 4001
+        },
+        "AuthLinc": {
+            "oid": "1.3.6.1.4.1.61026.3.3.2",
+            "capabilities": ["verify_eligibility", "request_prior_auth"],
+            "endpoint": os.getenv("AUTHLINC_URL", "http://authlinc-agent:4002"),
+            "port": 4002
+        },
+        "ComplianceLinc": {
+            "oid": "1.3.6.1.4.1.61026.3.3.3",
+            "capabilities": ["audit_claim", "validate_nphies", "check_pdpl"],
+            "endpoint": os.getenv("COMPLIANCELINC_URL", "http://compliancelinc-agent:4003"),
+            "port": 4003
+        },
+        "ClinicalLinc": {
+            "oid": "1.3.6.1.4.1.61026.3.3.4",
+            "capabilities": ["suggest_codes", "validate_diagnosis"],
+            "endpoint": os.getenv("CLINICALLINC_URL", "http://clinicallinc-agent:4004"),
+            "port": 4004
+        }
+    }
+    
+    for name, config in known_agents.items():
+        try:
+            agent_info = AgentInfo(
+                name=name,
+                oid=config["oid"],
+                capabilities=config["capabilities"],
+                endpoint=config["endpoint"],
+                port=config["port"]
+            )
+            agent_registry.register(agent_info)
+            logger.info(f"Pre-registered agent: {name}")
+        except Exception as e:
+            logger.warning(f"Failed to pre-register {name}: {e}")
+    
+    # Connect to Redis
+    await event_bus.connect()
+    logger.info("MasterLinc Bridge startup complete")
+    
+    yield
+    
+    # Shutdown
+    logger.info("MasterLinc Bridge shutting down...")
+    await event_bus.disconnect()
+    logger.info("MasterLinc Bridge shutdown complete")
+
+
 app = FastAPI(
     title="MasterLinc Bridge Service",
     description="Central coordinator for BrainSAIT Linc agents",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS middleware
@@ -270,66 +339,6 @@ async def get_workflow_history(workflow_id: str):
         "timestamp": datetime.utcnow().isoformat()
     }
 
-
-# Initialize agents on startup
-@app.on_event("startup")
-async def startup_event():
-    """Initialize agents on startup"""
-    logger.info("MasterLinc Bridge starting up...")
-    
-    # Pre-register known agents
-    known_agents = {
-        "ClaimLinc": {
-            "oid": "1.3.6.1.4.1.61026.3.3.1",
-            "capabilities": ["process_claim", "track_status", "handle_denial"],
-            "endpoint": os.getenv("CLAIMLINC_URL", "http://claimlinc-agent:4001"),
-            "port": 4001
-        },
-        "AuthLinc": {
-            "oid": "1.3.6.1.4.1.61026.3.3.2",
-            "capabilities": ["verify_eligibility", "request_prior_auth"],
-            "endpoint": os.getenv("AUTHLINC_URL", "http://authlinc-agent:4002"),
-            "port": 4002
-        },
-        "ComplianceLinc": {
-            "oid": "1.3.6.1.4.1.61026.3.3.3",
-            "capabilities": ["audit_claim", "validate_nphies", "check_pdpl"],
-            "endpoint": os.getenv("COMPLIANCELINC_URL", "http://compliancelinc-agent:4003"),
-            "port": 4003
-        },
-        "ClinicalLinc": {
-            "oid": "1.3.6.1.4.1.61026.3.3.4",
-            "capabilities": ["suggest_codes", "validate_diagnosis"],
-            "endpoint": os.getenv("CLINICALLINC_URL", "http://clinicallinc-agent:4004"),
-            "port": 4004
-        }
-    }
-    
-    for name, config in known_agents.items():
-        try:
-            agent_info = AgentInfo(
-                name=name,
-                oid=config["oid"],
-                capabilities=config["capabilities"],
-                endpoint=config["endpoint"],
-                port=config["port"]
-            )
-            agent_registry.register(agent_info)
-            logger.info(f"Pre-registered agent: {name}")
-        except Exception as e:
-            logger.warning(f"Failed to pre-register {name}: {e}")
-    
-    # Connect to Redis
-    await event_bus.connect()
-    logger.info("MasterLinc Bridge startup complete")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    logger.info("MasterLinc Bridge shutting down...")
-    await event_bus.disconnect()
-    logger.info("MasterLinc Bridge shutdown complete")
 
 
 if __name__ == "__main__":

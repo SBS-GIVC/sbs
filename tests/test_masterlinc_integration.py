@@ -334,7 +334,7 @@ class TestLandingAPIIntegration:
                 
                 if response.status_code == 200:
                     data = response.json()
-                    assert data["success"] == True
+                    assert data["success"] is True
                     assert "claimId" in data or "workflowId" in data
                     
             except httpx.ConnectError:
@@ -386,7 +386,7 @@ class TestFallbackMechanism:
                 # Should get either success or fallback
                 if response.status_code == 200:
                     data = response.json()
-                    assert data["success"] == True
+                    assert data["success"] is True
                     # May have fallback flag if MasterLinc unavailable
                     
             except httpx.ConnectError:

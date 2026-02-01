@@ -26,7 +26,7 @@ EXPOSE 4002
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD python -c "import httpx; httpx.get('http://localhost:4002/health', timeout=5.0)"
+  CMD python -c "import httpx; r = httpx.get('http://localhost:4002/health', timeout=5.0); exit(0 if r.status_code == 200 else 1)"
 
 # Run application
 CMD ["python", "main.py"]
