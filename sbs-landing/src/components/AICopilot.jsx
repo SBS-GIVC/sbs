@@ -1,12 +1,12 @@
 /**
- * AI Copilot - DeepSeek Powered Healthcare Assistant
+ * AI Copilot - AI-Powered Healthcare Assistant
  * Provides real-time AI assistance for claims, coding, and clinical decisions
  */
 
 import React, { useState, useRef, useEffect } from 'react';
 import { callGemini } from '../services/geminiService';
 
-const SYSTEM_CONTEXT = `You are an expert Saudi healthcare AI assistant named "GIVC-SBS Copilot" powered by DeepSeek. You help with:
+const SYSTEM_CONTEXT = `You are an expert Saudi healthcare AI assistant named "GIVC-SBS Copilot". You help with:
 - SBS (Saudi Billing System) code lookups and explanations
 - NPHIES eligibility and prior authorization guidance
 - Healthcare claim validation and optimization
@@ -29,7 +29,7 @@ export function AICopilot({ isOpen, onClose, context = {} }) {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: `👋 **Hello!** I'm your **GIVC-SBS Copilot** - powered by DeepSeek AI.
+      content: `👋 **Hello!** I'm your **GIVC-SBS Copilot** - your AI healthcare assistant.
 
 I can help you with:
 - 🔍 Finding and explaining SBS codes
@@ -45,6 +45,7 @@ How can I assist you today?`,
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [lastFailedPrompt, setLastFailedPrompt] = useState('');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -141,14 +142,16 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      setLastFailedPrompt('');
     } catch (error) {
       console.error('AI Copilot error:', error);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: '❌ I encountered an error. Please check your connection and try again.',
+        content: '❌ AI service is currently unavailable. You can retry or continue with another prompt.',
         timestamp: new Date(),
         isError: true
       }]);
+      setLastFailedPrompt(messageText);
     } finally {
       setIsLoading(false);
     }
@@ -191,7 +194,7 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
                 AI
               </span>
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Powered by DeepSeek · BrainSAIT</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">AI Assistant · BrainSAIT</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -263,7 +266,7 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
                   <span className="size-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
                   <span className="size-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                 </div>
-                <span className="text-xs text-slate-500">DeepSeek is thinking...</span>
+                <span className="text-xs text-slate-500">AI is thinking...</span>
               </div>
             </div>
           </div>
@@ -274,6 +277,23 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
 
       {/* Input Area */}
       <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+        {lastFailedPrompt && (
+          <div className="mb-3 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+            <span>AI service connection paused. Retry your last message?</span>
+            <button
+              onClick={() => {
+                const currentInput = input;
+                handleSend(lastFailedPrompt);
+                if (currentInput) {
+                  setInput(currentInput);
+                }
+              }}
+              className="rounded-lg bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-amber-700 transition"
+            >
+              Retry
+            </button>
+          </div>
+        )}
         <div className="flex items-end gap-2">
           <div className="flex-1 relative">
             <textarea
@@ -310,7 +330,7 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
         </div>
         <p className="text-[10px] text-slate-400 text-center mt-3 flex items-center justify-center gap-2">
           <span className="size-1.5 bg-emerald-500 rounded-full"></span>
-          Powered by DeepSeek AI • SBS V3.1 Compliant
+          Powered by AI Assistant • SBS V3.1 Compliant
         </p>
       </div>
     </div>

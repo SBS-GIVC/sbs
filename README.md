@@ -67,6 +67,8 @@ docker-compose up -d
 docker-compose ps
 ```
 
+Note: GitHub Pages deployment is intentionally disabled to avoid conflicts with the production domain at https://sbs.brainsait.cloud.
+
 ## 📊 Database Schema
 
 - `sbs_master_catalogue`: Official CHI SBS codes
