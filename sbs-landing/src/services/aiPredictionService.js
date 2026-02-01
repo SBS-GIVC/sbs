@@ -295,13 +295,3 @@ export async function generateReport(facilityId, claimData, analysis) {
   }
 }
 
-// Export all functions
-export {
-  predictClaim,
-  optimizeCost,
-  detectFraud,
-  checkCompliance,
-  analyzeClaim,
-  getFacilityAnalytics,
-  generateReport
-};
