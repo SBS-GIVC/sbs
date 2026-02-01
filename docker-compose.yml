@@ -238,6 +238,98 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # ClaimLinc Agent (Revenue Cycle Management)
+  claimlinc-agent:
+    build:
+      context: ./services/agents/claimlinc
+      dockerfile: Dockerfile
+    container_name: sbs-claimlinc-agent
+    environment:
+      NORMALIZER_URL: http://normalizer-service:8000
+      FINANCIAL_RULES_URL: http://financial-rules-engine:8002
+      SIGNER_URL: http://signer-service:8001
+      NPHIES_BRIDGE_URL: http://nphies-bridge:8003
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+    ports:
+      - "127.0.0.1:4001:4001"
+    depends_on:
+      - normalizer-service
+      - financial-rules-engine
+      - signer-service
+      - nphies-bridge
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 384M
+        reservations:
+          memory: 192M
+    networks:
+      - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  # AuthLinc Agent (Eligibility and Pre-Authorization)
+  authlinc-agent:
+    build:
+      context: ./services/agents/authlinc
+      dockerfile: Dockerfile
+    container_name: sbs-authlinc-agent
+    environment:
+      NPHIES_BRIDGE_URL: http://nphies-bridge:8003
+      REDIS_URL: redis://redis:6379
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+    ports:
+      - "127.0.0.1:4002:4002"
+    depends_on:
+      - redis
+      - nphies-bridge
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+        reservations:
+          memory: 128M
+    networks:
+      - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  # ComplianceLinc Agent (Audit and Compliance)
+  compliancelinc-agent:
+    build:
+      context: ./services/agents/compliancelinc
+      dockerfile: Dockerfile
+    container_name: sbs-compliancelinc-agent
+    environment:
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+    ports:
+      - "127.0.0.1:4003:4003"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+        reservations:
+          memory: 128M
+    networks:
+      - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
   # SBS Landing API
   sbs-landing:
     build:
@@ -269,6 +361,9 @@ services:
       - nphies-bridge
       - ai-prediction-service
       - masterlinc-bridge
+      - claimlinc-agent
+      - authlinc-agent
+      - compliancelinc-agent
     restart: unless-stopped
     networks:
       - sbs-network
