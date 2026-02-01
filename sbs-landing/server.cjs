@@ -67,6 +67,15 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files
 app.use(express.static('public'));
 
+// Ensure SPA routes under /sbs/* work (serve the built app index)
+app.get('/sbs', (req, res) => res.redirect(301, '/sbs/'));
+app.get('/sbs/*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'sbs', 'index.html'));
+});
+
+// Backwards-compatible aliases (older docs/scripts)
+app.get(['/ai-analytics', '/ai-hub'], (req, res) => res.redirect(302, '/sbs/'));
+
 // File upload configuration
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
