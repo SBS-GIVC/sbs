@@ -320,7 +320,16 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       payerId,
       providerId,
       claimType,
-      userEmail
+      userEmail,
+      // Optional: direct SBS processing inputs (used when n8n is unavailable)
+      facility_id,
+      internal_code,
+      description,
+      quantity,
+      unit_price,
+      // Compatibility aliases (some clients send these)
+      service_code,
+      service_desc
       // Note: userCredentials removed for security - authenticate server-side
     } = req.body;
 
@@ -340,6 +349,13 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
         id: patientId,
         memberId: memberId || patientId
       },
+
+      // Optional: direct SBS processing inputs (used when n8n is unavailable)
+      facility_id,
+      internal_code: internal_code || service_code,
+      description: description || service_desc,
+      quantity,
+      unit_price,
       
       // Payer & Provider
       payerId: payerId || 'DEFAULT_PAYER',
@@ -471,36 +487,99 @@ async function triggerN8nWorkflow(claimData) {
 async function triggerDirectSBS(claimData) {
   try {
     console.log('🔄 Fallback: Calling SBS services directly...');
-    
-    // Step 1: Normalize
+
+    // Expect either a JSON body (direct API use) or multipart/form-data fields (web form).
+    // Supported JSON input (recommended): { facility_id, internal_code, description, quantity, unit_price, patientId }
+    const raw = claimData || {};
+    const facility_id = Number(raw.facility_id || 1);
+    const internal_code = raw.internal_code || raw.internalCode || raw.service_code || raw.serviceCode;
+    const description = raw.description || raw.service_desc || raw.serviceDesc || raw.patient?.name || 'Claim submission';
+    const quantity = Number(raw.quantity || 1);
+    const unit_price = Number(raw.unit_price || raw.unitPrice || 0);
+    const patientId = raw.patientId || raw.patient?.id || 'Patient/TEST';
+
+    if (!internal_code) {
+      throw new Error('Missing internal_code (or service_code) for direct SBS processing');
+    }
+
+    // Step 1: Normalize internal code -> SBS code
     const normalizeResponse = await axios.post((process.env.NORMALIZER_URL || 'http://localhost:8000') + '/normalize', {
-      data: claimData
+      facility_id,
+      internal_code,
+      description
     });
-    
-    // Step 2: Apply Financial Rules
-    const rulesResponse = await axios.post((process.env.FINANCIAL_RULES_URL || 'http://localhost:8002') + '/validate', {
-      data: normalizeResponse.data
-    });
-    
+
+    const sbsCode = normalizeResponse.data?.sbs_mapped_code;
+    const officialDescription = normalizeResponse.data?.official_description || description;
+
+    if (!sbsCode) {
+      throw new Error('Normalizer did not return sbs_mapped_code');
+    }
+
+    // Step 2: Build minimal FHIR Claim & apply financial rules
+    const claim = {
+      resourceType: 'Claim',
+      status: 'active',
+      facility_id,
+      type: {
+        coding: [{
+          system: 'http://terminology.hl7.org/CodeSystem/claim-type',
+          code: 'institutional'
+        }]
+      },
+      use: 'claim',
+      patient: { reference: String(patientId) },
+      created: new Date().toISOString(),
+      provider: { reference: `Organization/${facility_id}` },
+      priority: {
+        coding: [{
+          system: 'http://terminology.hl7.org/CodeSystem/processpriority',
+          code: 'normal'
+        }]
+      },
+      item: [{
+        sequence: 1,
+        productOrService: {
+          coding: [{
+            system: 'http://sbs.sa/coding/services',
+            code: sbsCode,
+            display: officialDescription
+          }]
+        },
+        quantity: { value: quantity },
+        unitPrice: { value: unit_price, currency: 'SAR' }
+      }]
+    };
+
+    const rulesResponse = await axios.post((process.env.FINANCIAL_RULES_URL || 'http://localhost:8002') + '/validate', claim);
+
     // Step 3: Sign
     const signResponse = await axios.post((process.env.SIGNER_URL || 'http://localhost:8001') + '/sign', {
-      data: rulesResponse.data
+      facility_id,
+      payload: rulesResponse.data
     });
-    
-    // Step 4: Submit to NPHIES
-    const nphiesResponse = await axios.post((process.env.NPHIES_BRIDGE_URL || 'http://localhost:8003') + '/submit', {
-      data: signResponse.data,
-      credentials: claimData.credentials
+
+    // Step 4: Submit to NPHIES Bridge (will return rejected/error if NPHIES_API_KEY not set)
+    const nphiesResponse = await axios.post((process.env.NPHIES_BRIDGE_URL || 'http://localhost:8003') + '/submit-claim', {
+      facility_id,
+      fhir_payload: rulesResponse.data,
+      signature: signResponse.data?.signature,
+      resource_type: 'Claim'
     });
-    
+
     return {
       success: true,
-      claimId: nphiesResponse.data.claimId,
-      submissionId: nphiesResponse.data.submissionId,
-      status: 'submitted',
-      trackingUrl: null
+      claimId: nphiesResponse.data?.transaction_id || `CLAIM-${Date.now()}`,
+      submissionId: nphiesResponse.data?.transaction_uuid,
+      status: nphiesResponse.data?.status || 'submitted',
+      trackingUrl: null,
+      normalization: {
+        internal_code,
+        sbs_mapped_code: sbsCode,
+        confidence: normalizeResponse.data?.confidence
+      }
     };
-    
+
   } catch (error) {
     console.error('❌ Direct SBS call failed:', error.message);
     throw error;
