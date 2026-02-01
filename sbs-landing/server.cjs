@@ -23,7 +23,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://fonts.googleapis.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com", "https://fonts.googleapis.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.tailwindcss.com"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'", "https:"],
@@ -465,10 +465,10 @@ async function triggerN8nWorkflow(claimData) {
 
     return {
       success: true,
-      claimId: response.data.claimId || `CLAIM-${Date.now()}`,
-      submissionId: response.data.submissionId || response.data.executionId,
-      trackingUrl: response.data.trackingUrl || null,
-      status: response.data.status || 'processing'
+      claimId: response.data?.claimId || response.data?.transaction_id || response.data?.transactionId || `CLAIM-${Date.now()}`,
+      submissionId: response.data?.submissionId || response.data?.transaction_uuid || response.data?.transactionUuid || response.data?.executionId,
+      trackingUrl: response.data?.trackingUrl || null,
+      status: response.data?.status || 'processing'
     };
 
   } catch (error) {
