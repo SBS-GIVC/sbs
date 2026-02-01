@@ -203,6 +203,41 @@ services:
 
 
 
+  # MasterLinc Bridge (BrainSAIT Linc Agent Coordinator)
+  masterlinc-bridge:
+    build:
+      context: ./services/masterlinc-bridge
+      dockerfile: Dockerfile
+    container_name: sbs-masterlinc-bridge
+    environment:
+      REDIS_URL: redis://redis:6379
+      CLAIMLINC_URL: http://claimlinc-agent:4001
+      AUTHLINC_URL: http://authlinc-agent:4002
+      COMPLIANCELINC_URL: http://compliancelinc-agent:4003
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      BRAINSAIT_OID_ROOT: ${BRAINSAIT_OID_ROOT:-1.3.6.1.4.1.61026}
+      BRAINSAIT_PEN: ${BRAINSAIT_PEN:-61026}
+    ports:
+      - "127.0.0.1:4000:4000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 384M
+        reservations:
+          memory: 192M
+    networks:
+      - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
   # SBS Landing API
   sbs-landing:
     build:
@@ -221,15 +256,19 @@ services:
       - FINANCIAL_RULES_URL=http://financial-rules-engine:8002
       - NPHIES_BRIDGE_URL=http://nphies-bridge:8003
       - AI_PREDICTION_URL=http://ai-prediction-service:8004
+      - MASTERLINC_URL=http://masterlinc-bridge:4000
+      - REDIS_URL=redis://redis:6379
     ports:
       - "127.0.0.1:3000:3000"  # Bind to localhost only for security
     depends_on:
       - n8n
+      - redis
       - normalizer-service
       - financial-rules-engine
       - signer-service
       - nphies-bridge
       - ai-prediction-service
+      - masterlinc-bridge
     restart: unless-stopped
     networks:
       - sbs-network
