@@ -29,6 +29,31 @@ services:
         reservations:
           memory: 128M
 
+  # Redis (for event streaming and agent coordination)
+  redis:
+    image: redis:7-alpine
+    container_name: sbs-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - sbs-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 128M
+        reservations:
+          memory: 64M
+
   # Normalizer Service (AI-Powered)
   normalizer-service:
     build:
@@ -321,6 +346,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local
   n8n_data:
     driver: local
