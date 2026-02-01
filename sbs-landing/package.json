@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "start": "node server.cjs",
     "server": "node server.cjs",
     "test": "echo \"No tests configured yet\" && exit 0"
   },
