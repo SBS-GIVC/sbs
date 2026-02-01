@@ -954,6 +954,247 @@ app.get('/api/services/status', async (req, res) => {
   }
 });
 
+// ============================================================================
+// MASTERLINC AGENT ENDPOINTS
+// ============================================================================
+
+// MasterLinc orchestrated claim submission
+app.post('/api/submit-claim-linc', async (req, res) => {
+  try {
+    const claimData = req.body;
+    
+    // Validate required fields
+    if (!claimData.patientId || !claimData.facilityId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: patientId, facilityId'
+      });
+    }
+
+    const masterlincUrl = process.env.MASTERLINC_URL || 'http://localhost:4000';
+    
+    // Start MasterLinc workflow
+    const workflowResponse = await axios.post(`${masterlincUrl}/workflows/start`, {
+      workflow_type: 'claim_processing',
+      data: claimData,
+      requester: 'sbs-landing'
+    });
+
+    const workflowId = workflowResponse.data.workflow_id;
+    
+    // Store in claimStore
+    const claimId = claimData.claimId || `CLM-${Date.now()}`;
+    claimStore.set(claimId, {
+      claimId,
+      workflowId,
+      patientId: claimData.patientId,
+      facilityId: claimData.facilityId,
+      status: 'processing',
+      createdAt: new Date().toISOString(),
+      lastUpdate: new Date().toISOString(),
+      stages: {
+        received: 'completed'
+      },
+      orchestrationType: 'masterlinc'
+    });
+
+    res.json({
+      success: true,
+      claimId,
+      workflowId,
+      status: 'processing',
+      message: 'Claim submitted via MasterLinc orchestration',
+      trackingUrl: `/api/workflow-status/${workflowId}`
+    });
+
+  } catch (error) {
+    console.error('❌ MasterLinc submission failed:', error.message);
+    
+    // Fallback to direct submission if MasterLinc unavailable
+    if (error.code === 'ECONNREFUSED' || error.response?.status === 503) {
+      console.log('⚠️ MasterLinc unavailable, falling back to direct submission');
+      try {
+        const directResult = await callDirectSBSPipeline(req.body);
+        return res.json({
+          success: true,
+          ...directResult,
+          fallback: true,
+          message: 'Claim submitted via direct pipeline (MasterLinc unavailable)'
+        });
+      } catch (fallbackError) {
+        return res.status(500).json({
+          success: false,
+          error: 'Both MasterLinc and direct submission failed',
+          details: fallbackError.message
+        });
+      }
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Failed to submit claim via MasterLinc',
+      details: error.message
+    });
+  }
+});
+
+// Verify eligibility via AuthLinc
+app.post('/api/verify-eligibility', async (req, res) => {
+  try {
+    const { patientId, insuranceId, payerId, serviceDate } = req.body;
+    
+    if (!patientId || !insuranceId || !payerId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: patientId, insuranceId, payerId'
+      });
+    }
+
+    const masterlincUrl = process.env.MASTERLINC_URL || 'http://localhost:4000';
+    
+    // Start eligibility check workflow
+    const workflowResponse = await axios.post(`${masterlincUrl}/workflows/start`, {
+      workflow_type: 'eligibility_check',
+      data: {
+        patient_id: patientId,
+        insurance_id: insuranceId,
+        payer_id: payerId,
+        service_date: serviceDate
+      },
+      requester: 'sbs-landing'
+    });
+
+    const workflowId = workflowResponse.data.workflow_id;
+    
+    // Poll for result (simple implementation)
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+    
+    const statusResponse = await axios.get(`${masterlincUrl}/workflows/${workflowId}`);
+    
+    res.json({
+      success: true,
+      workflowId,
+      eligibility: statusResponse.data.result || {
+        eligible: false,
+        message: 'Processing eligibility check'
+      },
+      status: statusResponse.data.status
+    });
+
+  } catch (error) {
+    console.error('❌ Eligibility verification failed:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to verify eligibility',
+      details: error.message
+    });
+  }
+});
+
+// Audit claim via ComplianceLinc
+app.post('/api/audit-claim', async (req, res) => {
+  try {
+    const claimData = req.body;
+    
+    if (!claimData.claimId && !claimData.claim_data) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing claim data'
+      });
+    }
+
+    const masterlincUrl = process.env.MASTERLINC_URL || 'http://localhost:4000';
+    
+    // Start compliance audit workflow
+    const workflowResponse = await axios.post(`${masterlincUrl}/workflows/start`, {
+      workflow_type: 'compliance_audit',
+      data: claimData.claim_data || claimData,
+      requester: 'sbs-landing'
+    });
+
+    const workflowId = workflowResponse.data.workflow_id;
+    
+    // Poll for result
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5 seconds
+    
+    const statusResponse = await axios.get(`${masterlincUrl}/workflows/${workflowId}`);
+    
+    res.json({
+      success: true,
+      workflowId,
+      audit: statusResponse.data.result || {
+        overall_status: 'processing',
+        message: 'Compliance audit in progress'
+      },
+      status: statusResponse.data.status
+    });
+
+  } catch (error) {
+    console.error('❌ Compliance audit failed:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to audit claim',
+      details: error.message
+    });
+  }
+});
+
+// Get agent status from MasterLinc
+app.get('/api/agents/status', async (req, res) => {
+  try {
+    const masterlincUrl = process.env.MASTERLINC_URL || 'http://localhost:4000';
+    
+    const agentsResponse = await axios.get(`${masterlincUrl}/agents`);
+    
+    res.json({
+      success: true,
+      agents: agentsResponse.data.agents,
+      total: agentsResponse.data.total,
+      timestamp: agentsResponse.data.timestamp
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to get agent status:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get agent status',
+      details: error.message,
+      agents: []
+    });
+  }
+});
+
+// Get workflow status
+app.get('/api/workflow-status/:workflowId', async (req, res) => {
+  try {
+    const { workflowId } = req.params;
+    const masterlincUrl = process.env.MASTERLINC_URL || 'http://localhost:4000';
+    
+    const statusResponse = await axios.get(`${masterlincUrl}/workflows/${workflowId}`);
+    
+    res.json({
+      success: true,
+      workflow: statusResponse.data
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to get workflow status:', error.message);
+    
+    if (error.response?.status === 404) {
+      return res.status(404).json({
+        success: false,
+        error: 'Workflow not found'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get workflow status',
+      details: error.message
+    });
+  }
+});
+
 // 404 for unknown API routes
 app.use('/api', (req, res) => {
   res.status(404).json({
@@ -1009,7 +1250,14 @@ app.listen(PORT, '0.0.0.0', () => {
 ✅ API endpoint: http://localhost:${PORT}/api/submit-claim
 ✅ Services status: http://localhost:${PORT}/api/services/status
 
+🔗 MasterLinc Integration:
+   - Submit claim: http://localhost:${PORT}/api/submit-claim-linc
+   - Verify eligibility: http://localhost:${PORT}/api/verify-eligibility
+   - Audit claim: http://localhost:${PORT}/api/audit-claim
+   - Agent status: http://localhost:${PORT}/api/agents/status
+
 🔗 n8n webhook: ${process.env.N8N_WEBHOOK_URL || 'Not configured'}
+🔗 MasterLinc: ${process.env.MASTERLINC_URL || 'Not configured'}
 🌍 Environment: ${process.env.NODE_ENV || 'development'}
 
 Ready to process claims! 📋

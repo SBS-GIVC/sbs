@@ -29,6 +29,31 @@ services:
         reservations:
           memory: 128M
 
+  # Redis (for event streaming and agent coordination)
+  redis:
+    image: redis:7-alpine
+    container_name: sbs-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - sbs-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 128M
+        reservations:
+          memory: 64M
+
   # Normalizer Service (AI-Powered)
   normalizer-service:
     build:
@@ -178,6 +203,133 @@ services:
 
 
 
+  # MasterLinc Bridge (BrainSAIT Linc Agent Coordinator)
+  masterlinc-bridge:
+    build:
+      context: ./services/masterlinc-bridge
+      dockerfile: Dockerfile
+    container_name: sbs-masterlinc-bridge
+    environment:
+      REDIS_URL: redis://redis:6379
+      CLAIMLINC_URL: http://claimlinc-agent:4001
+      AUTHLINC_URL: http://authlinc-agent:4002
+      COMPLIANCELINC_URL: http://compliancelinc-agent:4003
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      BRAINSAIT_OID_ROOT: ${BRAINSAIT_OID_ROOT:-1.3.6.1.4.1.61026}
+      BRAINSAIT_PEN: ${BRAINSAIT_PEN:-61026}
+    ports:
+      - "127.0.0.1:4000:4000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 384M
+        reservations:
+          memory: 192M
+    networks:
+      - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  # ClaimLinc Agent (Revenue Cycle Management)
+  claimlinc-agent:
+    build:
+      context: ./services/agents/claimlinc
+      dockerfile: Dockerfile
+    container_name: sbs-claimlinc-agent
+    environment:
+      NORMALIZER_URL: http://normalizer-service:8000
+      FINANCIAL_RULES_URL: http://financial-rules-engine:8002
+      SIGNER_URL: http://signer-service:8001
+      NPHIES_BRIDGE_URL: http://nphies-bridge:8003
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+    ports:
+      - "127.0.0.1:4001:4001"
+    depends_on:
+      - normalizer-service
+      - financial-rules-engine
+      - signer-service
+      - nphies-bridge
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 384M
+        reservations:
+          memory: 192M
+    networks:
+      - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  # AuthLinc Agent (Eligibility and Pre-Authorization)
+  authlinc-agent:
+    build:
+      context: ./services/agents/authlinc
+      dockerfile: Dockerfile
+    container_name: sbs-authlinc-agent
+    environment:
+      NPHIES_BRIDGE_URL: http://nphies-bridge:8003
+      REDIS_URL: redis://redis:6379
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+    ports:
+      - "127.0.0.1:4002:4002"
+    depends_on:
+      - redis
+      - nphies-bridge
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+        reservations:
+          memory: 128M
+    networks:
+      - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  # ComplianceLinc Agent (Audit and Compliance)
+  compliancelinc-agent:
+    build:
+      context: ./services/agents/compliancelinc
+      dockerfile: Dockerfile
+    container_name: sbs-compliancelinc-agent
+    environment:
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+    ports:
+      - "127.0.0.1:4003:4003"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+        reservations:
+          memory: 128M
+    networks:
+      - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
   # SBS Landing API
   sbs-landing:
     build:
@@ -196,15 +348,22 @@ services:
       - FINANCIAL_RULES_URL=http://financial-rules-engine:8002
       - NPHIES_BRIDGE_URL=http://nphies-bridge:8003
       - AI_PREDICTION_URL=http://ai-prediction-service:8004
+      - MASTERLINC_URL=http://masterlinc-bridge:4000
+      - REDIS_URL=redis://redis:6379
     ports:
       - "127.0.0.1:3000:3000"  # Bind to localhost only for security
     depends_on:
       - n8n
+      - redis
       - normalizer-service
       - financial-rules-engine
       - signer-service
       - nphies-bridge
       - ai-prediction-service
+      - masterlinc-bridge
+      - claimlinc-agent
+      - authlinc-agent
+      - compliancelinc-agent
     restart: unless-stopped
     networks:
       - sbs-network
@@ -321,6 +480,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local
   n8n_data:
     driver: local
