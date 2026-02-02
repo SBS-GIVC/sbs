@@ -513,6 +513,15 @@ Removed redundant API documentation superseded by consolidated README content:
 
 **Updated cleanup total:** 10,400+ lines removed across legacy reports and redundant documents.
 
+### Addendum: Docs Folder & Architecture Cleanup
+
+Removed empty docs folder and redundant architecture documentation:
+
+- `docs/` (empty folder, removed)
+- `ARCHITECTURE.md` (content consolidated to README and production guides)
+
+**Updated cleanup total:** 10,930+ lines removed across legacy reports and redundant documents.
+
 ---
 
 ## 10. DEPLOYMENT READINESS
