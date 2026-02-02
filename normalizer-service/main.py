@@ -37,10 +37,18 @@ app = FastAPI(
 )
 
 # CORS middleware
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS") or os.getenv("CORS_ORIGIN")
+allowed_origins = (
+    [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+    if allowed_origins_env
+    else ["http://localhost:3000", "http://localhost:3001"]
+)
+allow_credentials = "*" not in allowed_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

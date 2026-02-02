@@ -11,6 +11,8 @@ yarn-error.log*
 
 # Python
 __pycache__/
+.mypy_cache/
+.venv/
 *.py[cod]
 *$py.class
 *.so

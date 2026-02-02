@@ -103,9 +103,17 @@ def load_private_key(key_path: str) -> rsa.RSAPrivateKey:
     Supports PEM format
     """
     try:
-        # Check if path is absolute or relative
+        base_cert_dir = os.path.abspath(os.getenv("CERT_BASE_PATH", "/certs"))
         if not os.path.isabs(key_path):
-            key_path = os.path.join(os.getenv("CERT_BASE_PATH", "/certs"), key_path)
+            key_path = os.path.join(base_cert_dir, key_path)
+
+        key_path = os.path.abspath(os.path.normpath(key_path))
+
+        if os.path.commonpath([base_cert_dir, key_path]) != base_cert_dir:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid certificate path"
+            )
 
         with open(key_path, "rb") as key_file:
             private_key = serialization.load_pem_private_key(
@@ -119,7 +127,7 @@ def load_private_key(key_path: str) -> rsa.RSAPrivateKey:
     except FileNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Private key file not found: {key_path}"
+            detail="Private key file not found"
         )
     except Exception as e:
         raise HTTPException(
