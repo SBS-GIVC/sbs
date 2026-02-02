@@ -111,7 +111,8 @@ All Python requirements audited and pinned to specific versions:
 - ✅ **Test reports** (`TEST_REPORT_*.md`, `workflow_test_report_*.json`)
 - ✅ **Redundant audit docs** (4 files removed)
 - ✅ **Redundant deployment/status docs** (`BUILD_COMPLETE.txt`, `DEPLOYMENT_*`, `COMPLETE_DEPLOYMENT_SUMMARY.md`, `PROJECT_SUMMARY.md`, `PRODUCTION_READY*.md`)
-- ✅ **Total cleanup:** 5,770 lines removed
+- ✅ **Legacy standalone test tools** (`test_*`, `SAMPLE_TEST_CLAIM.json`)
+- ✅ **Total cleanup:** 6,848 lines removed
 
 ### 4.2 Repository Hygiene
 - ✅ **Added `.mypy_cache/` and `.venv/` to `.gitignore`**
