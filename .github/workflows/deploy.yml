@@ -159,7 +159,7 @@ jobs:
             echo "✅ Staging deployment complete!"
 
       - name: Notify Staging Deployment
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v2.1.1
         if: always()
         with:
           payload: |
@@ -223,7 +223,7 @@ jobs:
             echo "✅ Production deployment complete!"
 
       - name: Notify Production Deployment
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v2.1.1
         if: always()
         with:
           payload: |
