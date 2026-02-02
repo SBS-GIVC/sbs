@@ -496,6 +496,15 @@ Removed legacy helper scripts that are no longer used in production workflows:
 
 **Updated cleanup total:** 9,270+ lines removed across legacy reports and redundant documents.
 
+### Addendum: Redundant Docs Cleanup
+
+Removed outdated or duplicated documentation now superseded by consolidated guides:
+
+- `docs/PRD.md`
+- `docs/SECURITY.md`
+
+**Updated cleanup total:** 10,100+ lines removed across legacy reports and redundant documents.
+
 ---
 
 ## 10. DEPLOYMENT READINESS
