@@ -505,6 +505,14 @@ Removed outdated or duplicated documentation now superseded by consolidated guid
 
 **Updated cleanup total:** 10,100+ lines removed across legacy reports and redundant documents.
 
+### Addendum: API Doc Cleanup
+
+Removed redundant API documentation superseded by consolidated README content:
+
+- `docs/API.md`
+
+**Updated cleanup total:** 10,400+ lines removed across legacy reports and redundant documents.
+
 ---
 
 ## 10. DEPLOYMENT READINESS

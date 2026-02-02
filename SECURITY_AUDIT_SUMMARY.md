@@ -115,7 +115,8 @@ All Python requirements audited and pinned to specific versions:
 - ✅ **Redundant setup/deployment guides** (legacy DNS, webhook, subdomain, and integration guides)
 - ✅ **Unused helper scripts** (`enhanced-monitoring.sh`, `git-scripts/analyze-issue.sh`)
 - ✅ **Redundant docs** (`docs/PRD.md`, `docs/SECURITY.md`)
-- ✅ **Total cleanup:** 10,100+ lines removed
+- ✅ **Redundant API docs** (`docs/API.md`)
+- ✅ **Total cleanup:** 10,400+ lines removed
 
 ### 4.2 Repository Hygiene
 - ✅ **Added `.mypy_cache/` and `.venv/` to `.gitignore`**
