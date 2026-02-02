@@ -116,7 +116,9 @@ All Python requirements audited and pinned to specific versions:
 - ✅ **Unused helper scripts** (`enhanced-monitoring.sh`, `git-scripts/analyze-issue.sh`)
 - ✅ **Redundant docs** (`docs/PRD.md`, `docs/SECURITY.md`, `docs/API.md`, `ARCHITECTURE.md`)
 - ✅ **Empty docs folder** (removed)
-- ✅ **Total cleanup:** 10,930+ lines removed
+- ✅ **Config & startup scripts** (`pytest.ini`, `quickstart.sh`)
+- ✅ **Old public assets** (legacy JS, HTML, manifests, icons from `sbs-landing/public/`)
+- ✅ **Total cleanup:** 13,800+ lines removed
 
 ### 4.2 Repository Hygiene
 - ✅ **Added `.mypy_cache/` and `.venv/` to `.gitignore`**
