@@ -110,7 +110,8 @@ All Python requirements audited and pinned to specific versions:
 ### 4.1 Removed Legacy Files
 - ✅ **Test reports** (`TEST_REPORT_*.md`, `workflow_test_report_*.json`)
 - ✅ **Redundant audit docs** (4 files removed)
-- ✅ **Total cleanup:** 2,819 lines removed
+- ✅ **Redundant deployment/status docs** (`BUILD_COMPLETE.txt`, `DEPLOYMENT_*`, `COMPLETE_DEPLOYMENT_SUMMARY.md`, `PROJECT_SUMMARY.md`, `PRODUCTION_READY*.md`)
+- ✅ **Total cleanup:** 5,770 lines removed
 
 ### 4.2 Repository Hygiene
 - ✅ **Added `.mypy_cache/` and `.venv/` to `.gitignore`**
