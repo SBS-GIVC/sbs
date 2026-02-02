@@ -113,6 +113,48 @@ export function DashboardPage() {
       badge: 'Predictive',
     },
   ];
+  const codeSystems = [
+    {
+      title: 'SBS',
+      subtitle: 'Saudi Billing System',
+      detail: 'Live CHI-compliant pricing + bundling.',
+      icon: 'dataset',
+      tone: 'from-primary/20 via-primary/10 to-transparent',
+      accent: 'text-primary',
+    },
+    {
+      title: 'ICD-10',
+      subtitle: 'Diagnosis Intelligence',
+      detail: 'Mapped to payer rules + edits.',
+      icon: 'medical_information',
+      tone: 'from-indigo-500/20 via-indigo-500/10 to-transparent',
+      accent: 'text-indigo-500',
+    },
+    {
+      title: 'DRG',
+      subtitle: 'Grouping Engine',
+      detail: 'Auto-grouped for inpatient billing.',
+      icon: 'tune',
+      tone: 'from-emerald-500/20 via-emerald-500/10 to-transparent',
+      accent: 'text-emerald-500',
+    },
+    {
+      title: 'SNOMED',
+      subtitle: 'Clinical Terms',
+      detail: 'Terminology alignment + crosswalks.',
+      icon: 'biotech',
+      tone: 'from-rose-500/20 via-rose-500/10 to-transparent',
+      accent: 'text-rose-500',
+    },
+    {
+      title: 'DICOM',
+      subtitle: 'Imaging Codes',
+      detail: 'Radiology metadata + billing tags.',
+      icon: 'image',
+      tone: 'from-sky-500/20 via-sky-500/10 to-transparent',
+      accent: 'text-sky-500',
+    },
+  ];
 
   const handleAction = (action) => {
     toast.info(`${action} is ready for integration.`);
@@ -267,6 +309,39 @@ export function DashboardPage() {
                     </CardBody>
                 </Card>
             </div>
+        </section>
+
+        <section className="px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8">
+            <Card className="relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent"></div>
+                <CardBody className="relative">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Code Systems Panorama</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">Unified SBS, ICD-10, DRG, SNOMED, and DICOM intelligence.</p>
+                        </div>
+                        <Button variant="secondary" icon="search" onClick={() => handleAction('Search code systems')}>
+                            Search Codes
+                        </Button>
+                    </div>
+                    <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                        {codeSystems.map((system) => (
+                            <div
+                                key={system.title}
+                                className={`rounded-2xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br ${system.tone} px-4 py-4 shadow-soft`}
+                            >
+                                <div className="flex items-start justify-between">
+                                    <span className={`material-symbols-outlined text-[22px] ${system.accent}`}>{system.icon}</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Active</span>
+                                </div>
+                                <p className="mt-3 text-sm font-semibold text-slate-900 dark:text-white">{system.title}</p>
+                                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{system.subtitle}</p>
+                                <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{system.detail}</p>
+                            </div>
+                        ))}
+                    </div>
+                </CardBody>
+            </Card>
         </section>
 
         <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
