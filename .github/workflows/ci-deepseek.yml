@@ -1,0 +1,41 @@
+name: DeepSeek smoke tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check-and-test:
+    runs-on: ubuntu-latest
+    env:
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPEEK_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check DEEPSEEK_API_KEY secret is set
+        run: |
+          if [ -z "${DEEPSEEK_API_KEY}" ]; then
+            echo "DEEPSEEK_API_KEY secret is not set. Failing the job." >&2
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install -U pip
+          pip install -r normalizer-service/requirements.txt
+          pip install pytest
+
+      - name: Run DeepSeek smoke test
+        env:
+          ENABLE_DEEPSEEK: 'true'
+          AI_PROVIDER: 'deepseek'
+        run: |
+          . .venv/bin/activate
+          PYTHONPATH=$(pwd) python -m pytest services/normalizer/tests/test_deepseek_provider.py -q
