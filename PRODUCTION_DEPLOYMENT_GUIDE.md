@@ -72,6 +72,9 @@ NPHIES_MAX_RETRIES=3
 GEMINI_API_KEY=<secure_key_from_vault>
 # OR
 DEEPSEEK_API_KEY=<secure_key_from_vault>
+AI_PROVIDER=deepseek  # Options: gemini | deepseek | custom
+ENABLE_DEEPSEEK=true   # REQUIRED in production to activate DeepSeek
+ENVIRONMENT=production # Controls feature flag gating
 
 # Certificate Configuration
 CERT_BASE_PATH=/etc/sbs/certs
@@ -440,6 +443,294 @@ openssl x509 -in cert.pem -noout -dates
 limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
 limit_req zone=api burst=20 nodelay;
 ```
+
+---
+
+## DeepSeek AI Integration
+
+### Overview
+The normalizer service can use DeepSeek AI for intelligent medical code mapping. This section covers configuration, verification, and rollback procedures for the DeepSeek integration.
+
+### Feature Flag Configuration
+
+DeepSeek is gated by environment-based feature flags to ensure safe rollout:
+
+| Environment | Behavior |
+|-------------|----------|
+| **Development** | Uses any AI provider with available key |
+| **Staging** | DeepSeek enabled automatically if `DEEPSEEK_API_KEY` is present |
+| **Production** | Requires explicit `ENABLE_DEEPSEEK=true` flag + key |
+
+### Required Configuration
+
+#### Environment Variables
+
+```bash
+# Required for DeepSeek in production
+DEEPSEEK_API_KEY=<from-secrets-manager>
+ENABLE_DEEPSEEK=true
+AI_PROVIDER=deepseek
+ENVIRONMENT=production
+
+# Optional: AI fallback configuration
+AI_FALLBACK_ENDPOINT=https://ai.internal.sbs/api/map
+AI_FALLBACK_API_KEY=<from-secrets-manager>
+```
+
+#### Docker Compose Update
+
+Add to `normalizer-service` environment in `docker-compose.yml`:
+
+```yaml
+normalizer:
+  environment:
+    - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+    - ENABLE_DEEPSEEK=true
+    - AI_PROVIDER=deepseek
+    - ENVIRONMENT=production
+```
+
+### Secrets Configuration
+
+#### 1. GitHub Actions Secret (for CI/CD)
+
+```bash
+# Via GitHub UI:
+# Repository > Settings > Secrets and variables > Actions > New repository secret
+# Name: DEEPSEEK_API_KEY
+# Value: sk-your-deepseek-api-key
+
+# Or via API:
+gh secret set DEEPSEEK_API_KEY -b "sk-your-deepseek-api-key" -R SBS-GIVC/sbs
+```
+
+#### 2. Production Runtime Secret
+
+Use your organization's secrets manager:
+
+**AWS Secrets Manager:**
+```bash
+aws secretsmanager create-secret \
+  --name sbs/normalizer/deepseek-api-key \
+  --secret-string "sk-your-deepseek-api-key" \
+  --description "DeepSeek API key for SBS normalizer service"
+```
+
+**Azure Key Vault:**
+```bash
+az keyvault secret set \
+  --vault-name sbs-production-vault \
+  --name deepseek-api-key \
+  --value "sk-your-deepseek-api-key"
+```
+
+**HashiCorp Vault:**
+```bash
+vault kv put secret/sbs/normalizer \
+  deepseek_api_key="sk-your-deepseek-api-key"
+```
+
+### Verification Procedures
+
+#### 1. Verify Feature Flag is Active
+
+```bash
+# Check environment configuration
+docker exec sbs-normalizer printenv | grep -E "(DEEPSEEK|AI_PROVIDER|ENABLE_DEEPSEEK)"
+
+# Expected output:
+# DEEPSEEK_API_KEY=sk-***
+# ENABLE_DEEPSEEK=true
+# AI_PROVIDER=deepseek
+```
+
+#### 2. Verify AI Provider Initialization
+
+Check application logs for successful initialization:
+
+```bash
+docker logs sbs-normalizer 2>&1 | grep -i "deepseek\|ai provider"
+
+# Expected log entries:
+# INFO: AI provider initialized: deepseek
+# INFO: DeepSeek client ready (model: deepseek-chat)
+```
+
+#### 3. Test AI Mapping Endpoint
+
+```bash
+# Send a test request to the normalizer
+curl -X POST http://localhost:8000/normalize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "service_code": "99213",
+    "service_description": "Office visit, established patient"
+  }'
+
+# Expected response includes:
+# "ai_provider": "deepseek",
+# "mapping_confidence": 0.95,
+# "mapped_code": "..."
+```
+
+#### 4. Monitor AI Call Metrics
+
+```bash
+# Check Prometheus metrics endpoint
+curl http://localhost:8000/metrics | grep ai_
+
+# Key metrics:
+# ai_requests_total{provider="deepseek"} 123
+# ai_request_duration_seconds_sum{provider="deepseek"} 45.6
+# ai_errors_total{provider="deepseek"} 0
+```
+
+### Rollback Procedures
+
+#### Scenario 1: DeepSeek API Failures
+
+If DeepSeek API calls are failing (rate limits, downtime, errors):
+
+**Quick Rollback (No Restart):**
+```bash
+# The service automatically falls back to rule-based mapping
+# Monitor fallback usage:
+docker logs sbs-normalizer 2>&1 | grep "AI fallback"
+```
+
+**Disable DeepSeek (Requires Restart):**
+```bash
+# Method 1: Environment variable override
+docker exec sbs-normalizer sh -c 'export ENABLE_DEEPSEEK=false'
+docker restart sbs-normalizer
+
+# Method 2: Update docker-compose.yml
+# Set ENABLE_DEEPSEEK=false
+docker-compose up -d normalizer
+
+# Method 3: Switch to Gemini
+# Set AI_PROVIDER=gemini and GEMINI_API_KEY
+docker-compose up -d normalizer
+```
+
+#### Scenario 2: Incorrect Mappings
+
+If DeepSeek is producing incorrect medical code mappings:
+
+```bash
+# 1. Immediately switch to deterministic fallback
+export AI_PROVIDER=disabled
+docker-compose up -d normalizer
+
+# 2. Review error logs
+docker logs sbs-normalizer 2>&1 | grep -A 10 "mapping error"
+
+# 3. Audit recent mappings in database
+psql -h DB_HOST -U sbs_api_user -d sbs_production -c "
+  SELECT service_code, mapped_code, ai_provider, confidence, created_at 
+  FROM normalized_codes 
+  WHERE ai_provider = 'deepseek' 
+  ORDER BY created_at DESC 
+  LIMIT 50;
+"
+
+# 4. Restore previous provider or rules engine
+export AI_PROVIDER=gemini  # or leave empty for rules-only
+docker-compose up -d normalizer
+```
+
+#### Scenario 3: Key Rotation Incident
+
+If the DeepSeek API key is compromised:
+
+```bash
+# Emergency key rotation (see docs/DEEPSEEK_KEY_ROTATION.md)
+
+# 1. Immediately revoke compromised key at DeepSeek platform
+# Visit: https://platform.deepseek.com/api-keys
+
+# 2. Generate new key and update secrets
+aws secretsmanager update-secret \
+  --secret-id sbs/normalizer/deepseek-api-key \
+  --secret-string "sk-new-key"
+
+# 3. Force service restart to pick up new key
+docker-compose pull normalizer
+docker-compose up -d --force-recreate normalizer
+
+# 4. Verify new key works
+curl http://localhost:8000/health
+
+# 5. Audit access logs at DeepSeek for unauthorized usage
+# Contact DeepSeek support if suspicious activity detected
+```
+
+### Monitoring & Alerting
+
+#### Key Metrics to Monitor
+
+1. **AI Request Success Rate**
+   - Metric: `ai_requests_total{status="success"} / ai_requests_total`
+   - Alert if: < 95% over 5 minutes
+
+2. **AI Response Time**
+   - Metric: `ai_request_duration_seconds`
+   - Alert if: p99 > 5 seconds
+
+3. **Fallback Usage Rate**
+   - Metric: `ai_fallback_total / ai_requests_total`
+   - Alert if: > 10% over 5 minutes (indicates DeepSeek issues)
+
+4. **API Key Expiration**
+   - Manual check: Review key age every 90 days
+   - Alert: 30 days before expiration
+
+#### Recommended Alerts
+
+```yaml
+# Prometheus AlertManager rules
+groups:
+  - name: deepseek_ai
+    rules:
+      - alert: DeepSeekHighErrorRate
+        expr: rate(ai_errors_total{provider="deepseek"}[5m]) > 0.05
+        for: 5m
+        annotations:
+          summary: "DeepSeek AI error rate above 5%"
+          description: "Consider rolling back to rule-based mapping"
+
+      - alert: DeepSeekHighLatency
+        expr: histogram_quantile(0.99, ai_request_duration_seconds{provider="deepseek"}) > 5
+        for: 10m
+        annotations:
+          summary: "DeepSeek API latency above 5s (p99)"
+
+      - alert: DeepSeekFallbackHigh
+        expr: rate(ai_fallback_total[10m]) / rate(ai_requests_total[10m]) > 0.1
+        for: 5m
+        annotations:
+          summary: "More than 10% of requests using fallback mapping"
+```
+
+#### Dashboard Metrics
+
+Add to your Grafana dashboard:
+
+```
+- AI Provider Distribution (pie chart)
+- AI Request Rate (requests/sec by provider)
+- AI Latency (p50, p95, p99)
+- Fallback Rate (% of requests)
+- Error Rate (% by error type)
+```
+
+### Documentation References
+
+- **Key Rotation Guide:** `docs/DEEPSEEK_KEY_ROTATION.md`
+- **Feature Flags Implementation:** `normalizer-service/feature_flags.py`
+- **AI Fallback Module:** `services/normalizer/ai_fallback.py`
+- **CI Workflow:** `.github/workflows/ci-deepseek.yml`
+- **Environment Template:** `normalizer-service/.env.example`
 
 ---
 

@@ -10,6 +10,9 @@ Improvements:
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import Counter, Histogram
+from . import ai_assistant  # local ai helper (added below)
+from utils.retry_circuit import retry, CircuitBreaker
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, validator
 from typing import Optional
