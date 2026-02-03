@@ -1,0 +1,252 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: sbs-vps-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-sbs_integration}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../../database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - sbs-internal
+
+  # Normalizer Service (AI-Powered)
+  normalizer-service:
+    build:
+      context: ../../normalizer-service
+      dockerfile: Dockerfile
+    container_name: sbs-vps-normalizer
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:-sbs_integration}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: 5432
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      AI_PROVIDER: ${AI_PROVIDER:-gemini}
+      ENABLE_DEEPSEEK: ${ENABLE_DEEPSEEK:-false}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; r=requests.get('http://localhost:8000/health'); exit(0 if r.status_code==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sbs-internal
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE:-false}"
+      - "traefik.http.routers.normalizer.rule=Host(`${NORMALIZER_HOST:-normalizer.example.com}`)"
+      - "traefik.http.routers.normalizer.entrypoints=websecure"
+      - "traefik.http.routers.normalizer.tls.certresolver=letsencrypt"
+      - "traefik.http.services.normalizer.loadbalancer.server.port=8000"
+      - "traefik.docker.network=traefik"
+    profiles:
+      - traefik
+
+  # Financial Rules Engine
+  financial-rules-engine:
+    build:
+      context: ../../financial-rules-engine
+      dockerfile: Dockerfile
+    container_name: sbs-vps-financial-rules
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:-sbs_integration}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: 5432
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; r=requests.get('http://localhost:8002/health'); exit(0 if r.status_code==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sbs-internal
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE:-false}"
+      - "traefik.http.routers.financial.rule=Host(`${FINANCIAL_HOST:-financial.example.com}`)"
+      - "traefik.http.routers.financial.entrypoints=websecure"
+      - "traefik.http.routers.financial.tls.certresolver=letsencrypt"
+      - "traefik.http.services.financial.loadbalancer.server.port=8002"
+      - "traefik.docker.network=traefik"
+    profiles:
+      - traefik
+
+  # Signer Service
+  signer-service:
+    build:
+      context: ../../signer-service
+      dockerfile: Dockerfile
+    container_name: sbs-vps-signer
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:-sbs_integration}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: 5432
+      CERT_BASE_PATH: ${CERT_BASE_PATH:-/certs}
+      CERT_PASSWORD: ${CERT_PASSWORD:-}
+      NPHIES_ENV: ${NPHIES_ENV:-sandbox}
+    volumes:
+      - ${CERT_PATH_HOST:-./certs}:/certs:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; r=requests.get('http://localhost:8001/health'); exit(0 if r.status_code==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sbs-internal
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE:-false}"
+      - "traefik.http.routers.signer.rule=Host(`${SIGNER_HOST:-signer.example.com}`)"
+      - "traefik.http.routers.signer.entrypoints=websecure"
+      - "traefik.http.routers.signer.tls.certresolver=letsencrypt"
+      - "traefik.http.services.signer.loadbalancer.server.port=8001"
+      - "traefik.docker.network=traefik"
+    profiles:
+      - traefik
+
+  # NPHIES Bridge
+  nphies-bridge:
+    build:
+      context: ../../nphies-bridge
+      dockerfile: Dockerfile
+    container_name: sbs-vps-nphies-bridge
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:-sbs_integration}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: 5432
+      NPHIES_BASE_URL: ${NPHIES_BASE_URL:-https://sandbox.nphies.sa/api/v1}
+      NPHIES_API_KEY: ${NPHIES_API_KEY}
+      NPHIES_TIMEOUT: ${NPHIES_TIMEOUT:-30}
+      NPHIES_MAX_RETRIES: ${NPHIES_MAX_RETRIES:-3}
+      ENABLE_MOCK_NPHIES: ${ENABLE_MOCK_NPHIES:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; r=requests.get('http://localhost:8003/health'); exit(0 if r.status_code==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sbs-internal
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE:-false}"
+      - "traefik.http.routers.nphies.rule=Host(`${NPHIES_HOST:-nphies.example.com}`)"
+      - "traefik.http.routers.nphies.entrypoints=websecure"
+      - "traefik.http.routers.nphies.tls.certresolver=letsencrypt"
+      - "traefik.http.services.nphies.loadbalancer.server.port=8003"
+      - "traefik.docker.network=traefik"
+    profiles:
+      - traefik
+
+  # SBS Landing (Orchestration API)
+  sbs-landing:
+    build:
+      context: ../../sbs-landing
+      dockerfile: Dockerfile
+    container_name: sbs-vps-landing
+    environment:
+      PORT: 3000
+      NODE_ENV: ${NODE_ENV:-production}
+      SBS_NORMALIZER_URL: http://normalizer-service:8000
+      SBS_SIGNER_URL: http://signer-service:8001
+      SBS_FINANCIAL_RULES_URL: http://financial-rules-engine:8002
+      SBS_NPHIES_BRIDGE_URL: http://nphies-bridge:8003
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      UPLOAD_DIR: /app/uploads
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
+      ENABLE_STAGE_HOOKS: ${ENABLE_STAGE_HOOKS:-false}
+      SBS_STAGE_HOOK_URL: ${SBS_STAGE_HOOK_URL:-}
+      ENABLE_MOCK_PROCESSING: ${ENABLE_MOCK_PROCESSING:-false}
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      normalizer-service:
+        condition: service_healthy
+      financial-rules-engine:
+        condition: service_healthy
+      signer-service:
+        condition: service_healthy
+      nphies-bridge:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sbs-internal
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE:-false}"
+      - "traefik.http.routers.landing.rule=Host(`${LANDING_HOST:-sbs.example.com}`)"
+      - "traefik.http.routers.landing.entrypoints=websecure"
+      - "traefik.http.routers.landing.tls.certresolver=letsencrypt"
+      - "traefik.http.services.landing.loadbalancer.server.port=3000"
+      - "traefik.docker.network=traefik"
+    profiles:
+      - traefik
+
+  # Cloudflare Tunnel (optional, via profile)
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: sbs-vps-cloudflared
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    restart: unless-stopped
+    networks:
+      - sbs-internal
+    profiles:
+      - cloudflare
+
+volumes:
+  postgres_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  sbs-internal:
+    driver: bridge
+  # External network for Traefik (if using)
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik}

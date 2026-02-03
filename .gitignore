@@ -2,6 +2,7 @@
 .env
 .env.local
 .env.production
+deploy/vps/.env
 
 # Node.js
 node_modules/
@@ -91,6 +92,11 @@ n8n_data/
 *.bak
 *.backup
 *.sql.gz
+backups/
+
+# Deployment artifacts
+deploy.tar.gz
+*.tar.gz
 
 # OS
 Thumbs.db
