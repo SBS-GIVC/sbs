@@ -60,8 +60,6 @@ services:
       - "traefik.http.routers.normalizer.tls.certresolver=letsencrypt"
       - "traefik.http.services.normalizer.loadbalancer.server.port=8000"
       - "traefik.docker.network=traefik"
-    profiles:
-      - traefik
 
   # Financial Rules Engine
   financial-rules-engine:
@@ -94,8 +92,6 @@ services:
       - "traefik.http.routers.financial.tls.certresolver=letsencrypt"
       - "traefik.http.services.financial.loadbalancer.server.port=8002"
       - "traefik.docker.network=traefik"
-    profiles:
-      - traefik
 
   # Signer Service
   signer-service:
@@ -133,8 +129,6 @@ services:
       - "traefik.http.routers.signer.tls.certresolver=letsencrypt"
       - "traefik.http.services.signer.loadbalancer.server.port=8001"
       - "traefik.docker.network=traefik"
-    profiles:
-      - traefik
 
   # NPHIES Bridge
   nphies-bridge:
@@ -172,8 +166,6 @@ services:
       - "traefik.http.routers.nphies.tls.certresolver=letsencrypt"
       - "traefik.http.services.nphies.loadbalancer.server.port=8003"
       - "traefik.docker.network=traefik"
-    profiles:
-      - traefik
 
   # SBS Landing (Orchestration API)
   sbs-landing:
@@ -221,8 +213,6 @@ services:
       - "traefik.http.routers.landing.tls.certresolver=letsencrypt"
       - "traefik.http.services.landing.loadbalancer.server.port=3000"
       - "traefik.docker.network=traefik"
-    profiles:
-      - traefik
 
   # Cloudflare Tunnel (optional, via profile)
   cloudflared:
