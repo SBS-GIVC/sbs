@@ -125,6 +125,8 @@ services:
       NPHIES_API_KEY: ${NPHIES_API_KEY}
       NPHIES_TIMEOUT: ${NPHIES_TIMEOUT:-30}
       NPHIES_MAX_RETRIES: ${NPHIES_MAX_RETRIES:-3}
+      # Local/dev default: avoid calling real NPHIES.
+      ENABLE_MOCK_NPHIES: ${ENABLE_MOCK_NPHIES:-true}
     ports:
       - "8003:8003"
     depends_on:

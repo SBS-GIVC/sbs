@@ -10,6 +10,11 @@ Improvements:
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import Counter, Histogram
+# `normalizer-service/` is not a Python package (hyphenated folder name), so
+# relative imports will fail when running `uvicorn main_enhanced:app`.
+import ai_assistant  # local AI helper
+from utils.retry_circuit import retry, CircuitBreaker
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, validator
 from typing import Optional

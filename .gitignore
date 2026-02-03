@@ -59,6 +59,14 @@ htmlcov/
 logs/
 *.log.*
 
+# Local stack runtime artifacts (no Docker)
+.pgdata/
+.pg.log
+.runlogs/
+
+# Generated local certs (runtime)
+certs/
+
 # Certificates (DO NOT COMMIT)
 certs/**/*.pem
 certs/**/*.key

@@ -158,6 +158,33 @@ services and the landing API for a unified local environment.
    - `http://localhost:8003` (NPHIES Bridge)
    - `http://localhost:5678` (n8n)
 
+## ✅ End-to-End workflow testing (API pipeline)
+
+### Option A: Docker Compose (recommended)
+
+```bash
+docker-compose up -d
+python -m pytest tests/test_claim_workflow.py -v
+```
+
+### Option B: No Docker (Alpine/devcontainers)
+
+If Docker isn’t available, you can run Postgres + all services locally and execute
+the full workflow scenario matrix (claim types × mock NPHIES outcomes × file upload variants).
+
+```bash
+# one-time setup (installs postgres/node, creates venvs, installs deps)
+./scripts/bootstrap-local-stack.sh
+
+# start Postgres + all services
+./scripts/start-local-stack.sh
+
+# run E2E matrix tests + workflow simulator live check
+./scripts/run-e2e.sh
+```
+
+Details: `docs/LOCAL_E2E.md`.
+
 ## 🌐 GitHub Pages Frontend
 
 The landing UI can be deployed as a static site using GitHub Pages.
