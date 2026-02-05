@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrainSAIT - من أروقة الشفاء إلى آفاق الذكاء</title>
+    <meta name="description" content="رحلة من الطب إلى الذكاء الاصطناعي: قصة BrainSAIT في بناء جسر بين العناية البشرية والتقنية المتقدمة">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #0ea5e9;
+            --primary-dark: #0369a1;
+            --secondary: #14b8a6;
+            --dark: #0f172a;
+            --darker: #020617;
+            --light: #f8fafc;
+            --gray: #64748b;
+            --gray-light: #cbd5e1;
+            --accent: #8b5cf6;
+            --accent-light: #a78bfa;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            
+            --font-arabic: 'Noto Naskh Arabic', serif;
+            --font-sans: 'Inter', sans-serif;
+            
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+            
+            --gradient-primary: linear-gradient(135deg, var(--primary), var(--secondary));
+            --gradient-dark: linear-gradient(135deg, var(--darker), var(--dark));
+            --gradient-accent: linear-gradient(135deg, var(--accent), var(--primary));
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        body {
+            font-family: var(--font-arabic);
+            background: var(--darker);
+            color: var(--light);
+            line-height: 1.8;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        /* Navigation */
+        .navbar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            left: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+            border-bottom: 1px solid rgba(100, 116, 139, 0.2);
+            padding: 15px 0;
+            transition: all 0.3s ease;
+        }
+        
+        .navbar.scrolled {
+            padding: 10px 0;
+            box-shadow: var(--shadow);
+        }
+        
+        .nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: inherit;
+        }
+        
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient-primary);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 20px;
+            color: white;
+        }
+        
+        .logo-text {
+            font-family: var(--font-sans);
+            font-weight: 800;
+            font-size: 24px;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 30px;
+            list-style: none;
+        }
+        
+        .nav-link {
+            color: var(--gray-light);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: color 0.3s;
+            position: relative;
+        }
+        
+        .nav-link:hover {
+            color: var(--primary);
+        }
+        
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            right: 0;
+            width: 0;
+            height: 2px;
+            background: var(--primary);
+            transition: width 0.3s;
+        }
+        
+        .nav-link:hover::after {
+            width: 100%;
+        }
+        
+        .nav-actions {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .btn {
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: none;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(14, 165, 233, 0.3);
+        }
+        
+        .btn-outline {
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+        
+        .btn-outline:hover {
+            background: rgba(14, 165, 233, 0.1);
+        }
+        
+        /* Hero Section */
+        .hero {
+            padding: 180px 0 100px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero-bg {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            z-index: -1;
+            background: radial-gradient(circle at 20% 50%, rgba(14, 165, 233, 0.15) 0%, transparent 50%),
+                      radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+                      radial-gradient(circle at 40% 80%, rgba(20, 184, 166, 0.1) 0%, transparent 50%);
+        }
+        
+        .hero-content {
+            text-align: center;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        .hero-subtitle {
+            color: var(--secondary);
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            letter-spacing: 1px;
+        }
+        
+        .hero-title {
+            font-size: 64px;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 30px;
+            background: linear-gradient(to right, var(--light), var(--primary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .hero-description {
+            font-size: 20px;
+            color: var(--gray-light);
+            max-width: 700px;
+            margin: 0 auto 40px;
+        }
+        
+        .hero-actions {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        /* Story Sections */
+        .story-section {
+            padding: 100px 0;
+            position: relative;
+        }
+        
+        .story-section:nth-child(even) {
+            background: rgba(15, 23, 42, 0.5);
+        }
+        
+        .section-title {
+            text-align: center;
+            font-size: 42px;
+            font-weight: 800;
+            margin-bottom: 60px;
+            position: relative;
+        }
+        
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -15px;
+            right: 50%;
+            transform: translateX(50%);
+            width: 100px;
+            height: 4px;
+            background: var(--gradient-primary);
+            border-radius: 2px;
+        }
+        
+        .story-card {
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            border: 1px solid rgba(100, 116, 139, 0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .story-card:hover {
+            transform: translateY(-10px);
+            box-shadow: var(--shadow-lg);
+            border-color: rgba(14, 165, 233, 0.3);
+        }
+        
+        .story-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--gradient-primary);
+        }
+        
+        .story-number {
+            font-size: 72px;
+            font-weight: 800;
+            color: rgba(14, 165, 233, 0.1);
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            line-height: 1;
+        }
+        
+        .story-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--primary);
+            padding-right: 40px;
+        }
+        
+        .story-content {
+            font-size: 18px;
+            line-height: 1.9;
+            color: var(--gray-light);
+        }
+        
+        .story-content p {
+            margin-bottom: 20px;
+        }
+        
+        .story-content p:last-child {
+            margin-bottom: 0;
+        }
+        
+        /* Bridge Section - SBS Integration */
+        .bridge-section {
+            padding: 120px 0;
+            background: var(--gradient-dark);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .bridge-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0,0 L100,0 L100,100 Z" fill="rgba(14,165,233,0.05)"/></svg>');
+            background-size: cover;
+        }
+        
+        .bridge-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+        
+        @media (max-width: 992px) {
+            .bridge-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .bridge-text {
+            padding-left: 40px;
+        }
+        
+        .bridge-title {
+            font-size: 36px;
+            font-weight: 800;
+            margin-bottom: 30px;
+            color: var(--light);
+        }
+        
+        .bridge-description {
+            font-size: 18px;
+            color: var(--gray-light);
+            margin-bottom: 30px;
+        }
+        
+        .bridge-features {
+            list-style: none;
+            margin-bottom: 40px;
+        }
+        
+        .bridge-features li {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        
+        .bridge-features i {
+            color: var(--secondary);
+            margin-top: 5px;
+        }
+        
+        .bridge-visual {
+            position: relative;
+            height: 400px;
+            background: rgba(30, 41, 59, 0.7);
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid rgba(100, 116, 139, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .bridge-visual::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            background: linear-gradient(45deg, transparent 40%, rgba(14, 165, 233, 0.1) 50%, transparent 60%);
+            animation: shine 3s infinite;
+        }
+        
+        @keyframes shine {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        .sbs-preview {
+            text-align: center;
+            padding: 30px;
+            width: 100%;
+        }
+        
+        .sbs-logo {
+            font-size: 48px;
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
+        
+        .sbs-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: var(--light);
+        }
+        
+        .sbs-description {
+            color: var(--gray-light);
+            margin-bottom: 30px;
+            font-size: 18px;
+        }
+        
+        /* Footer */
+        .footer {
+            background: var(--dark);
+            padding: 80px 0 40px;
+            border-top: 1px solid rgba(100, 116, 139, 0.2);
+        }
+        
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 40px;
+            margin-bottom: 60px;
+        }
+        
+        @media (max-width: 992px) {
+            .footer-content {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .footer-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .footer-column h3 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 25px;
+            color: var(--light);
+        }
+        
+        .footer-links {
+            list-style: none;
+        }
+        
+        .footer-links li {
+            margin-bottom: 12px;
+        }
+        
+        .footer-links a {
+            color: var(--gray-light);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        
+        .footer-links a:hover {
+            color: var(--primary);
+        }
+        
+        .footer-bottom {
+            text-align: center;
+            padding-top: 40px;
+            border-top: 1px solid rgba(100, 116, 139, 0.2);
+            color: var(--gray);
+            font-size: 14px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 48px;
+            }
+            
+            .section-title {
+                font-size: 32px;
+            }
+            
+            .story-title {
+                font-size: 24px;
+            }
+            
+            .nav-links {
+                display: none;
+            }
+            
+            .mobile-menu-btn {
+                display: block;
+                background: none;
+                border: none;
+                color: var(--light);
+                font-size: 24px;
+                cursor: pointer;
+            }
+            
+            .mobile-menu {
+                position: fixed;
+                top: 70px;
+                right: 0;
+                left: 0;
+                background: var(--dark);
+                padding: 20px;
+                display: none;
+                flex-direction: column;
+                gap: 20px;
+                border-top: 1px solid rgba(100, 116, 139, 0.2);
+                z-index: 999;
+            }
+            
+            .mobile-menu.active {
+                display: flex;
+            }
+        }
+        
+        /* Animation Classes */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s, transform 0.8s;
+        }
+        
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .stagger-delay-1 { transition-delay: 0.1s; }
+        .stagger-delay-2 { transition-delay: 0.2s; }
+        .stagger-delay-3 { transition-delay: 0.3s; }
+        .stagger-delay-4 { transition-delay: 0.4s; }
+        
+        /* Utility Classes */
+        .text-center { text-align: center; }
+        .mb-20 { margin-bottom: 20px; }
+        .mb-30 { margin-bottom: 30px; }
+        .mb-40 { margin-bottom: 40px; }
+        .mt-40 { margin-top: 40px; }
+        .mt-60 { margin-top: 60px; }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="container">
+            <div class="nav-container">
+                <a href="#hero" class="logo">
+                    <div class="logo-icon">B</div>
+                    <div class="logo-text">BrainSAIT</div>
+                </a>
+                
+                <ul class="nav-links">
+                    <li><a href="#story" class="nav-link">القصة</a></li>
+                    <li><a href="#bridge" class="nav-link">النظام</a></li>
+                    <li><a href="#services" class="nav-link">الخدمات</a></li>
+                    <li><a href="#contact" class="nav-link">اتصل بنا</a></li>
+                </ul>
+                
+                <div class="nav-actions">
+                    <a href="https://brainsait.cloud/sbs" class="btn btn-outline" target="_blank">SBS النظام</a>
+                    <a href="#bridge" class="btn btn-primary">جرب الآن</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero" id="hero">
+        <div class="hero-bg"></div>
+        <div class="container">
+            <div class="hero-content">
+                <div class="hero-subtitle">رحلة من الطب إلى الذكاء الاصطناعي</div>
+                <h1 class="hero-title">من أروقة الشفاء إلى آفاق الذكاء</h1>
+                <p class="hero-description">
+                    قصة BrainSAIT التي تروي كيف تحولت خبرة سنوات في الطب إلى نظام ذكي متكامل يربط بين العناية البشرية والتقنية المتقدمة، لبناء مستقبل أفضل للرعاية الصحية في المملكة العربية السعودية.
+                </p>
+                <div class="hero-actions">
+                    <a href="#story" class="btn btn-primary">اكتشف القصة</a>
+                    <a href="https://brainsait.cloud/sbs" class="btn btn-outline" target="_blank">تجربة النظام</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Story Section 1 -->
+    <section class="story-section" id="story">
+        <div class="container">
+            <h2 class="section-title">القصة: من الطب إلى التقنية</h2>
+            
+            <div class="story-card fade-in">
+                <div class="story-number">١</div>
+                <h3 class="story-title">بداية الرحلة: في أروقة المستشفيات</h3>
+                <div class="story-content">
+                    <p>بدأت القصة بين أروقة المستشفيات وغرف العمليات، حيث شهدنا عن قرب التحديات اليومية التي تواجه العاملين في القطاع الصحي. من تعقيدات التوثيق الطبي إلى صعوبات التواصل بين مقدمي الخدمة وشركات التأمين.</p>
+                    <p>لاحظنا كيف تضيع ساعات ثمينة في معالجة الأوراق والمستندات، وكيف تؤثر الأخطاء البسيطة في الترميز على جودة الرعاية المقدمة للمرضى. كانت هناك فجوة واضحة بين التقدم الطبي والتقنيات الداعمة له.</p>
+                </div>
+            </div>
+            
+            <div class="story-card fade-in">
+                <div class="story-number">٢</div>
+                <h3 class="story-title">التحول: عندما التقى الطب بالذكاء الاصطناعي</h3>
+                <div class="story-content">
+                    <p>مع تطور تقنيات الذكاء الاصطناعي، أدركنا أن الحل لا يكمن في مجرد أتمتة المهام، بل في بناء نظام ذكي يفهم سياق العمل الطبي ويتكيف مع احتياجاته.</p>
+                    <p>بدأنا في تطوير خوارزميات قادرة على فهم النصوص الطبية باللغتين العربية والإنجليزية، وتحليل الصور الشعاعية، وتوقع الأخطاء المحتملة قبل وقوعها. كان الهدف بناء جسر بين الخبرة الطبية البشرية ودقة الآلة.</p>
+                </div>
+            </div>
+            
+            <div class="story-card fade-in">
+                <div class="story-number">٣</div>
+                <h3 class="story-title">الولادة: نظام SBS المتكامل</h3>
+                <div class="story-content">
+                    <p>من هذه الرحلة ولد نظام Saudi Billing System (SBS)، وهو منصة متكاملة مصممة خصيصاً للبيئة الصحية السعودية، متوافقة تماماً مع متطلبات نظام نفيس (NPHIES).</p>
+                    <p>النظام لا يقدم فقط أدوات للمعالجة، بل يبني بيئة تعاونية تربط بين جميع أطراف العملية الصحية: الأطباء، الممرضين، إدارات المستشفيات، وشركات التأمين.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Bridge Section - SBS Integration -->
+    <section class="bridge-section" id="bridge">
+        <div class="container">
+            <div class="bridge-content">
+                <div class="bridge-text">
+                    <h2 class="bridge-title">النظام الذكي: SBS</h2>
+                    <p class="bridge-description">
+                        نظام SBS هو الجسر الذي يربط بين قصة BrainSAIT والواقع العملي. منصة متكاملة تجمع بين الذكاء الاصطناعي والخبرة الطبية لتحويل تحديات الرعاية الصحية إلى فرص للتميز.
+                    </p>
+                    
+                    <ul class="bridge-features">
+                        <li><i class="fas fa-check-circle"></i> <span>تحقق تلقائي متوافق مع نفيس (NPHIES)</span></li>
+                        <li><i class="fas fa-check-circle"></i> <span>معالجة ذكية للنصوص الطبية بالعربية والإنجليزية</span></li>
+                        <li><i class="fas fa-check-circle"></i> <span>توقع الأخطاء قبل وقوعها باستخدام الذكاء الاصطناعي</span></li>
+                        <li><i class="fas fa-check-circle"></i> <span>منصة تعاونية تربط جميع أطراف العملية الصحية</span></li>
+                        <li><i class="fas fa-check-circle"></i> <span>تقارير تحليلية ذكية لاتخاذ القرارات</span></li>
+                    </ul>
+                    
+                    <div class="hero-actions">
+                        <a href="https://brainsait.cloud/sbs" class="btn btn-primary" target="_blank">تجربة النظام الآن</a>
+                        <a href="#services" class="btn btn-outline">الخدمات المتاحة</a>
+                    </div>
+                </div>
+                
+                <div class="bridge-visual">
+                    <div class="sbs-preview">
+                        <div class="sbs-logo">
+                            <i class="fas fa-brain"></i>
+                        </div>
+                        <h3 class="sbs-title">SBS System</h3>
+                        <p class="sbs-description">
+                            Saudi Billing System المتكامل<br>
+                            الذكاء الاصطناعي في خدمة الرعاية الصحية
+                        </p>
+                        <div class="hero-actions">
+                            <a href="https://sbs.brainsait.cloud" class="btn btn-primary" target="_blank">الدخول إلى النظام</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Services Section -->
+    <section class="story-section" id="services">
+        <div class="container">
+            <h2 class="section-title">الخدمات المتاحة على BrainSAIT</h2>
+            
+            <div class="bridge-content">
+                <div class="bridge-visual">
+                    <div class="sbs-preview">
+                        <div class="sbs-logo">
+                            <i class="fas fa-cloud"></i>
+                        </div>
+                        <h3 class="sbs-title">منصة الخدمات</h3>
+                        <p class="sbs-description">
+                            جميع خدمات BrainSAIT متاحة عبر<br>
+                            النطاق brainsait.cloud
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="bridge-text">
+                    <h3 class="bridge-title">خدماتنا المتكاملة</h3>
+                    
+                    <ul class="bridge-features">
+                        <li><i class="fas fa-robot"></i> <span><strong>منصة الذكاء الاصطناعي:</strong> ai.brainsait.cloud</span></li>
+                        <li><i class="fas fa-cogs"></i> <span><strong>نظام الأتمتة N8N:</strong> n8n.brainsait.cloud</span></li>
+                        <li><i class="fas fa-graduation-cap"></i> <span><strong>نظام التعليم Moodle:</strong> moodle.brainsait.cloud</span></li>
+                        <li><i class="fas fa-box"></i> <span><strong>سجل Docker:</strong> registry.brainsait.cloud</span></li>
+                        <li><i class="fas fa-shield-alt"></i> <span><strong>الأمان:</strong> TLS 1.2/1.3، HTTP/2</span></li>
+                    </ul>
+                    
+                    <p class="bridge-description mt-40">
+                        جميع الخدمات تعمل بشكل متكامل وتتواصل مع بعضها البعض لضمان تجربة سلسة ومتماسكة للمستخدمين.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section class="story-section" id="contact">
+        <div class="container">
+            <h2 class="section-title">اتصل بنا</h2>
+            
+            <div class="story-card">
+                <h3 class="story-title">للاستفسارات والشراكات</h3>
+                <div class="story-content">
+                    <p>نحن في BrainSAIT نؤمن بأن أفضل الحلول تأتي من التعاون والفهم العميق للتحديات. سواء كنت مؤسسة صحية تبحث عن حلول متكاملة، أو مطوراً مهتماً بالتقنيات الحديثة، أو مستثمراً يرى فرص النمو في قطاع الرعاية الصحية.</p>
+                    <p>نرحب بفرص التعاون والشراكات التي تساهم في بناء مستقبل أفضل للرعاية الصحية في المملكة العربية السعودية والعالم العربي.</p>
+                    
+                    <div class="hero-actions mt-40">
+                        <a href="mailto:contact@brainsait.cloud" class="btn btn-primary">
+                            <i class="fas fa-envelope"></i> contact@brainsait.cloud
+                        </a>
+                        <a href="https://brainsait.cloud/sbs" class="btn btn-outline" target="_blank">
+                            <i class="fas fa-external-link-alt"></i> زيارة النظام
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-column">
+                    <h3>BrainSAIT</h3>
+                    <ul class="footer-links">
+                        <li><a href="#story">القصة</a></li>
+                        <li><a href="#bridge">النظام</a></li>
+                        <li><a href="#services">الخدمات</a></li>
+                        <li><a href="#contact">اتصل بنا</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-column">
+                    <h3>الخدمات</h3>
+                    <ul class="footer-links">
+                        <li><a href="https://sbs.brainsait.cloud" target="_blank">SBS النظام</a></li>
+                        <li><a href="https://ai.brainsait.cloud" target="_blank">منصة الذكاء الاصطناعي</a></li>
+                        <li><a href="https://n8n.brainsait.cloud" target="_blank">نظام الأتمتة</a></li>
+                        <li><a href="https://moodle.brainsait.cloud" target="_blank">نظام التعليم</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-column">
+                    <h3>روابط سريعة</h3>
+                    <ul class="footer-links">
+                        <li><a href="https://brainsait.cloud/sbs" target="_blank">الدخول إلى SBS</a></li>
+                        <li><a href="https://brainsait.cloud" target="_blank">الصفحة الرئيسية</a></li>
+                        <li><a href="#contact">طلب عرض توضيحي</a></li>
+                        <li><a href="mailto:contact@brainsait.cloud">الدعم الفني</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-column">
+                    <h3>التقنية</h3>
+                    <ul class="footer-links">
+                        <li>الذكاء الاصطناعي المتقدم</li>
+                        <li>معالجة اللغة الطبيعية</li>
+                        <li>التكامل مع نفيس (NPHIES)</li>
+                        <li>أمن وحماية البيانات</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>© 2024 BrainSAIT. جميع الحقوق محفوظة.</p>
+                <p>منصة متكاملة للرعاية الصحية الذكية في المملكة العربية السعودية</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Navbar scroll effect
+        window.addEventListener('scroll', function() {
+            const navbar = document.getElementById('navbar');
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+
+        // Fade-in animation on scroll
+        const fadeElements = document.querySelectorAll('.fade-in');
+        
+        const fadeInOnScroll = function() {
+            fadeElements.forEach(element => {
+                const elementTop = element.getBoundingClientRect().top;
+                const elementVisible = 150;
+                
+                if (elementTop < window.innerHeight - elementVisible) {
+                    element.classList.add('visible');
+                }
+            });
+        };
+        
+        window.addEventListener('scroll', fadeInOnScroll);
+        fadeInOnScroll(); // Check on load
+
+        // Mobile menu toggle
+        const mobileMenuBtn = document.createElement('button');
+        mobileMenuBtn.className = 'mobile-menu-btn';
+        mobileMenuBtn.innerHTML = '<i class="fas fa-bars"></i>';
+        
+        const mobileMenu = document.createElement('div');
+        mobileMenu.className = 'mobile-menu';
+        
+        const navLinks = document.querySelector('.nav-links').cloneNode(true);
+        mobileMenu.appendChild(navLinks);
+        
+        document.querySelector('.nav-container').appendChild(mobileMenuBtn);
+        document.querySelector('.navbar').appendChild(mobileMenu);
+        
+        mobileMenuBtn.addEventListener('click', function() {
+            mobileMenu.classList.toggle('active');
+        });
+
+        // Close mobile menu when clicking a link
+        mobileMenu.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function() {
+                mobileMenu.classList.remove('active');
+            });
+        });
+
+        // Language toggle (simplified)
+        const langToggle = document.createElement('button');
+        langToggle.className = 'btn btn-outline';
+        langToggle.innerHTML = '<i class="fas fa-language"></i> English';
+        langToggle.style.marginLeft = '10px';
+        
+        langToggle.addEventListener('click', function() {
+            // This is a simplified version - in production, you would have full translation
+            alert('في النسخة الكاملة، سيكون هنا تبديل كامل بين اللغتين العربية والإنجليزية');
+        });
+        
+        document.querySelector('.nav-actions').appendChild(langToggle);
+    </script>
+</body>
+</html>
