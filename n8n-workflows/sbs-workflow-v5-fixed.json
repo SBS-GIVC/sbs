@@ -4,7 +4,7 @@
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "sbs-gateway",
+        "path": "sbs-claim-submission",
         "options": {}
       },
       "id": "webhook-1",
@@ -15,7 +15,7 @@
         240,
         300
       ],
-      "webhookId": "sbs-gateway"
+      "webhookId": "sbs-claim-submission"
     },
     {
       "parameters": {
@@ -113,7 +113,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://sbs-nphies-bridge:8003/submit",
+        "url": "http://sbs-nphies-bridge:8003/submit-claim",
         "sendBody": true,
         "contentType": "json",
         "bodyParameters": {

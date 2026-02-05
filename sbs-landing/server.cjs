@@ -623,15 +623,16 @@ async function triggerN8nWorkflow(claimData) {
     }
 
     // n8n webhook URL - Update this with your actual webhook URL
-    const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 
-      'https://n8n.srv791040.hstgr.cloud/webhook/sbs-claim-submission';
+    const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL ||
+      'https://n8n.brainsait.cloud/webhook/sbs-claim-submission';
 
     console.log('🚀 Triggering n8n workflow...');
 
     const response = await axios.post(N8N_WEBHOOK_URL, claimData, {
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'SBS-Landing-API/1.0'
+        'User-Agent': 'SBS-Landing-API/1.0',
+        ...(process.env.SBS_API_KEY ? { 'X-API-Key': process.env.SBS_API_KEY } : {})
       },
       timeout: 30000 // 30 second timeout
     });

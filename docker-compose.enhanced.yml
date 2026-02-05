@@ -143,6 +143,7 @@ services:
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
       - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-changeme}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:?N8N_ENCRYPTION_KEY is required}
       - N8N_HOST=n8n.brainsait.cloud
       - N8N_PORT=5678
       - N8N_PROTOCOL=https
@@ -150,6 +151,17 @@ services:
       - GENERIC_TIMEZONE=${TIMEZONE:-Asia/Riyadh}
       - N8N_EDITOR_BASE_URL=https://n8n.brainsait.cloud
       - N8N_SECURE_COOKIE=true
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        set -e
+        n8n import:workflow --input=/workflows/sbs-claim-processing.json --userId=1 || true
+        n8n update:workflow --all --active=true || true
+        exec n8n start
     ports:
       - "127.0.0.1:5678:5678"
     volumes:
@@ -180,7 +192,7 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - PORT=3000
-      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/sbs-claim-submission
+      - N8N_WEBHOOK_URL=http://sbs-n8n:5678/webhook/sbs-claim-submission
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
       - ENABLE_DIRECT_SBS=${ENABLE_DIRECT_SBS:-true}
       - NORMALIZER_URL=http://normalizer-service:8000

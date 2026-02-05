@@ -75,7 +75,7 @@
     },
     {
       "parameters": {
-        "url": "http://sbs-nphies-bridge:8003/submit",
+        "url": "http://sbs-nphies-bridge:8003/submit-claim",
         "method": "POST",
         "jsonParameters": true,
         "options": {
