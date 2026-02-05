@@ -1,55 +1,42 @@
-# Environment variables
-.env
-*.env
-!.env.example
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-
-# Docker
-docker-compose.override.yml
-
-# Certificates
-*.pem
-*.key
-*.crt
-certs/*
-!certs/.gitkeep
-
-# Logs
+# Test results and logs
+sbs_test_report_*.json
+sbs_test_execution*.log
+workflow_test_report_*.json
 *.log
-logs/
 
-# IDEs
+# System files
+.bash_history
+.bash_logout
+.bashrc
+.profile
+.lesshst
+.sudo_as_admin_successful
+
+# Cache and temporary files
+.cache/
+.npm/
+.nvm/
+__pycache__/
+*.pyc
+*.pyo
+*.tmp
+
+# IDE and editor files
+.cline/
+.copilot/
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# OS
-.DS_Store
-Thumbs.db
+# SSH and certificates
+.ssh/
+*.key
+*.crt
+*.pem
 
-# Generated artifacts
-deployment.tar.gz
-**/deployment.tar.gz
+# Environment files
+.env.local
+.env.*.local
 
-# macOS resource forks
-._*
-**/._*
-
-# Node
-node_modules/
-npm-debug.log*
-
-# Database
-*.db
-*.sqlite
-postgres_data/
+# Backup files
+*.backup
+*~
