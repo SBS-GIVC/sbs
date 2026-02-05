@@ -44,6 +44,18 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [copilotOpen, setCopilotOpen] = useState(false);
 
+  useEffect(() => {
+    const handleNavigate = (event) => {
+      const view = event?.detail?.view;
+      if (!view) return;
+      setCurrentView(view);
+      setSidebarOpen(false);
+    };
+
+    window.addEventListener('sbs:navigate', handleNavigate);
+    return () => window.removeEventListener('sbs:navigate', handleNavigate);
+  }, []);
+
   // Update header based on view
   useEffect(() => {
     switch (currentView) {
@@ -224,4 +236,3 @@ export default function App() {
     </div>
   );
 }
-

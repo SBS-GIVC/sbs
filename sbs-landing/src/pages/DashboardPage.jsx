@@ -155,8 +155,74 @@ export function DashboardPage() {
       accent: 'text-sky-500',
     },
   ];
+  const scenarioPipelines = [
+    { name: 'Eligibility > Prior Auth > Claim Submit', state: 'Ready', icon: 'account_tree', stateColor: 'text-emerald-500' },
+    { name: 'Radiology DICOM + SNOMED Crosswalk', state: 'Monitoring', icon: 'monitor_heart', stateColor: 'text-primary' },
+    { name: 'High-Risk Denial Auto-Correction', state: 'Needs review', icon: 'rule_settings', stateColor: 'text-amber-500' },
+  ];
 
-  const handleAction = (action) => {
+  const locale = typeof document !== 'undefined' && document.documentElement.dir === 'rtl' ? 'ar' : 'en';
+  const uiText = {
+    en: {
+      codeSystemsTitle: 'Code Systems Panorama',
+      codeSystemsSub: 'Unified SBS, ICD-10, DRG, SNOMED, and DICOM intelligence.',
+      searchCodes: 'Search Codes',
+      workflowLabTitle: 'Workflow Scenario Lab',
+      workflowLabSub: 'Run simulated end-to-end pipelines before production cutover.',
+      runSimulation: 'Run Simulation',
+      replayFailures: 'Replay Failures'
+    },
+    ar: {
+      codeSystemsTitle: 'بانوراما أنظمة الترميز',
+      codeSystemsSub: 'تكامل موحد لأكواد SBS و ICD-10 و DRG و SNOMED و DICOM.',
+      searchCodes: 'بحث في الأكواد',
+      workflowLabTitle: 'مختبر سيناريوهات سير العمل',
+      workflowLabSub: 'شغّل محاكاة شاملة لمسارات المعالجة قبل الإطلاق الإنتاجي.',
+      runSimulation: 'تشغيل المحاكاة',
+      replayFailures: 'إعادة تشغيل الحالات المتعثرة'
+    }
+  }[locale];
+
+  const handleAction = async (action) => {
+    const navigationMap = {
+      'Launch orchestration': 'claims',
+      'Generate insights': 'predictive-analytics',
+      'Share workspace': 'developer',
+      'Deploy to production': 'settings',
+      'View release plan': 'mapping_rules',
+      'Open AI fabric': 'ai-copilot',
+      'Boost agents': 'claim-optimizer',
+      'Search code systems': 'unified-browser',
+      'Run workflow simulation': 'facility_performance',
+      'Replay failed claims': 'claims',
+      'Upload claims': 'claim-builder',
+    };
+
+    const targetView = navigationMap[action];
+
+    if (action === 'Run workflow simulation') {
+      try {
+        const apiBase = window.SBS_API_URL || window.location.origin;
+        const response = await fetch(`${apiBase}/api/workflows/simulate-claim-pipeline`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: 'dashboard_workflow_lab' })
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          throw new Error(result?.message || 'simulation trigger failed');
+        }
+
+        toast.success(`Workflow simulation triggered (${result.requestId}).`);
+      } catch (error) {
+        toast.error(`Unable to trigger simulation: ${error.message}`);
+      }
+    }
+
+    if (targetView && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: targetView } }));
+    }
     toast.info(`${action} is ready for integration.`);
   };
 
@@ -317,11 +383,11 @@ export function DashboardPage() {
                 <CardBody className="relative">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div>
-                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Code Systems Panorama</h3>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">Unified SBS, ICD-10, DRG, SNOMED, and DICOM intelligence.</p>
+                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{uiText.codeSystemsTitle}</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{uiText.codeSystemsSub}</p>
                         </div>
                         <Button variant="secondary" icon="search" onClick={() => handleAction('Search code systems')}>
-                            Search Codes
+                            {uiText.searchCodes}
                         </Button>
                     </div>
                     <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -337,6 +403,38 @@ export function DashboardPage() {
                                 <p className="mt-3 text-sm font-semibold text-slate-900 dark:text-white">{system.title}</p>
                                 <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{system.subtitle}</p>
                                 <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{system.detail}</p>
+                            </div>
+                        ))}
+                    </div>
+                </CardBody>
+            </Card>
+        </section>
+
+        <section className="px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8">
+            <Card>
+                <CardBody>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{uiText.workflowLabTitle}</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{uiText.workflowLabSub}</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button variant="secondary" icon="science" onClick={() => handleAction('Run workflow simulation')}>
+                                {uiText.runSimulation}
+                            </Button>
+                            <Button variant="secondary" icon="play_circle" onClick={() => handleAction('Replay failed claims')}>
+                                {uiText.replayFailures}
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="mt-5 grid gap-3 md:grid-cols-3">
+                        {scenarioPipelines.map((scenario) => (
+                            <div key={scenario.name} className="rounded-2xl border border-slate-200 dark:border-slate-800 px-4 py-4 bg-slate-50/70 dark:bg-slate-900/40">
+                                <div className="flex items-center justify-between gap-2">
+                                    <span className="material-symbols-outlined text-primary">{scenario.icon}</span>
+                                    <span className={`text-xs font-semibold ${scenario.stateColor}`}>{scenario.state}</span>
+                                </div>
+                                <p className="mt-3 text-sm font-medium text-slate-800 dark:text-slate-100">{scenario.name}</p>
                             </div>
                         ))}
                     </div>

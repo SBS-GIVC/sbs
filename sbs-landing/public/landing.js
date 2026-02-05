@@ -40,6 +40,12 @@ const translations = {
       error: "Error",
       close: "Close"
     },
+    domain: {
+      corporateLabel: "Corporate Experience",
+      corporateDesc: "Brand, product vision, and strategic healthcare AI narrative.",
+      appLabel: "Application Experience",
+      appDesc: "Operational command center for SBS workflows, coding, and pipeline execution."
+    },
     services: {
       title: "Core Microservices",
       subtitle: "Four robust, containerized services powering your revenue cycle.",
@@ -94,6 +100,12 @@ const translations = {
       successMsg: "تم تقديم مطالبتك وهي قيد المعالجة عبر نظامنا.",
       error: "خطأ",
       close: "إغلاق"
+    },
+    domain: {
+      corporateLabel: "تجربة المنصة التعريفية",
+      corporateDesc: "عرض الهوية، الرؤية، والذكاء الاصطناعي الصحي في برينسايت.",
+      appLabel: "تجربة التطبيق التشغيلية",
+      appDesc: "مركز تشغيل متكامل لمسارات SBS والترميز وتنفيذ خطوط المعالجة."
     },
     services: {
       title: "الخدمات الأساسية",
@@ -209,7 +221,7 @@ class SBSLandingPage {
       <!-- Navbar -->
       <nav class="fixed top-0 left-0 right-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div class="flex items-center justify-between h-20">
+          <div class="flex items-center justify-between h-16 sm:h-20">
             <div class="flex items-center gap-3">
               <div class="bg-gradient-to-tr from-emerald-400 to-cyan-500 p-2 rounded-lg">
                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -223,6 +235,7 @@ class SBSLandingPage {
             
             <div class="flex items-center gap-4">
               <a href="#features" class="text-slate-300 hover:text-white transition-colors text-sm font-medium hidden md:block">${t.nav.features}</a>
+              <a href="#features" class="text-slate-300 hover:text-white transition-colors text-sm font-medium hidden md:block">${t.nav.docs}</a>
               <button onclick="app.openClaimModal()" class="bg-emerald-500 hover:bg-emerald-400 text-slate-900 px-5 py-2 rounded-full font-bold text-sm transition-all shadow-lg shadow-emerald-500/20">
                 ${t.nav.submitClaim}
               </button>
@@ -235,7 +248,7 @@ class SBSLandingPage {
       </nav>
 
       <!-- Hero -->
-      <div class="min-h-screen flex items-center justify-center overflow-hidden bg-slate-950 pt-20 relative">
+      <div class="min-h-screen flex items-center justify-center overflow-hidden bg-slate-950 pt-16 sm:pt-20 relative">
         <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
         
         <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-600 rounded-full blur-[80px] opacity-30 animate-pulse-slow"></div>
@@ -250,27 +263,45 @@ class SBSLandingPage {
             ${t.hero.badge}
           </span>
 
-          <h1 class="text-5xl md:text-7xl font-extrabold text-white tracking-tight leading-tight mb-6 max-w-4xl animate-fade-in" style="animation-delay: 0.2s;">
+          <h1 class="text-4xl sm:text-5xl md:text-7xl font-extrabold text-white tracking-tight leading-tight mb-6 max-w-4xl animate-fade-in" style="animation-delay: 0.2s;">
             ${t.hero.title}
           </h1>
 
-          <p class="text-xl md:text-2xl text-slate-400 max-w-2xl mb-10 leading-relaxed animate-fade-in" style="animation-delay: 0.4s;">
+          <p class="text-base sm:text-xl md:text-2xl text-slate-400 max-w-2xl mb-10 leading-relaxed animate-fade-in" style="animation-delay: 0.4s;">
             ${t.hero.subtitle}
           </p>
 
           <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto animate-fade-in" style="animation-delay: 0.6s;">
-            <a href="https://sbs.brainsait.cloud/" class="px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-400 hover:to-cyan-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-emerald-900/40 transition-all transform hover:scale-105 text-center">
+            <a href="https://sbs.brainsait.cloud" class="px-8 py-4 bg-gradient-to-r from-emerald-500 to-cyan-600 hover:from-emerald-400 hover:to-cyan-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-emerald-900/40 transition-all transform hover:scale-105 text-center">
               ${t.hero.cta_launch}
             </a>
             <button onclick="app.openClaimModal()" class="px-8 py-4 bg-slate-800/50 hover:bg-slate-800 text-white border border-slate-700 rounded-xl font-bold text-lg backdrop-blur-sm transition-all">
               ${t.hero.cta_submit}
             </button>
-            <a href="https://brainsait369.blogspot.com/" target="_blank" class="px-6 py-4 bg-transparent hover:bg-slate-800/30 text-slate-400 hover:text-white border border-slate-700 rounded-xl font-semibold text-lg backdrop-blur-sm transition-all">
+            <a href="#features" class="px-6 py-4 bg-transparent hover:bg-slate-800/30 text-slate-400 hover:text-white border border-slate-700 rounded-xl font-semibold text-lg backdrop-blur-sm transition-all">
               ${t.hero.cta_docs}
             </a>
           </div>
         </div>
       </div>
+
+      <!-- Domain Experience -->
+      <section class="py-10 bg-slate-950 border-y border-slate-800/80">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <a href="https://brainsait.cloud" target="_blank" rel="noopener noreferrer" class="group rounded-2xl border border-slate-800 bg-slate-900/50 p-5 hover:border-emerald-500/50 transition-all">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">${t.domain.corporateLabel}</p>
+              <h3 class="text-xl font-bold text-white group-hover:text-emerald-400 transition-colors">brainsait.cloud</h3>
+              <p class="text-slate-400 mt-2">${t.domain.corporateDesc}</p>
+            </a>
+            <a href="https://sbs.brainsait.cloud" target="_blank" rel="noopener noreferrer" class="group rounded-2xl border border-slate-800 bg-slate-900/50 p-5 hover:border-cyan-500/50 transition-all">
+              <p class="text-xs uppercase tracking-wider text-slate-500 mb-2">${t.domain.appLabel}</p>
+              <h3 class="text-xl font-bold text-white group-hover:text-cyan-400 transition-colors">sbs.brainsait.cloud</h3>
+              <p class="text-slate-400 mt-2">${t.domain.appDesc}</p>
+            </a>
+          </div>
+        </div>
+      </section>
 
       <!-- Services -->
       <section id="features" class="py-24 bg-slate-950 relative">
@@ -308,10 +339,10 @@ class SBSLandingPage {
             </div>
             <p class="text-slate-400 text-sm mb-4">${t.footer.desc}</p>
             <div class="flex flex-col gap-2 text-xs font-medium">
-              <a href="https://github.com/enterprises/brainsait" target="_blank" class="text-slate-500 hover:text-emerald-400 transition-colors">
+              <a href="https://github.com/enterprises/brainsait" target="_blank" rel="noopener noreferrer" class="text-slate-500 hover:text-emerald-400 transition-colors">
                 ${t.footer.powered}
               </a>
-              <a href="https://github.com/Fadil369" target="_blank" class="text-slate-500 hover:text-emerald-400 transition-colors">
+              <a href="https://github.com/Fadil369" target="_blank" rel="noopener noreferrer" class="text-slate-500 hover:text-emerald-400 transition-colors">
                 ${t.footer.author}
               </a>
             </div>

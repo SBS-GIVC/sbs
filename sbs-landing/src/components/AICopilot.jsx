@@ -1,12 +1,12 @@
 /**
- * AI Copilot - AI-Powered Healthcare Assistant
+ * AI Copilot - DeepSeek Powered Healthcare Assistant
  * Provides real-time AI assistance for claims, coding, and clinical decisions
  */
 
 import React, { useState, useRef, useEffect } from 'react';
 import { callGemini } from '../services/geminiService';
 
-const SYSTEM_CONTEXT = `You are an expert Saudi healthcare AI assistant named "GIVC-SBS Copilot". You help with:
+const SYSTEM_CONTEXT = `You are an expert Saudi healthcare AI assistant named "GIVC-SBS Copilot" powered by DeepSeek. You help with:
 - SBS (Saudi Billing System) code lookups and explanations
 - NPHIES eligibility and prior authorization guidance
 - Healthcare claim validation and optimization
@@ -17,19 +17,9 @@ const SYSTEM_CONTEXT = `You are an expert Saudi healthcare AI assistant named "G
 Always be concise, professional, and cite relevant Saudi healthcare regulations when applicable.
 Format responses with markdown for readability. Use bullet points and headers for clarity.`;
 
-const QUICK_PROMPTS = [
-  { icon: '🔍', label: 'Find SBS Code', prompt: 'Help me find the SBS code for' },
-  { icon: '✅', label: 'Validate Claim', prompt: 'Validate this claim for NPHIES submission:' },
-  { icon: '📋', label: 'Prior Auth', prompt: 'Help me prepare prior authorization for' },
-  { icon: '🔄', label: 'Map Code', prompt: 'Map this internal code to SBS:' },
-  { icon: '💡', label: 'Optimize', prompt: 'How can I optimize this claim:' },
-];
-
-export function AICopilot({ isOpen, onClose, context = {} }) {
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content: `👋 **Hello!** I'm your **GIVC-SBS Copilot** - your AI healthcare assistant.
+const LOCALE_TEXT = {
+  en: {
+    greeting: `👋 **Hello!** I'm your **GIVC-SBS Copilot** - powered by DeepSeek AI.
 
 I can help you with:
 - 🔍 Finding and explaining SBS codes
@@ -39,6 +29,87 @@ I can help you with:
 - 💡 Claim optimization tips
 
 How can I assist you today?`,
+    clearChat: 'Clear chat',
+    cleared: '🔄 Chat cleared. How can I help you?',
+    placeholder: 'Ask about SBS codes, claims, or compliance...',
+    voiceInput: 'Voice input',
+    thinking: 'DeepSeek is thinking...',
+    retryHint: 'DeepSeek connection paused. Retry your last message?',
+    retry: 'Retry',
+    footer: 'Powered by DeepSeek AI • SBS V3.1 Compliant',
+    fallbackHeader: '⚠️ **Live DeepSeek service is temporarily unavailable.**',
+    fallbackBody: 'Here is a fast local guidance draft while the connection recovers:',
+    fallbackStep: '**Suggested next step:** Provide the diagnosis, procedure, and payer contract details for a precise SBS mapping.',
+    fallbackChecks: '**Quick safety checks:**',
+    fallbackFoot: 'Use **Retry** to re-run this with DeepSeek as soon as connectivity is restored.'
+  },
+  ar: {
+    greeting: `👋 **مرحباً!** أنا **مساعد GIVC-SBS** المدعوم بـ DeepSeek.
+
+أستطيع مساعدتك في:
+- 🔍 البحث عن أكواد SBS وشرحها
+- ✅ التحقق من المطالبات قبل الإرسال
+- 📋 إرشادات الموافقات المسبقة
+- 🔄 مواءمة الأكواد (ICD-10, CPT ← SBS)
+- 💡 تحسين جودة المطالبات
+
+كيف يمكنني مساعدتك اليوم؟`,
+    clearChat: 'مسح المحادثة',
+    cleared: '🔄 تم مسح المحادثة. كيف يمكنني مساعدتك؟',
+    placeholder: 'اسأل عن أكواد SBS أو المطالبات أو الامتثال...',
+    voiceInput: 'إدخال صوتي',
+    thinking: 'DeepSeek يقوم بالتحليل...',
+    retryHint: 'تم إيقاف الاتصال مؤقتًا مع DeepSeek. إعادة المحاولة لآخر رسالة؟',
+    retry: 'إعادة المحاولة',
+    footer: 'مدعوم بـ DeepSeek AI • متوافق مع SBS V3.1',
+    fallbackHeader: '⚠️ **خدمة DeepSeek غير متاحة مؤقتًا.**',
+    fallbackBody: 'إليك مسودة إرشادية سريعة لحين استعادة الاتصال:',
+    fallbackStep: '**الخطوة التالية المقترحة:** زودنا بالتشخيص والإجراء وتفاصيل عقد شركة التأمين للحصول على مواءمة أدق.',
+    fallbackChecks: '**فحوصات سريعة:**',
+    fallbackFoot: 'استخدم **إعادة المحاولة** لإعادة تشغيل الطلب عند عودة الاتصال.'
+  }
+};
+
+const QUICK_PROMPTS = {
+  en: [
+    { icon: '🔍', label: 'Find SBS Code', prompt: 'Help me find the SBS code for' },
+    { icon: '✅', label: 'Validate Claim', prompt: 'Validate this claim for NPHIES submission:' },
+    { icon: '📋', label: 'Prior Auth', prompt: 'Help me prepare prior authorization for' },
+    { icon: '🔄', label: 'Map Code', prompt: 'Map this internal code to SBS:' },
+    { icon: '🧠', label: 'Crosswalk', prompt: 'Crosswalk ICD-10, DRG, SNOMED, and DICOM context for:' },
+    { icon: '💡', label: 'Optimize', prompt: 'How can I optimize this claim:' },
+  ],
+  ar: [
+    { icon: '🔍', label: 'بحث SBS', prompt: 'ساعدني في العثور على كود SBS لـ' },
+    { icon: '✅', label: 'تحقق المطالبة', prompt: 'تحقق من هذه المطالبة قبل إرسالها إلى نفيس:' },
+    { icon: '📋', label: 'موافقة مسبقة', prompt: 'ساعدني في إعداد موافقة مسبقة لـ' },
+    { icon: '🔄', label: 'مواءمة كود', prompt: 'قم بمواءمة هذا الكود الداخلي إلى SBS:' },
+    { icon: '🧠', label: 'Crosswalk', prompt: 'قم بمواءمة سياق ICD-10 و DRG و SNOMED و DICOM لـ:' },
+    { icon: '💡', label: 'تحسين', prompt: 'كيف يمكنني تحسين هذه المطالبة:' },
+  ]
+};
+
+function generateLocalFallback(messageText, copy) {
+  return `${copy.fallbackHeader}
+
+${copy.fallbackBody}
+
+- **Request received:** ${messageText}
+- ${copy.fallbackStep}
+- ${copy.fallbackChecks}
+  - Verify ICD-10 principal + secondary diagnosis pairing.
+  - Confirm DRG grouping and medical necessity narrative.
+  - Align SNOMED concepts to clinical notes before claim submission.
+  - Ensure DICOM/radiology metadata matches billed services.
+
+${copy.fallbackFoot}`;
+}
+
+export function AICopilot({ isOpen, onClose, context = {} }) {
+  const [messages, setMessages] = useState([
+    {
+      role: 'assistant',
+      content: LOCALE_TEXT.en.greeting,
       timestamp: new Date()
     }
   ]);
@@ -48,6 +119,9 @@ How can I assist you today?`,
   const [lastFailedPrompt, setLastFailedPrompt] = useState('');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const locale = typeof document !== 'undefined' && document.documentElement.dir === 'rtl' ? 'ar' : 'en';
+  const copy = LOCALE_TEXT[locale] || LOCALE_TEXT.en;
+  const quickPrompts = QUICK_PROMPTS[locale] || QUICK_PROMPTS.en;
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -70,14 +144,14 @@ How can I assist you today?`,
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
-    
+
     recognition.lang = 'en-US';
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
-    
+
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
       setInput(prev => prev + ' ' + transcript);
@@ -119,7 +193,7 @@ How can I assist you today?`,
       }
 
       // Build conversation history (last 6 messages for context)
-      const recentHistory = messages.slice(-6).map(m => 
+      const recentHistory = messages.slice(-6).map(m =>
         `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`
       ).join('\n\n');
 
@@ -147,7 +221,7 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
       console.error('AI Copilot error:', error);
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: '❌ AI service is currently unavailable. You can retry or continue with another prompt.',
+        content: generateLocalFallback(messageText, copy),
         timestamp: new Date(),
         isError: true
       }]);
@@ -167,7 +241,7 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
   const clearChat = () => {
     setMessages([{
       role: 'assistant',
-      content: '🔄 Chat cleared. How can I help you?',
+      content: copy.cleared,
       timestamp: new Date()
     }]);
   };
@@ -194,14 +268,14 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
                 AI
               </span>
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">AI Assistant · BrainSAIT</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Powered by DeepSeek · BrainSAIT</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={clearChat}
             className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-all"
-            title="Clear chat"
+            title={copy.clearChat}
           >
             <span className="material-symbols-outlined text-lg">refresh</span>
           </button>
@@ -217,7 +291,7 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
       {/* Quick Prompts */}
       <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 overflow-x-auto scrollbar-hide">
         <div className="flex gap-2">
-          {QUICK_PROMPTS.map((qp, idx) => (
+          {quickPrompts.map((qp, idx) => (
             <button
               key={idx}
               onClick={() => setInput(qp.prompt + ' ')}
@@ -256,7 +330,7 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
             </div>
           </div>
         ))}
-        
+
         {isLoading && (
           <div className="flex justify-start">
             <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl rounded-bl-md px-4 py-3 border border-slate-100 dark:border-slate-700">
@@ -266,12 +340,12 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
                   <span className="size-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
                   <span className="size-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                 </div>
-                <span className="text-xs text-slate-500">AI is thinking...</span>
+                <span className="text-xs text-slate-500">{copy.thinking}</span>
               </div>
             </div>
           </div>
         )}
-        
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -279,18 +353,12 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
       <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
         {lastFailedPrompt && (
           <div className="mb-3 flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-            <span>AI service connection paused. Retry your last message?</span>
+            <span>{copy.retryHint}</span>
             <button
-              onClick={() => {
-                const currentInput = input;
-                handleSend(lastFailedPrompt);
-                if (currentInput) {
-                  setInput(currentInput);
-                }
-              }}
+              onClick={() => handleSend(lastFailedPrompt)}
               className="rounded-lg bg-amber-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-amber-700 transition"
             >
-              Retry
+              {copy.retry}
             </button>
           </div>
         )}
@@ -301,7 +369,7 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about SBS codes, claims, or compliance..."
+              placeholder={copy.placeholder}
               className="w-full px-4 py-3 pr-12 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none text-sm transition-all"
               rows={1}
               style={{ minHeight: '48px', maxHeight: '120px' }}
@@ -309,11 +377,11 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
             <button
               onClick={startListening}
               className={`absolute right-3 bottom-3 p-1.5 rounded-lg transition-all ${
-                isListening 
-                  ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30' 
+                isListening
+                  ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30'
                   : 'text-slate-400 hover:text-primary hover:bg-primary/10'
               }`}
-              title="Voice input"
+              title={copy.voiceInput}
             >
               <span className="material-symbols-outlined text-lg">
                 {isListening ? 'mic' : 'mic_none'}
@@ -330,7 +398,7 @@ Provide a helpful, concise response. Use markdown formatting for readability.`;
         </div>
         <p className="text-[10px] text-slate-400 text-center mt-3 flex items-center justify-center gap-2">
           <span className="size-1.5 bg-emerald-500 rounded-full"></span>
-          Powered by AI Assistant • SBS V3.1 Compliant
+          {copy.footer}
         </p>
       </div>
     </div>
@@ -348,32 +416,18 @@ export function AICopilotFAB({ onClick, hasNotification = false }) {
       <div className="relative">
         {/* Glow Effect */}
         <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary via-blue-500 to-purple-600 blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
-        
+
         {/* Button */}
         <div className="relative size-14 rounded-full bg-gradient-to-br from-primary via-blue-500 to-purple-600 shadow-xl flex items-center justify-center transition-all group-hover:scale-110 group-hover:shadow-2xl">
           <span className="material-symbols-outlined text-white text-2xl group-hover:scale-110 transition-transform">
             psychology
           </span>
         </div>
-        
-        {/* Pulse Ring */}
-        <div className="absolute inset-0 rounded-full border-2 border-primary animate-ping opacity-30"></div>
-        
-        {/* Notification dot */}
+
+        {/* Notification Dot */}
         {hasNotification && (
-          <div className="absolute -top-1 -right-1 size-5 bg-red-500 rounded-full ring-2 ring-white dark:ring-slate-900 flex items-center justify-center shadow-lg">
-            <span className="text-[10px] text-white font-bold">!</span>
-          </div>
+          <span className="absolute -top-1 -right-1 size-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
         )}
-      </div>
-      
-      {/* Tooltip */}
-      <div className="absolute bottom-full right-0 mb-3 px-3 py-2 bg-slate-900 dark:bg-slate-700 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 transition-all transform translate-y-1 group-hover:translate-y-0 whitespace-nowrap shadow-lg">
-        <span className="flex items-center gap-1.5">
-          <span className="size-2 bg-emerald-400 rounded-full"></span>
-          AI Copilot Ready
-        </span>
-        <div className="absolute top-full right-4 border-4 border-transparent border-t-slate-900 dark:border-t-slate-700"></div>
       </div>
     </button>
   );

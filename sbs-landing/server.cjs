@@ -118,7 +118,7 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // CORS configuration - Restrict to allowed origins
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001').split(',');
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001,http://localhost:5173,http://localhost:4173').split(',');
 app.use(cors({
   origin: function(origin, callback) {
     // Allow requests with no origin (mobile apps, curl, etc.) only in development
@@ -659,6 +659,24 @@ async function triggerN8nWorkflow(claimData) {
   }
 }
 
+async function triggerAutomationWorkflow(payload) {
+  const workflowWebhook = process.env.N8N_AUTOMATION_WEBHOOK_URL || process.env.N8N_WEBHOOK_URL;
+
+  if (!workflowWebhook) {
+    throw new Error('N8N automation webhook is not configured');
+  }
+
+  const response = await axios.post(workflowWebhook, payload, {
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': 'SBS-Workflow-Orchestrator/1.0'
+    },
+    timeout: 30000
+  });
+
+  return response.data || {};
+}
+
 // Fallback: Direct call to SBS microservices
 async function triggerDirectSBS(claimData) {
   try {
@@ -951,6 +969,54 @@ app.get('/api/services/status', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message
+    });
+  }
+});
+
+// Trigger a full simulation workflow from UI (claim upload -> nphies + PR request)
+app.post('/api/workflows/simulate-claim-pipeline', async (req, res) => {
+  try {
+    const requestId = `WF-${Date.now()}`;
+    const simulationPayload = {
+      eventType: 'claim_pipeline_simulation',
+      requestId,
+      triggerSource: req.body?.source || 'dashboard',
+      initiatedAt: new Date().toISOString(),
+      workflow: {
+        name: 'Claim Upload to NPHIES Submission',
+        stages: [
+          'claim_upload_received',
+          'normalization',
+          'financial_rules',
+          'payload_signing',
+          'nphies_submission'
+        ]
+      },
+      automation: {
+        createPullRequest: true,
+        repository: process.env.REPO_NAME || 'brainsait/sbs',
+        baseBranch: process.env.REPO_BASE_BRANCH || 'main',
+        headBranch: process.env.REPO_HEAD_BRANCH || 'automation/claim-pipeline-simulation',
+        title: 'chore: workflow simulation report and next-step automation',
+        body: 'Automated simulation trigger from SBS UI. Includes claim workflow checkpoints and suggested follow-up tasks.'
+      }
+    };
+
+    const automationResponse = await triggerAutomationWorkflow(simulationPayload);
+
+    return res.json({
+      success: true,
+      message: 'Workflow simulation started. n8n orchestration and PR request dispatched.',
+      requestId,
+      executionId: automationResponse.executionId || automationResponse.id || null,
+      data: automationResponse
+    });
+  } catch (error) {
+    console.error('❌ Workflow simulation trigger failed:', error.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to trigger workflow simulation',
+      message: error.message
     });
   }
 });
