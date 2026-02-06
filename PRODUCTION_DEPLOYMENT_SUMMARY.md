@@ -24,7 +24,7 @@
 - ✅ 32-character encryption key for N8N
 
 ### 3. AI Configuration - DeepSeek
-- ✅ **API Key:** `sk-0c40aa1539e64139a6cddb08cb362324`
+- ✅ **API Key:** `[REDACTED - Set via environment variable DEEPSEEK_API_KEY]`
 - ✅ **Model:** `deepseek-chat`
 - ✅ **Endpoint:** `https://api.deepseek.com/chat/completions`
 - ✅ Integration tested and working
@@ -33,9 +33,11 @@
 
 ### 4. Production Credentials Generated
 ```bash
-DB_PASSWORD: xNuywewTE6AoAM4slQdbd70gPtei+fEm
-N8N_PASSWORD: BrainSAIT@SBS2026!Secure
-N8N_ENCRYPTION_KEY: gzWTHpdbRkzbc8QQ9rTQ7btzLLfK8IHHVVf6vGAWHFE=
+# SECURITY NOTE: All production credentials have been redacted from this document
+# Generate secure credentials using:
+# - DB_PASSWORD: openssl rand -base64 32
+# - N8N_PASSWORD: Use a strong password manager
+# - N8N_ENCRYPTION_KEY: openssl rand -base64 32
 ```
 
 ### 5. Deployment Scripts Created
@@ -135,10 +137,10 @@ gh auth login -h github.com -p ssh -w
 If you prefer to add secrets manually via GitHub web interface:
 
 **Critical Secrets to Add:**
-1. `DEEPSEEK_API_KEY` = `sk-0c40aa1539e64139a6cddb08cb362324`
-2. `DB_PASSWORD` = `xNuywewTE6AoAM4slQdbd70gPtei+fEm`
-3. `N8N_PASSWORD` = `BrainSAIT@SBS2026!Secure`
-4. `N8N_ENCRYPTION_KEY` = `gzWTHpdbRkzbc8QQ9rTQ7btzLLfK8IHHVVf6vGAWHFE=`
+1. `DEEPSEEK_API_KEY` = `[REDACTED - Must be set in GitHub Secrets]`
+2. `DB_PASSWORD` = `[REDACTED - Generate strong password]`
+3. `N8N_PASSWORD` = `[REDACTED - Generate strong password]`
+4. `N8N_ENCRYPTION_KEY` = `[REDACTED - Generate 32-byte base64 key]`
 5. `ALLOWED_ORIGINS` = `https://sbs.brainsait.cloud`
 6. `NODE_ENV` = `production`
 

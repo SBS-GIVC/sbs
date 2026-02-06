@@ -40,3 +40,28 @@ __pycache__/
 # Backup files
 *.backup
 *~
+
+# Security-sensitive files - NEVER commit these
+.env
+.env.production
+.env.staging
+*.env
+**/secrets.yaml
+**/secrets.yml
+**/*credentials*.json
+**/*credentials*.yaml
+**/*private-key*.pem
+deploy_vps.py.backup
+
+# Build and deployment artifacts
+deployment.tar.gz
+node_modules/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+
+# Docker volumes
+postgres_data/
+redis_data/
+grafana_data/

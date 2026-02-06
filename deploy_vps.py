@@ -3,11 +3,17 @@ import paramiko
 import os
 import sys
 
-HOSTNAME = "82.25.101.65"
-USERNAME = "root"
-PASSWORD = "Fadil12345678#"
+# Security: Load credentials from environment variables
+HOSTNAME = os.environ.get("VPS_HOSTNAME")
+USERNAME = os.environ.get("VPS_USERNAME", "root")
+PASSWORD = os.environ.get("VPS_PASSWORD")
 LOCAL_DIR = "./"
-REMOTE_DIR = "/root/sbs"
+REMOTE_DIR = os.environ.get("VPS_REMOTE_DIR", "/root/sbs")
+
+if not HOSTNAME or not PASSWORD:
+    print("ERROR: VPS_HOSTNAME and VPS_PASSWORD environment variables must be set")
+    print("Usage: VPS_HOSTNAME=<host> VPS_PASSWORD=<password> python deploy_vps.py")
+    sys.exit(1)
 
 def run_command(client, command):
     print(f"Running: {command}")

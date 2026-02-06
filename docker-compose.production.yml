@@ -324,7 +324,7 @@ services:
     container_name: sbs-grafana
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-BrainSAIT@Grafana2026}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?GRAFANA_PASSWORD is required}
       GF_INSTALL_PLUGINS: redis-datasource
     volumes:
       - grafana_data:/var/lib/grafana
@@ -343,7 +343,7 @@ services:
     environment:
       REDIS_HOSTS: local:redis:6379
       HTTP_USER: admin
-      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-BrainSAIT@Redis2026}
+      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:?REDIS_COMMANDER_PASSWORD is required}
     ports:
       - "127.0.0.1:8081:8081"
     depends_on:
