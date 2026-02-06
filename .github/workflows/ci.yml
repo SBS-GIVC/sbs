@@ -102,7 +102,6 @@ jobs:
         run: |
           cd ${{ matrix.service }}
           python -m pytest --cov=. --cov-report=xml --cov-report=term-missing -v || echo "No tests found for ${{ matrix.service }}"
-        continue-on-error: true
 
       - name: Verify service can start
         run: |
@@ -135,7 +134,6 @@ jobs:
       - name: Run tests
         working-directory: sbs-landing
         run: npm test || echo "Basic test completed"
-        continue-on-error: true
 
       - name: Verify server can start
         working-directory: sbs-landing
@@ -171,7 +169,6 @@ jobs:
         run: |
           cd tests
           python -m pytest test_normalizer.py test_signer.py -v --tb=short || echo "Integration tests completed"
-        continue-on-error: true
 
   # ============================================================================
   # E2E Tests (Playwright)
@@ -223,7 +220,6 @@ jobs:
           SBS_BASE_URL: http://localhost:3000
           SBS_API_URL: http://localhost:3000
           HEADLESS: true
-        continue-on-error: true
 
   # ============================================================================
   # Docker Build Verification
