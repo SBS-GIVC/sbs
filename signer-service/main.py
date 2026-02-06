@@ -51,8 +51,6 @@ app.add_middleware(
 # Initialize rate limiter (50 requests per minute per IP) - using shared module
 rate_limiter = RateLimiter(max_requests=50, time_window=60)
 
-rate_limiter = RateLimiter(max_requests=50, time_window=60)
-
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     """Rate limiting middleware"""
