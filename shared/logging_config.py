@@ -6,7 +6,7 @@ Provides structured logging setup for all SBS services
 import logging
 import sys
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 
@@ -26,7 +26,7 @@ class StructuredFormatter(logging.Formatter):
             JSON-formatted log string
         """
         log_data = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
