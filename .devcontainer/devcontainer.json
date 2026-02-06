@@ -8,39 +8,96 @@
   "workspaceFolder": "/workspace",
   "runServices": [
     "postgres",
+    "redis",
     "normalizer-service",
     "financial-rules-engine",
     "signer-service",
     "nphies-bridge",
+    "ai-prediction-service",
+    "masterlinc-bridge",
+    "claimlinc-agent",
+    "authlinc-agent",
+    "compliancelinc-agent",
+    "simulation-service",
+    "n8n",
     "sbs-landing"
   ],
   "shutdownAction": "stopCompose",
   "forwardPorts": [
     3000,
+    4000,
+    4001,
+    4002,
+    4003,
+    5050,
+    5432,
+    5678,
+    6379,
     8000,
     8001,
     8002,
-    8003
+    8003,
+    8004,
+    8005
   ],
   "portsAttributes": {
     "3000": { "label": "SBS Landing API" },
+    "4000": { "label": "MasterLinc Bridge" },
+    "4001": { "label": "ClaimLinc Agent" },
+    "4002": { "label": "AuthLinc Agent" },
+    "4003": { "label": "ComplianceLinc Agent" },
+    "5050": { "label": "pgAdmin", "onAutoForward": "silent" },
+    "5432": { "label": "PostgreSQL", "onAutoForward": "silent" },
+    "5678": { "label": "n8n Workflow Engine" },
+    "6379": { "label": "Redis", "onAutoForward": "silent" },
     "8000": { "label": "Normalizer Service" },
     "8001": { "label": "Signer Service" },
     "8002": { "label": "Financial Rules Engine" },
-    "8003": { "label": "NPHIES Bridge" }
+    "8003": { "label": "NPHIES Bridge" },
+    "8004": { "label": "AI Prediction Service" },
+    "8005": { "label": "Simulation Service" }
   },
   "features": {
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
     "ghcr.io/devcontainers/features/node:1": { "version": "20" },
-    "ghcr.io/devcontainers/features/python:1": { "version": "3.11" }
+    "ghcr.io/devcontainers/features/python:1": { "version": "3.11" },
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-azuretools.vscode-docker",
         "ms-python.python",
-        "dbaeumer.vscode-eslint"
-      ]
+        "ms-python.pylint",
+        "ms-python.black-formatter",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-json",
+        "redhat.vscode-yaml",
+        "humao.rest-client",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg",
+        "eamodio.gitlens",
+        "GitHub.copilot"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.black-formatter"
+        },
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        },
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true
+      }
     }
+  },
+  "postCreateCommand": "if [ -f .env.example ] && [ ! -f .env ]; then cp .env.example .env && echo 'Created .env from .env.example - please configure your secrets.'; elif [ -f .env ]; then echo '.env already exists - skipping copy.'; else echo 'Warning: .env.example not found.'; fi",
+  "remoteEnv": {
+    "NODE_ENV": "development",
+    "PYTHONDONTWRITEBYTECODE": "1"
   }
 }
