@@ -1,13 +1,97 @@
-version: "3.8"
-
 services:
   devcontainer:
     image: mcr.microsoft.com/devcontainers/base:ubuntu-22.04
     command: sleep infinity
     volumes:
       - ..:/workspace:cached
+    environment:
+      - NODE_ENV=development
+      - PYTHONDONTWRITEBYTECODE=1
     networks:
       - sbs-network
+    depends_on:
+      - postgres
+      - redis
+
+  # Override services for development (bind all ports to all interfaces for port forwarding)
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  normalizer-service:
+    ports:
+      - "8000:8000"
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:3000
+
+  financial-rules-engine:
+    ports:
+      - "8002:8002"
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:3000
+
+  signer-service:
+    ports:
+      - "8001:8001"
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:3000
+      - ENABLE_TEST_CERTIFICATES=true
+
+  nphies-bridge:
+    ports:
+      - "8003:8003"
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:3000
+
+  ai-prediction-service:
+    ports:
+      - "8004:8004"
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:3000
+
+  masterlinc-bridge:
+    ports:
+      - "4000:4000"
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:3000
+
+  claimlinc-agent:
+    ports:
+      - "4001:4001"
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:3000
+
+  authlinc-agent:
+    ports:
+      - "4002:4002"
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:3000
+
+  compliancelinc-agent:
+    ports:
+      - "4003:4003"
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:3000
+
+  simulation-service:
+    ports:
+      - "8005:8005"
+
+  n8n:
+    environment:
+      # SECURITY NOTE: These are development-only defaults. Never use in production!
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=DevContainer2024!
+      - N8N_ENCRYPTION_KEY=DEVONLY-change-this-in-prod-32!
+
+  pgadmin:
+    ports:
+      - "5050:80"
+    profiles: []  # Enable pgAdmin in devcontainer (override the 'tools' profile)
 
   sbs-landing:
     build:
@@ -16,10 +100,15 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3000
-      - SBS_NORMALIZER_URL=http://normalizer-service:8000
-      - SBS_SIGNER_URL=http://signer-service:8001
-      - SBS_FINANCIAL_RULES_URL=http://financial-rules-engine:8002
-      - SBS_NPHIES_BRIDGE_URL=http://nphies-bridge:8003
+      - ENABLE_DIRECT_SBS=true
+      - NORMALIZER_URL=http://normalizer-service:8000
+      - SIGNER_URL=http://signer-service:8001
+      - FINANCIAL_RULES_URL=http://financial-rules-engine:8002
+      - NPHIES_BRIDGE_URL=http://nphies-bridge:8003
+      - AI_PREDICTION_URL=http://ai-prediction-service:8004
+      - MASTERLINC_URL=http://masterlinc-bridge:4000
+      - REDIS_URL=redis://redis:6379
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:3000
     ports:
       - "3000:3000"
     depends_on:
@@ -27,5 +116,7 @@ services:
       - signer-service
       - financial-rules-engine
       - nphies-bridge
+      - ai-prediction-service
+      - masterlinc-bridge
     networks:
       - sbs-network
