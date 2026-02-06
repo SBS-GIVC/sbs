@@ -35,7 +35,11 @@ app = FastAPI(
 )
 
 # CORS middleware - Restrict to allowed origins (security fix: no wildcards)
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
+# In production, ALLOWED_ORIGINS must be explicitly set via environment variable
+_default_origins = "http://localhost:3000,http://localhost:3001"
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", _default_origins).split(",")
+if ALLOWED_ORIGINS == _default_origins.split(",") and os.getenv("PRODUCTION", "").lower() == "true":
+    print("⚠️ WARNING: Using default localhost origins in production. Set ALLOWED_ORIGINS environment variable.")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,

@@ -94,7 +94,7 @@ function buildTimeline(stages = {}) {
 // NOTE: 'unsafe-inline' is required for the runtime API config in index.html
 // TODO: Consider moving to nonce-based CSP for enhanced security
 // 'unsafe-eval' removed - Tailwind CDN and Vite HMR don't require it in production
-const isProduction = process.env.NODE_ENV === 'production';
+const isProduction = (process.env.NODE_ENV || 'development') === 'production';
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
