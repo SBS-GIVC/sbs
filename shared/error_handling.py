@@ -37,8 +37,15 @@ def sanitize_credentials(data: Any) -> Any:
             data = pattern.sub(replacement, data)
         return data
     elif isinstance(data, dict):
-        # Recursively sanitize dictionary values
-        return {k: sanitize_credentials(v) for k, v in data.items()}
+        # Recursively sanitize dictionary values and check keys
+        result = {}
+        sensitive_keys = ['password', 'token', 'api_key', 'secret', 'authorization']
+        for k, v in data.items():
+            if k.lower() in sensitive_keys:
+                result[k] = "***REDACTED***"
+            else:
+                result[k] = sanitize_credentials(v)
+        return result
     elif isinstance(data, (list, tuple)):
         # Recursively sanitize list/tuple items
         return [sanitize_credentials(item) for item in data]

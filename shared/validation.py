@@ -36,9 +36,19 @@ def validate_phone(phone: str) -> bool:
     """
     if not phone:
         return False
-    # Saudi phone numbers: +966 or 05 followed by 8 digits
-    pattern = r'^(\+966|966|05)\d{8}$'
-    return bool(re.match(pattern, phone.replace(' ', '').replace('-', '')))
+    # Saudi phone numbers: +966 5XXXXXXXX (9 digits starting with 5)
+    # or 05XXXXXXXX (10 digits starting with 05)
+    cleaned = phone.replace(' ', '').replace('-', '')
+    
+    # Match +966 5XXXXXXXX or 966 5XXXXXXXX (country code + 9 digits starting with 5)
+    if re.match(r'^(\+966|966)5\d{8}$', cleaned):
+        return True
+    
+    # Match 05XXXXXXXX (10 digits starting with 05)
+    if re.match(r'^05\d{8}$', cleaned):
+        return True
+    
+    return False
 
 
 def validate_national_id(national_id: str) -> bool:
