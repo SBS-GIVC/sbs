@@ -40,3 +40,4 @@ __pycache__/
 # Backup files
 *.backup
 *~
+node_modules/

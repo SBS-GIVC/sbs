@@ -1310,6 +1310,328 @@ app.use((error, req, res, next) => {
   });
 });
 
+// ==============================================================================
+// IoT Events API - For Arduino IoT Gateway Integration
+// ==============================================================================
+// Endpoint: POST /api/v1/iot/events
+// Gateway: ~/sbs/arduino-iot-gateway
+// Documentation: ~/sbs/INTEGRATION_ARCHITECTURE.md
+// ==============================================================================
+
+// In-memory store for IoT events (in production, use PostgreSQL)
+const iotEventsStore = {
+  events: [],
+  stats: {
+    received: 0,
+    processed: 0,
+    failed: 0
+  },
+  maxStoredEvents: 1000
+};
+
+// IoT device tokens (in production, store in database)
+const validIoTTokens = new Set([
+  process.env.IOT_DEVICE_TOKEN || 'dev_iot_token_12345',
+  'bsk_test_gateway_token'
+]);
+
+// Rate limiter specific to IoT devices (higher limits for telemetry)
+const iotLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 300, // Allow 300 requests per minute for IoT devices
+  message: { error: 'IoT rate limit exceeded', retry_after_ms: 60000 }
+});
+
+/**
+ * IoT Event Ingestion Endpoint
+ * Receives events from Arduino IoT Gateway
+ */
+app.post('/api/v1/iot/events', iotLimiter, async (req, res) => {
+  const requestId = req.headers['x-request-id'] || `iot-${Date.now()}`;
+  
+  try {
+    // 1. Validate Authorization
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      iotEventsStore.stats.failed++;
+      return res.status(401).json({ 
+        error: 'Missing or invalid Authorization header',
+        format: 'Bearer <API_TOKEN>'
+      });
+    }
+    
+    const token = authHeader.split(' ')[1];
+    if (!validIoTTokens.has(token) && token !== process.env.IOT_DEVICE_TOKEN) {
+      iotEventsStore.stats.failed++;
+      return res.status(403).json({ error: 'Invalid device token' });
+    }
+    
+    // 2. Parse event data
+    const event = req.body;
+    
+    if (!event || !event.event) {
+      iotEventsStore.stats.failed++;
+      return res.status(400).json({ 
+        error: 'Invalid event payload',
+        required: ['event'],
+        optional: ['node', 'ts', 'data']
+      });
+    }
+    
+    // 3. Enrich event with server metadata
+    const enrichedEvent = {
+      event_id: `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      received_at: new Date().toISOString(),
+      node: event.node || req.headers['x-node-id'] || 'unknown',
+      event_type: event.event,
+      device_ts: event.ts,
+      gateway_ts: event.gateway_ts,
+      data: event.data || {},
+      processed: false,
+      facility_code: event.facility_code || 'default',
+      source_ip: req.ip || req.connection?.remoteAddress
+    };
+    
+    // 4. Store event
+    iotEventsStore.events.push(enrichedEvent);
+    iotEventsStore.stats.received++;
+    
+    if (iotEventsStore.events.length > iotEventsStore.maxStoredEvents) {
+      iotEventsStore.events = iotEventsStore.events.slice(-iotEventsStore.maxStoredEvents);
+    }
+    
+    // 5. Log alerts
+    if (event.event === 'alert' || event.event === 'threshold') {
+      console.log(`🚨 [IoT Alert] Node: ${enrichedEvent.node} - ${JSON.stringify(event.data)}`);
+    } else {
+      console.log(`📡 [IoT Event] Node: ${enrichedEvent.node} | Type: ${event.event}`);
+    }
+    
+    iotEventsStore.stats.processed++;
+    
+    res.status(201).json({
+      status: 'received',
+      event_id: enrichedEvent.event_id,
+      stored_at: enrichedEvent.received_at,
+      node: enrichedEvent.node,
+      next_sync_ms: 5000
+    });
+    
+  } catch (error) {
+    console.error(`❌ [IoT Error] ${requestId}:`, error.message);
+    iotEventsStore.stats.failed++;
+    res.status(500).json({ error: 'Failed to process IoT event', request_id: requestId, retry: true });
+  }
+});
+
+// IoT Events Query Endpoint
+app.get('/api/v1/iot/events', async (req, res) => {
+  try {
+    const { node, limit = 50, event_type } = req.query;
+    let events = [...iotEventsStore.events].reverse();
+    if (node) events = events.filter(e => e.node === node);
+    if (event_type) events = events.filter(e => e.event_type === event_type);
+    events = events.slice(0, parseInt(limit));
+    
+    res.json({
+      success: true,
+      total: iotEventsStore.events.length,
+      returned: events.length,
+      stats: iotEventsStore.stats,
+      events
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// IoT Stats Endpoint
+app.get('/api/v1/iot/stats', (req, res) => {
+  const nodeStats = {};
+  iotEventsStore.events.forEach(event => {
+    const node = event.node || 'unknown';
+    if (!nodeStats[node]) nodeStats[node] = { count: 0, last_seen: null, event_types: new Set() };
+    nodeStats[node].count++;
+    nodeStats[node].last_seen = event.received_at;
+    nodeStats[node].event_types.add(event.event_type);
+  });
+  
+  Object.keys(nodeStats).forEach(node => {
+    nodeStats[node].event_types = [...nodeStats[node].event_types];
+  });
+  
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    gateway_endpoint: '/api/v1/iot/events',
+    stats: iotEventsStore.stats,
+    nodes: nodeStats,
+    buffer_size: iotEventsStore.events.length,
+    max_buffer: iotEventsStore.maxStoredEvents
+  });
+});
+
+// IoT Dashboard Summary
+app.get('/api/v1/iot/dashboard', (req, res) => {
+  try {
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    const recentEvents = iotEventsStore.events.filter(e => new Date(e.received_at) > oneHourAgo);
+    const dailyEvents = iotEventsStore.events.filter(e => new Date(e.received_at) > oneDayAgo);
+    
+    const eventTypeDistribution = {};
+    dailyEvents.forEach(e => {
+      const type = e.event_type || 'unknown';
+      eventTypeDistribution[type] = (eventTypeDistribution[type] || 0) + 1;
+    });
+    
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    const activeNodes = new Set(
+      iotEventsStore.events.filter(e => new Date(e.received_at) > fiveMinutesAgo).map(e => e.node)
+    );
+    
+    const alerts = dailyEvents.filter(e => e.event_type === 'alert');
+    const criticalAlerts = alerts.filter(e => e.data?.severity === 'critical');
+    
+    res.json({
+      success: true,
+      dashboard: {
+        timestamp: now.toISOString(),
+        status: criticalAlerts.length > 0 ? 'warning' : 'healthy',
+        system_health_score: Math.max(0, 100 - (criticalAlerts.length * 10)),
+        nodes: { total: Object.keys(getNodeStats()).length, active_now: activeNodes.size, active_list: [...activeNodes] },
+        events: { last_hour: recentEvents.length, last_24h: dailyEvents.length, total_stored: iotEventsStore.events.length },
+        alerts: { total_24h: alerts.length, critical: criticalAlerts.length },
+        event_types: eventTypeDistribution,
+        processing: iotEventsStore.stats
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+function getNodeStats() {
+  const nodeStats = {};
+  iotEventsStore.events.forEach(event => {
+    const node = event.node || 'unknown';
+    if (!nodeStats[node]) nodeStats[node] = { count: 0, last_seen: null, event_types: new Set(), first_seen: null };
+    nodeStats[node].count++;
+    nodeStats[node].last_seen = event.received_at;
+    if (!nodeStats[node].first_seen) nodeStats[node].first_seen = event.received_at;
+    nodeStats[node].event_types.add(event.event_type);
+  });
+  return nodeStats;
+}
+
+// IoT Device List
+app.get('/api/v1/iot/devices', (req, res) => {
+  try {
+    const nodeStats = getNodeStats();
+    const now = new Date();
+    
+    const devices = Object.entries(nodeStats).map(([nodeId, stats]) => {
+      const lastSeen = new Date(stats.last_seen);
+      const secondsSinceLastSeen = (now - lastSeen) / 1000;
+      let status = 'offline';
+      if (secondsSinceLastSeen < 300) status = 'online';
+      else if (secondsSinceLastSeen < 3600) status = 'idle';
+      
+      return {
+        node_id: nodeId, status, last_seen: stats.last_seen, first_seen: stats.first_seen,
+        event_count: stats.count, event_types: [...stats.event_types],
+        seconds_since_last_seen: Math.round(secondsSinceLastSeen)
+      };
+    });
+    
+    devices.sort((a, b) => new Date(b.last_seen) - new Date(a.last_seen));
+    
+    res.json({
+      success: true, total: devices.length,
+      online: devices.filter(d => d.status === 'online').length,
+      idle: devices.filter(d => d.status === 'idle').length,
+      offline: devices.filter(d => d.status === 'offline').length,
+      devices
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// IoT Alerts List
+app.get('/api/v1/iot/alerts', (req, res) => {
+  try {
+    const { severity, node, limit = 100, acknowledged } = req.query;
+    let alerts = iotEventsStore.events.filter(e => e.event_type === 'alert').reverse();
+    if (severity) alerts = alerts.filter(e => e.data?.severity === severity);
+    if (node) alerts = alerts.filter(e => e.node === node);
+    if (acknowledged !== undefined) {
+      const isAck = acknowledged === 'true';
+      alerts = alerts.filter(e => (e.data?.acknowledged || false) === isAck);
+    }
+    alerts = alerts.slice(0, parseInt(limit));
+    
+    const allAlerts = iotEventsStore.events.filter(e => e.event_type === 'alert');
+    res.json({
+      success: true, total: allAlerts.length, returned: alerts.length,
+      severity_summary: {
+        critical: allAlerts.filter(e => e.data?.severity === 'critical').length,
+        warning: allAlerts.filter(e => e.data?.severity === 'warning').length,
+        info: allAlerts.filter(e => e.data?.severity === 'info' || !e.data?.severity).length
+      },
+      alerts
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Acknowledge Alert
+app.post('/api/v1/iot/alerts/:eventId/acknowledge', (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { acknowledged_by } = req.body;
+    const event = iotEventsStore.events.find(e => e.event_id === eventId);
+    if (!event) return res.status(404).json({ error: 'Alert not found', event_id: eventId });
+    if (event.event_type !== 'alert') return res.status(400).json({ error: 'Event is not an alert' });
+    
+    event.data = event.data || {};
+    event.data.acknowledged = true;
+    event.data.acknowledged_at = new Date().toISOString();
+    event.data.acknowledged_by = acknowledged_by || 'system';
+    
+    res.json({ success: true, message: 'Alert acknowledged', event_id: eventId });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// IoT Health Check
+app.get('/api/v1/iot/health', (req, res) => {
+  const now = new Date();
+  const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+  const recentEvents = iotEventsStore.events.filter(e => new Date(e.received_at) > fiveMinutesAgo);
+  const criticalAlerts = iotEventsStore.events.filter(e => 
+    e.event_type === 'alert' && e.data?.severity === 'critical' && !e.data?.acknowledged
+  );
+  
+  let status = 'healthy';
+  if (criticalAlerts.length > 0) status = 'warning';
+  if (iotEventsStore.stats.failed > iotEventsStore.stats.processed * 0.1) status = 'degraded';
+  
+  res.json({
+    status, timestamp: now.toISOString(),
+    iot_subsystem: {
+      uptime_status: 'running', recent_activity: recentEvents.length > 0,
+      events_last_5min: recentEvents.length, unack_critical_alerts: criticalAlerts.length,
+      buffer_usage: `${iotEventsStore.events.length}/${iotEventsStore.maxStoredEvents}`,
+      stats: iotEventsStore.stats
+    }
+  });
+});
+
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`
