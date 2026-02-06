@@ -42,7 +42,14 @@ app.add_middleware(
 
 # Rate limiter
 class RateLimiter:
-    """Token bucket rate limiter with automatic cleanup"""
+    """Sliding-window rate limiter with automatic cleanup.
+
+    This enforces at most ``max_requests`` requests per ``time_window`` seconds
+    for each identifier by tracking request timestamps in a deque and removing
+    entries that fall outside the current window. Note that this is not a
+    token-bucket implementation and does not provide additional burst capacity
+    beyond ``max_requests`` within the configured time window.
+    """
     def __init__(self, max_requests: int = 100, time_window: int = 60, max_tracked_ips: int = 10000):
         self.max_requests = max_requests
         self.time_window = time_window
