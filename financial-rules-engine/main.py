@@ -38,16 +38,40 @@ app.add_middleware(
 
 # Rate limiter implementation
 class RateLimiter:
-    """Token bucket rate limiter"""
-    def __init__(self, max_requests: int = 100, time_window: int = 60):
+    """Token bucket rate limiter with automatic cleanup"""
+    def __init__(self, max_requests: int = 100, time_window: int = 60, max_tracked_ips: int = 10000):
         self.max_requests = max_requests
         self.time_window = time_window
+        self.max_tracked_ips = max_tracked_ips  # Prevent unbounded memory growth
         self.requests = {}
         self.lock = Lock()
+        self.last_cleanup = time.time()
+        self.cleanup_interval = 300  # Cleanup every 5 minutes
+
+    def _cleanup_old_entries(self, now: float) -> None:
+        """Remove stale IP entries to prevent memory leak"""
+        if now - self.last_cleanup < self.cleanup_interval:
+            return
+        
+        stale_threshold = now - self.time_window * 2
+        to_remove = [ip for ip, reqs in self.requests.items() 
+                     if not reqs or reqs[-1] < stale_threshold]
+        for ip in to_remove:
+            del self.requests[ip]
+        
+        if len(self.requests) > self.max_tracked_ips:
+            sorted_ips = sorted(self.requests.keys(), 
+                               key=lambda ip: self.requests[ip][-1] if self.requests[ip] else 0)
+            for ip in sorted_ips[:len(self.requests) - self.max_tracked_ips]:
+                del self.requests[ip]
+        
+        self.last_cleanup = now
 
     def is_allowed(self, identifier: str) -> bool:
         with self.lock:
             now = time.time()
+            self._cleanup_old_entries(now)
+            
             if identifier not in self.requests:
                 self.requests[identifier] = deque()
             while self.requests[identifier] and self.requests[identifier][0] < now - self.time_window:
