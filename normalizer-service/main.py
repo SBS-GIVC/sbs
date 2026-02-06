@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, validator
 from typing import Optional
 import os
+import sys
 from dotenv import load_dotenv
 import hashlib
 import time
@@ -23,10 +24,15 @@ from contextlib import contextmanager
 import psycopg2
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
-from collections import deque
-from threading import Lock
+
+# Add parent directory to path for shared module import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from shared import RateLimiter, setup_logging, format_database_error
 
 load_dotenv()
+
+# Setup structured logging
+logger = setup_logging("normalizer-service", log_level=os.getenv("LOG_LEVEL", "INFO"))
 
 app = FastAPI(
     title="SBS Normalizer Service - Enhanced",
@@ -55,67 +61,12 @@ try:
         password=os.getenv("DB_PASSWORD"),
         port=os.getenv("DB_PORT", "5432")
     )
-    print("✓ Database connection pool created")
+    logger.info("Database connection pool created successfully")
 except Exception as e:
-    print(f"✗ Failed to create connection pool: {e}")
+    logger.error(f"Failed to create connection pool: {format_database_error(e)}")
     db_pool = None
 
-# Rate limiter implementation
-class RateLimiter:
-    """Token bucket rate limiter with automatic cleanup"""
-    def __init__(self, max_requests: int = 100, time_window: int = 60, max_tracked_ips: int = 10000):
-        self.max_requests = max_requests
-        self.time_window = time_window
-        self.max_tracked_ips = max_tracked_ips  # Prevent unbounded memory growth
-        self.requests = {}
-        self.lock = Lock()
-        self.last_cleanup = time.time()
-        self.cleanup_interval = 300  # Cleanup every 5 minutes
-    
-    def _cleanup_old_entries(self, now: float) -> None:
-        """Remove stale IP entries to prevent memory leak"""
-        if now - self.last_cleanup < self.cleanup_interval:
-            return
-        
-        # Remove entries with no recent requests
-        stale_threshold = now - self.time_window * 2
-        to_remove = [ip for ip, reqs in self.requests.items() 
-                     if not reqs or reqs[-1] < stale_threshold]
-        for ip in to_remove:
-            del self.requests[ip]
-        
-        # If still too many entries, remove oldest
-        if len(self.requests) > self.max_tracked_ips:
-            sorted_ips = sorted(self.requests.keys(), 
-                               key=lambda ip: self.requests[ip][-1] if self.requests[ip] else 0)
-            for ip in sorted_ips[:len(self.requests) - self.max_tracked_ips]:
-                del self.requests[ip]
-        
-        self.last_cleanup = now
-    
-    def is_allowed(self, identifier: str) -> bool:
-        """Check if request is allowed for given identifier"""
-        with self.lock:
-            now = time.time()
-            
-            # Periodic cleanup to prevent memory leak
-            self._cleanup_old_entries(now)
-            
-            if identifier not in self.requests:
-                self.requests[identifier] = deque()
-            
-            # Remove old requests outside time window
-            while self.requests[identifier] and self.requests[identifier][0] < now - self.time_window:
-                self.requests[identifier].popleft()
-            
-            # Check if under limit
-            if len(self.requests[identifier]) < self.max_requests:
-                self.requests[identifier].append(now)
-                return True
-            
-            return False
-
-# Initialize rate limiter (100 requests per minute per IP)
+# Initialize rate limiter (100 requests per minute per IP) - using shared module
 rate_limiter = RateLimiter(max_requests=100, time_window=60)
 
 # Metrics storage (in production, use Prometheus)
@@ -148,7 +99,7 @@ def get_db_connection():
             )
             yield conn
     except Exception as e:
-        print(f"Database connection error: {e}")
+        logger.error(f"Database connection error: {format_database_error(e)}")
         raise
     finally:
         if conn and db_pool:
@@ -402,7 +353,7 @@ def lookup_local_mapping(facility_id: int, internal_code: str) -> Optional[dict]
             return dict(result) if result else None
             
     except Exception as e:
-        print(f"Database lookup error: {e}")
+        logger.error(f"Database lookup error: {format_database_error(e)}")
         return None
 
 
@@ -411,7 +362,7 @@ def shutdown_event():
     """Cleanup on shutdown"""
     if db_pool:
         db_pool.closeall()
-        print("✓ Database connection pool closed")
+        logger.info("Database connection pool closed")
 
 
 if __name__ == "__main__":

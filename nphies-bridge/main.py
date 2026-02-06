@@ -12,17 +12,23 @@ from typing import Dict, Any, Optional
 import httpx
 import json
 import os
+import sys
 from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
 import asyncio
 import uuid
-from collections import deque
-from threading import Lock
 import time
 
+# Add parent directory to path for shared module import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from shared import RateLimiter, setup_logging, format_database_error
+
 load_dotenv()
+
+# Setup structured logging
+logger = setup_logging("nphies-bridge", log_level=os.getenv("LOG_LEVEL", "INFO"))
 
 app = FastAPI(
     title="NPHIES Bridge Service",
@@ -40,51 +46,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
 )
 
-# Rate limiter implementation
-class RateLimiter:
-    """Token bucket rate limiter with automatic cleanup"""
-    def __init__(self, max_requests: int = 100, time_window: int = 60, max_tracked_ips: int = 10000):
-        self.max_requests = max_requests
-        self.time_window = time_window
-        self.max_tracked_ips = max_tracked_ips  # Prevent unbounded memory growth
-        self.requests = {}
-        self.lock = Lock()
-        self.last_cleanup = time.time()
-        self.cleanup_interval = 300  # Cleanup every 5 minutes
-
-    def _cleanup_old_entries(self, now: float) -> None:
-        """Remove stale IP entries to prevent memory leak"""
-        if now - self.last_cleanup < self.cleanup_interval:
-            return
-        
-        stale_threshold = now - self.time_window * 2
-        to_remove = [ip for ip, reqs in self.requests.items() 
-                     if not reqs or reqs[-1] < stale_threshold]
-        for ip in to_remove:
-            del self.requests[ip]
-        
-        if len(self.requests) > self.max_tracked_ips:
-            sorted_ips = sorted(self.requests.keys(), 
-                               key=lambda ip: self.requests[ip][-1] if self.requests[ip] else 0)
-            for ip in sorted_ips[:len(self.requests) - self.max_tracked_ips]:
-                del self.requests[ip]
-        
-        self.last_cleanup = now
-
-    def is_allowed(self, identifier: str) -> bool:
-        with self.lock:
-            now = time.time()
-            self._cleanup_old_entries(now)
-            
-            if identifier not in self.requests:
-                self.requests[identifier] = deque()
-            while self.requests[identifier] and self.requests[identifier][0] < now - self.time_window:
-                self.requests[identifier].popleft()
-            if len(self.requests[identifier]) < self.max_requests:
-                self.requests[identifier].append(now)
-                return True
-            return False
-
+# Initialize rate limiter (100 requests per minute per IP) - using shared module
 rate_limiter = RateLimiter(max_requests=100, time_window=60)
 
 @app.middleware("http")
@@ -190,7 +152,7 @@ def log_transaction(
         return txn_uuid
         
     except Exception as e:
-        print(f"Error logging transaction: {e}")
+        logger.error(f"Error logging transaction: {format_database_error(e)}")
         return str(uuid.uuid4())  # Return UUID even if logging fails
 
 
