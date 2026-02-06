@@ -66,7 +66,11 @@ except Exception as e:
 
 # Rate limiter implementation
 class RateLimiter:
-    """Token bucket rate limiter with automatic cleanup"""
+    """Sliding-window rate limiter using per-identifier request timestamps with automatic cleanup.
+
+    Enforces at most `max_requests` requests per `time_window` seconds for each identifier by
+    tracking recent request timestamps in memory and periodically cleaning up stale entries.
+    """
     def __init__(self, max_requests: int = 100, time_window: int = 60, max_tracked_ips: int = 10000):
         self.max_requests = max_requests
         self.time_window = time_window
