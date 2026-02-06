@@ -5,7 +5,7 @@ Provides consistent error responses and prevents sensitive data leakage
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-from pydantic import ValidationError
+from pydantic import ValidationError as PydanticValidationError
 import logging
 from typing import Union, Dict, Any
 import traceback
@@ -50,7 +50,7 @@ class DatabaseError(SanitizedException):
         super().__init__(message, status_code=500, details=details)
 
 
-class ValidationError(SanitizedException):
+class InputValidationError(SanitizedException):
     """Input validation error"""
     def __init__(self, message: str, details: Dict[str, Any] = None):
         super().__init__(message, status_code=400, details=details)
@@ -113,7 +113,7 @@ async def sanitized_exception_handler(request: Request, exc: SanitizedException)
     )
 
 
-async def validation_exception_handler(request: Request, exc: Union[RequestValidationError, ValidationError]) -> JSONResponse:
+async def validation_exception_handler(request: Request, exc: Union[RequestValidationError, PydanticValidationError]) -> JSONResponse:
     """Handle validation errors"""
     
     errors = []
