@@ -90,12 +90,19 @@ function buildTimeline(stages = {}) {
   }));
 }
 
-// Security middleware with proper CSP
+// Security middleware with CSP
+// NOTE: 'unsafe-inline' is required for the runtime API config in index.html
+// TODO: Consider moving to nonce-based CSP for enhanced security
+// 'unsafe-eval' removed - Tailwind CDN and Vite HMR don't require it in production
+const isProduction = process.env.NODE_ENV === 'production';
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com", "https://fonts.googleapis.com"],
+      // In production, unsafe-eval is NOT needed; in dev, Vite HMR may require it
+      scriptSrc: isProduction
+        ? ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://fonts.googleapis.com"]
+        : ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.tailwindcss.com", "https://fonts.googleapis.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.tailwindcss.com"],
       imgSrc: ["'self'", "data:", "https:"],
       connectSrc: ["'self'", "https:"],
