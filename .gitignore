@@ -1,62 +1,54 @@
-# Environment variables
+# Environment files
 .env
 .env.local
 .env.production
+.env.*.local
+config/.env
 deploy/vps/.env
 
-# Node.js
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Test results and logs
+sbs_test_report_*.json
+sbs_test_execution*.log
+workflow_test_report_*.json
+*.log
+*.err
 
-# Python
+# System files
+.bash_history
+.bash_logout
+.bashrc
+.profile
+.lesshst
+.sudo_as_admin_successful
+
+# Cache and temporary files
+.cache/
+.npm/
+.nvm/
 __pycache__/
 .mypy_cache/
 .venv/
+*.pyc
+*.pyo
 *.py[cod]
 *$py.class
+*.tmp
 *.so
 .Python
-env/
-venv/
-ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-*.cover
-.hypothesis/
-
-# IDEs
+# IDE and editor files
+.cline/
+.copilot/
+.cursor/
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
-.DS_Store
 
-# Docker
-.dockerignore
+# SSH and certificates
+.ssh/
 
-# Logs
-*.log
+# Logs directory (local)
 logs/
 *.log.*
 
@@ -65,31 +57,15 @@ logs/
 .pg.log
 .runlogs/
 
-# Generated local certs (runtime)
-certs/
-
 # Certificates (DO NOT COMMIT)
-certs/**/*.pem
 certs/**/*.key
 certs/**/*.p12
 certs/**/*.pfx
 *.key
-*.pem
 *.crt
-*.csr
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-postgres_data/
-
-# n8n
-n8n_data/
-.n8n/
+*.pem
 
 # Backup files
-*.bak
 *.backup
 *.sql.gz
 backups/
@@ -97,13 +73,28 @@ backups/
 # Deployment artifacts
 deploy.tar.gz
 *.tar.gz
+*.backup-*
+*~
+*.old
 
-# OS
+# Dependencies
+node_modules/
+.venv/
+venv/
+env/
+*.egg-info/
+
+# OS files
+.DS_Store
 Thumbs.db
-.Spotlight-V100
-.Trashes
 
-# Temporary files
-tmp/
-temp/
-*.tmp
+# Archive (cleanup directory)
+.archive/
+
+# Build outputs
+dist/
+build/
+
+# Wrangler
+.wrangler/
+*.pid

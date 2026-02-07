@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="GIVC-SBS (Global Integrated Virtual Care · Saudi Billing System) powered by BrainSAIT برينسايت" />
+    <meta name="keywords" content="GIVC-SBS, Saudi Billing System, SBS, healthcare, NPHIES, Saudi Arabia, medical coding" />
+    <meta name="author" content="BrainSAIT · Dr. Mohamed El Fadil" />
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="GIVC-SBS - Global Integrated Virtual Care · Saudi Billing System" />
+    <meta property="og:description" content="Premium Saudi Billing System platform powered by BrainSAIT برينسايت" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Google Fonts & Material Symbols -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+
+    <!-- Title -->
+    <title>GIVC-SBS · Global Integrated Virtual Care · Saudi Billing System</title>
+
+    <!-- Runtime API configuration -->
+    <script>
+      (function () {
+        const host = window.location.hostname;
+        if (window.SBS_API_URL) return;
+
+        if (host === 'sbs.brainsait.cloud' || host === 'brainsait.cloud' || host === 'www.brainsait.cloud') {
+          window.SBS_API_URL = 'https://api.brainsait.cloud';
+          return;
+        }
+
+        if (host === 'localhost' || host === '127.0.0.1') {
+          window.SBS_API_URL = 'http://localhost:3000';
+          return;
+        }
+
+        window.SBS_API_URL = window.location.origin;
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

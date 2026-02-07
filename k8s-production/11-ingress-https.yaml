@@ -1,0 +1,101 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sbs-ingress-https
+  namespace: sbs-prod
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+  - hosts:
+    - sbs.elfadil.com
+    - brainsait-pi.taile21830.ts.net
+    secretName: sbs-tls-cert
+  rules:
+  - host: sbs.elfadil.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+      - path: /api/normalize
+        pathType: Prefix
+        backend:
+          service:
+            name: normalizer-service
+            port:
+              number: 8000
+      - path: /api/sign
+        pathType: Prefix
+        backend:
+          service:
+            name: signer-service
+            port:
+              number: 8001
+      - path: /api/validate
+        pathType: Prefix
+        backend:
+          service:
+            name: financial-service
+            port:
+              number: 8002
+      - path: /api/submit-claim
+        pathType: Prefix
+        backend:
+          service:
+            name: nphies-service
+            port:
+              number: 8003
+      - path: /api/claim-status
+        pathType: Prefix
+        backend:
+          service:
+            name: nphies-service
+            port:
+              number: 8003
+  - host: brainsait-pi.taile21830.ts.net
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-service
+            port:
+              number: 80
+      - path: /api/normalize
+        pathType: Prefix
+        backend:
+          service:
+            name: normalizer-service
+            port:
+              number: 8000
+      - path: /api/sign
+        pathType: Prefix
+        backend:
+          service:
+            name: signer-service
+            port:
+              number: 8001
+      - path: /api/validate
+        pathType: Prefix
+        backend:
+          service:
+            name: financial-service
+            port:
+              number: 8002
+      - path: /api/submit-claim
+        pathType: Prefix
+        backend:
+          service:
+            name: nphies-service
+            port:
+              number: 8003

@@ -4,26 +4,63 @@ Manages all API communications with NPHIES platform
 Port: 8003
 """
 
-from fastapi import FastAPI, HTTPException, status, BackgroundTasks
+from fastapi import FastAPI, HTTPException, status, BackgroundTasks, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 import httpx
 import json
 import os
+import sys
 from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
 import asyncio
 import uuid
+import time
+
+# Add parent directory to path for shared module import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from shared import RateLimiter, setup_logging, format_database_error
 
 load_dotenv()
+
+# Setup structured logging
+logger = setup_logging("nphies-bridge", log_level=os.getenv("LOG_LEVEL", "INFO"))
 
 app = FastAPI(
     title="NPHIES Bridge Service",
     description="API Bridge to NPHIES national platform",
     version="1.0.0"
 )
+
+# CORS middleware - Restrict to allowed origins
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
+)
+
+# Initialize rate limiter (100 requests per minute per IP) - using shared module
+rate_limiter = RateLimiter(max_requests=100, time_window=60)
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Rate limiting middleware"""
+    if request.url.path in ["/health", "/"]:
+        return await call_next(request)
+    client_ip = request.client.host if request.client else "unknown"
+    if not rate_limiter.is_allowed(client_ip):
+        return JSONResponse(
+            status_code=429,
+            content={"error": "Rate limit exceeded", "retry_after_seconds": 60}
+        )
+    return await call_next(request)
 
 ALLOWED_MOCK_OUTCOMES = {"accepted", "rejected", "error"}
 
@@ -80,19 +117,19 @@ def log_transaction(
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-
+        
         txn_uuid = str(uuid.uuid4())
         txn_status = "submitted" if http_status and http_status < 400 else "error"
-
+        
         if http_status and http_status >= 200 and http_status < 300:
             txn_status = "accepted"
         elif http_status and http_status >= 400:
             txn_status = "rejected"
-
+        
         cursor.execute("""
-            INSERT INTO nphies_transactions
+            INSERT INTO nphies_transactions 
             (facility_id, transaction_uuid, request_type, fhir_payload, signature,
-             nphies_transaction_id, http_status_code, response_payload, status,
+             nphies_transaction_id, http_status_code, response_payload, status, 
              error_message, submission_timestamp, response_timestamp)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING transaction_id
@@ -110,18 +147,18 @@ def log_transaction(
             datetime.utcnow(),
             datetime.utcnow() if response_data else None
         ))
-
-        # Consume result to ensure query completed
-        cursor.fetchone()
-
+        
+        result = cursor.fetchone()
+        transaction_id = result['transaction_id']
+        
         conn.commit()
         cursor.close()
         conn.close()
-
+        
         return txn_uuid
-
+        
     except Exception as e:
-        print(f"Error logging transaction: {e}")
+        logger.error(f"Error logging transaction: {format_database_error(e)}")
         return str(uuid.uuid4())  # Return UUID even if logging fails
 
 
@@ -135,42 +172,42 @@ async def submit_to_nphies_with_retry(
     Submit request to NPHIES with exponential backoff retry logic
     Returns (response_dict, status_code, error_message)
     """
-
+    
     headers = {
         "Content-Type": "application/fhir+json",
         "Accept": "application/fhir+json",
         "X-NPHIES-Signature": signature,
         "Authorization": f"Bearer {os.getenv('NPHIES_API_KEY', '')}"
     }
-
+    
     url = f"{NPHIES_BASE_URL}/{endpoint}"
-
+    
     async with httpx.AsyncClient(timeout=NPHIES_TIMEOUT) as client:
         try:
             response = await client.post(url, json=payload, headers=headers)
-
+            
             # Success
             if response.status_code in [200, 201]:
                 return response.json(), response.status_code, None
-
+            
             # Retriable errors (500s, 429)
             if response.status_code >= 500 or response.status_code == 429:
                 if retry_count < MAX_RETRIES:
                     wait_time = 2 ** retry_count  # Exponential backoff
                     await asyncio.sleep(wait_time)
                     return await submit_to_nphies_with_retry(endpoint, payload, signature, retry_count + 1)
-
+            
             # Client errors (4xx)
             error_message = f"HTTP {response.status_code}: {response.text}"
             return response.json() if response.text else {}, response.status_code, error_message
-
+            
         except httpx.TimeoutException:
             if retry_count < MAX_RETRIES:
                 wait_time = 2 ** retry_count
                 await asyncio.sleep(wait_time)
                 return await submit_to_nphies_with_retry(endpoint, payload, signature, retry_count + 1)
             return {}, None, f"Timeout after {MAX_RETRIES} retries"
-
+            
         except Exception as e:
             error_message = f"Connection error: {str(e)}"
             if retry_count < MAX_RETRIES:
@@ -208,17 +245,35 @@ def health_check():
         )
 
 
+@app.get("/ready")
+def ready_check():
+    """Readiness probe endpoint for Kubernetes"""
+    try:
+        conn = get_db_connection()
+        conn.close()
+        return {
+            "status": "ready",
+            "database": "connected",
+            "nphies_endpoint": NPHIES_BASE_URL
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database connection failed: {str(e)}"
+        )
+
+
 @app.post("/submit-claim", response_model=SubmissionResponse)
 async def submit_claim(submission: ClaimSubmission, background_tasks: BackgroundTasks):
     """
     Submit a signed FHIR Claim to NPHIES
-
+    
     Features:
     - Automatic retry with exponential backoff
     - Transaction logging for audit
     - Error handling and reporting
     """
-
+    
     # Validate payload structure
     if submission.fhir_payload.get('resourceType') != 'Claim':
         raise HTTPException(
@@ -264,19 +319,18 @@ async def submit_claim(submission: ClaimSubmission, background_tasks: Background
             http_status=http_status,
             message=f"Mock NPHIES response ({response_data.get('status')})",
         )
-
     # Submit to NPHIES
     response_data, http_status, error_msg = await submit_to_nphies_with_retry(
         endpoint="Claim",
         payload=submission.fhir_payload,
         signature=submission.signature
     )
-
+    
     # Extract NPHIES transaction ID if available
     nphies_txn_id = None
     if response_data and 'id' in response_data:
         nphies_txn_id = response_data['id']
-
+    
     # Log transaction
     txn_uuid = log_transaction(
         facility_id=submission.facility_id,
@@ -288,7 +342,7 @@ async def submit_claim(submission: ClaimSubmission, background_tasks: Background
         nphies_txn_id=nphies_txn_id,
         error_msg=error_msg
     )
-
+    
     # Determine status
     if http_status and 200 <= http_status < 300:
         status_msg = "submitted_successfully"
@@ -299,7 +353,7 @@ async def submit_claim(submission: ClaimSubmission, background_tasks: Background
     else:
         status_msg = "error"
         message = f"Error submitting claim: {error_msg or 'Unknown error'}"
-
+    
     return SubmissionResponse(
         transaction_id=nphies_txn_id or "N/A",
         transaction_uuid=txn_uuid,
@@ -315,15 +369,15 @@ async def submit_preauth(submission: ClaimSubmission):
     """
     Submit a pre-authorization request to NPHIES
     """
-
+    
     response_data, http_status, error_msg = await submit_to_nphies_with_retry(
         endpoint="Claim/$submit",
         payload=submission.fhir_payload,
         signature=submission.signature
     )
-
+    
     nphies_txn_id = response_data.get('id') if response_data else None
-
+    
     txn_uuid = log_transaction(
         facility_id=submission.facility_id,
         request_type="PreAuth",
@@ -334,7 +388,7 @@ async def submit_preauth(submission: ClaimSubmission):
         nphies_txn_id=nphies_txn_id,
         error_msg=error_msg
     )
-
+    
     return SubmissionResponse(
         transaction_id=nphies_txn_id or "N/A",
         transaction_uuid=txn_uuid,
@@ -353,9 +407,9 @@ def get_transaction_status(transaction_uuid: str):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-
+        
         cursor.execute("""
-            SELECT
+            SELECT 
                 transaction_id,
                 transaction_uuid,
                 request_type,
@@ -368,20 +422,20 @@ def get_transaction_status(transaction_uuid: str):
             FROM nphies_transactions
             WHERE transaction_uuid = %s
         """, (transaction_uuid,))
-
+        
         result = cursor.fetchone()
-
+        
         cursor.close()
         conn.close()
-
+        
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Transaction {transaction_uuid} not found"
             )
-
+        
         return dict(result)
-
+        
     except HTTPException:
         raise
     except Exception as e:
@@ -399,9 +453,9 @@ def get_facility_transactions(facility_id: int, limit: int = 50):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-
+        
         cursor.execute("""
-            SELECT
+            SELECT 
                 transaction_uuid,
                 request_type,
                 status,
@@ -413,14 +467,14 @@ def get_facility_transactions(facility_id: int, limit: int = 50):
             ORDER BY submission_timestamp DESC
             LIMIT %s
         """, (facility_id, limit))
-
+        
         results = cursor.fetchall()
-
+        
         cursor.close()
         conn.close()
-
+        
         return [dict(row) for row in results]
-
+        
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

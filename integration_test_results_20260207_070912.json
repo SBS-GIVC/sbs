@@ -1,0 +1,70 @@
+{
+  "timestamp": "2026-02-07T07:09:12.401241",
+  "environment": "development",
+  "base_url": "http://localhost:8006",
+  "test_results": [
+    {
+      "test": "fhir_validation_integration",
+      "status": "failed",
+      "valid_bundle_validated": false,
+      "invalid_bundle_rejected": false
+    },
+    {
+      "test": "error_handling_integration",
+      "status": "passed",
+      "error_handled": true,
+      "error_logged": true,
+      "user_friendly_response": true
+    },
+    {
+      "test": "logging_integration",
+      "status": "passed",
+      "structured_logging": true,
+      "audit_logging": true,
+      "api_logging": true,
+      "metrics_collection": true
+    },
+    {
+      "test": "end_to_end_workflow",
+      "status": "failed",
+      "error": "[NPHIES-VALIDATION-ERROR] FHIR validation failed",
+      "error_handled": true
+    },
+    {
+      "test": "module_interoperability",
+      "status": "failed",
+      "scenario": {
+        "description": "Complete workflow with validation, error handling, and logging",
+        "steps": [
+          {
+            "step": "fhir_validation",
+            "status": "failed",
+            "errors": 12
+          },
+          {
+            "step": "error_handling",
+            "status": "passed",
+            "error_response_created": true
+          },
+          {
+            "step": "logging",
+            "status": "passed",
+            "timed_operation": true
+          },
+          {
+            "step": "audit_logging",
+            "status": "passed"
+          }
+        ]
+      },
+      "steps_completed": 4,
+      "all_passed": false
+    }
+  ],
+  "summary": {
+    "total_tests": 5,
+    "passed": 2,
+    "manual_required": 0,
+    "failed": 3
+  }
+}

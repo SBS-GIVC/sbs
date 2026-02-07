@@ -15,29 +15,50 @@ This solution implements a decoupled, microservices-based architecture with the 
 
 ### Core Services
 
-1. **Normalizer Service** (AI-Powered)
-   - Translates internal hospital codes to official SBS codes
-   - Uses local mapping database + Gemini AI for dynamic lookup
-   - Port: 8000
-
-2. **Financial Rules Engine**
-   - Applies CHI-mandated business rules
-   - Calculates bundles, validates coverage, applies pricing tiers
-   - Port: 8002
-
-3. **Security & Signer Service**
-   - Manages digital certificates and payload signing
-   - Implements SHA-256 hashing with RSA signing
-   - Port: 8001
-
-4. **NPHIES Bridge**
-   - Handles all communications with NPHIES platform
-   - Implements retry logic and transaction logging
-   - Port: 8003
+| Service | Port | Description |
+|---------|------|-------------|
+| **Normalizer Service** | 8000 | AI-powered translation of hospital codes to SBS codes |
+| **Signer Service** | 8001 | Digital certificates and SHA-256/RSA signing |
+| **Financial Rules Engine** | 8002 | CHI-mandated business rules and pricing |
+| **NPHIES Bridge** | 8003 | NPHIES platform communication and logging |
+| **SBS Landing** | 3000/3001 | Web UI and REST API |
 
 ### Orchestration
 
 - **n8n Workflow Engine**: Orchestrates end-to-end claim submission pipeline
+
+## 📁 Project Structure
+
+```
+sbs/
+├── normalizer-service/      # AI-powered code normalization
+├── financial-rules-engine/  # CHI business rules
+├── signer-service/          # Digital signing & certificates
+├── nphies-bridge/           # NPHIES API integration
+├── ai-prediction-service/   # AI prediction service
+├── sbs-landing/             # Web UI & Landing API
+├── services/                # Supporting microservices
+│   ├── agents/              # AI agents (AuthLinc, ClaimLinc, ComplianceLinc)
+│   └── masterlinc-bridge/   # MasterLinc integration
+├── database/                # Schema and migrations
+├── docker/                  # Docker Compose configurations
+├── docs/                    # 📚 All documentation
+│   ├── architecture/        # System architecture
+│   ├── deployment/          # Deployment guides
+│   ├── api/                 # API documentation
+│   ├── testing/             # Testing guides
+│   ├── security/            # Security docs
+│   ├── guides/              # Development guides
+│   └── reports/             # Audit reports
+├── scripts/                 # 🔧 All scripts
+│   ├── deploy/              # Deployment scripts
+│   ├── test/                # Test scripts
+│   └── maintenance/         # Maintenance scripts
+├── n8n-workflows/           # n8n workflow definitions
+├── k8s-production/          # Kubernetes manifests
+├── tests/                   # Test suite
+└── docker-compose.yml       # Main orchestration
+```
 
 ## 🚀 Quick Start
 
@@ -54,17 +75,17 @@ This solution implements a decoupled, microservices-based architecture with the 
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd sbs-integration-engine
+cd sbs
 
 # Configure environment variables
 cp .env.example .env
 # Edit .env with your credentials
 
 # Start the full stack (recommended)
-docker compose -f docker-compose.services.yml up -d
+docker compose -f docker/docker-compose.services.yml up -d
 
 # Check service health
-docker compose -f docker-compose.services.yml ps
+docker compose -f docker/docker-compose.services.yml ps
 ```
 
 ## 🔧 Environment Configuration
@@ -235,54 +256,17 @@ See `/database/schema.sql` for complete schema.
 - **PDPL Compliance**: Encrypted logging for PII protection
 - **FHIR R4**: Strict adherence to HL7 FHIR Release 4 standard
 
-### API Security Features
-
-- **CORS Protection**: Environment-configurable origin whitelist prevents cross-origin attacks
-- **Rate Limiting**: 100 requests per 15 minutes per IP address
-- **Error Handling**: All endpoints return proper JSON error responses
-- **Input Validation**: Strict JSON parsing with error handling to prevent DoS attacks
-- **Security Headers**: Helmet.js with strict Content Security Policy
-- **File Validation**: Only allowed file types (PDF, DOC, XLS, JSON, XML, Images)
-- **Logging**: Structured logging without exposing sensitive data
-- **Request Tracking**: Debug middleware logs method, path, and headers for incident analysis
-
-### Common Security Issues & Solutions
-
-| Issue | Symptoms | Solution |
-|-------|----------|----------|
-| CORS Errors | "Access to XMLHttpRequest has been blocked by CORS policy" | Verify `ALLOWED_ORIGINS` environment variable includes your frontend domain |
-| Invalid JSON | "Invalid JSON format" on form submission | Ensure request `Content-Type` is `application/json` |
-| Certificate Errors | mTLS authentication failures | Check certificate paths and NPHIES credentials in `.env` |
-| Rate Limiting | HTTP 429 responses | Wait 15 minutes or increase rate limit in production |
-
 ## 🧪 Testing
 
 ```bash
-# Sandbox Environment (Development)
-export NPHIES_ENV=sandbox
-docker-compose -f docker-compose.sandbox.yml up
+# Run quick test
+./scripts/test/quick_test_single_claim.sh
 
-# Run integration tests
-pytest tests/integration/
+# Run full integration tests
+pytest tests/
 
-# Production Environment
-export NPHIES_ENV=production
-docker-compose up -d
-```
-
-## 📁 Project Structure
-
-```
-sbs-integration-engine/
-├── normalizer-service/       # AI-powered code normalization
-├── financial-rules-engine/   # CHI business rules
-├── signer-service/           # Digital signing & certificates
-├── nphies-bridge/            # NPHIES API integration
-├── database/                 # Schema and migrations
-├── sbs-landing/              # Landing API & n8n workflows
-├── docker/                   # Docker configurations
-├── docs/                     # Documentation
-└── docker-compose.yml        # Orchestration
+# Run n8n workflow tests
+./scripts/test/test_n8n_integration.sh
 ```
 
 ## 🛠️ API Endpoints
@@ -299,80 +283,35 @@ sbs-integration-engine/
 ### NPHIES Bridge
 - `POST /submit-claim` - Submit claim to NPHIES
 
-## 🐛 Troubleshooting
-
-### CORS Errors
-
-**Error**: `Access to XMLHttpRequest has been blocked by CORS policy`
-
-**Causes & Solutions**:
-1. **Missing origin in whitelist**: Add your frontend domain to `ALLOWED_ORIGINS` in `.env`
-2. **Protocol mismatch**: Ensure both `http://` and `https://` versions are included if needed
-3. **Port mismatch**: Include the port number if your frontend runs on a non-standard port
-
-```bash
-# Example fix
-ALLOWED_ORIGINS=https://your-frontend.com,http://localhost:3001,http://localhost:3000
-docker-compose restart
-```
-
-### 405 Method Not Allowed
-
-**Error**: `405 Method Not Allowed` on POST requests
-
-**Solutions**:
-1. Verify the endpoint exists and is correctly spelled
-2. Check that CORS preflight (OPTIONS) requests are being handled
-3. Ensure the HTTP method matches the endpoint configuration
-
-### Invalid JSON Format
-
-**Error**: `Invalid JSON format` on form submission
-
-**Solutions**:
-1. Ensure request `Content-Type` header is set to `application/json`
-2. Validate JSON payload structure before sending
-3. Check for trailing commas or invalid characters in JSON
-
-### Service Connection Failures
-
-**Error**: `ECONNREFUSED` or service timeout errors
-
-**Solutions**:
-1. Verify all services are running: `docker-compose ps`
-2. Check service URLs in `.env` match the actual service addresses
-3. Ensure services are on the same Docker network
-4. Check individual service health: `curl http://localhost:8000/health`
-
-### Certificate Errors
-
-**Error**: mTLS or certificate validation failures
-
-**Solutions**:
-1. Verify certificate paths in `.env` (`CERT_BASE_PATH`)
-2. Check certificate permissions: `chmod 600 /certs/*/private_key.pem`
-3. Ensure certificates are not expired
-4. Verify certificate matches the registered facility in NPHIES
-
-### Database Connection Issues
-
-**Error**: Database connection refused or authentication failed
-
-**Solutions**:
-1. Verify database credentials in `.env`
-2. Check PostgreSQL is running: `docker-compose logs postgres`
-3. Test connection: `docker exec -it sbs-postgres psql -U postgres -d sbs_integration`
-
 ## 📚 Documentation
 
-- [PRD](docs/PRD.md) - Product Requirements Document
-- [API Reference](docs/API.md) - Complete API documentation
-- [Security Guide](docs/SECURITY.md) - Security implementation details
-- [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment
+See [docs/README.md](docs/README.md) for the complete documentation index.
 
-## 🤝 Contributing
+**Key Documents:**
+- [Architecture Overview](docs/architecture/ARCHITECTURE.md)
+- [API Reference](docs/api/API.md)
+- [Deployment Guide](docs/deployment/DEPLOYMENT.md)
+- [Security Guide](docs/security/SECURITY.md)
+- [Getting Started](docs/guides/START_HERE.md)
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+## 🔧 Scripts
+
+See [scripts/README.md](scripts/README.md) for available scripts.
+
+**Quick Commands:**
+```bash
+# Deploy
+./scripts/deploy/quickstart.sh          # Local development
+./scripts/deploy/deploy-production.sh   # Production
+
+# Test
+./scripts/test/quick_test_single_claim.sh
+./scripts/test/test_full_workflow.sh
+
+# Maintenance
+./scripts/maintenance/check_sbs_status.sh
+./scripts/maintenance/production-health-check.sh
+```
 
 ## 📄 License
 
@@ -380,4 +319,8 @@ Proprietary - All rights reserved
 
 ## 📞 Support
 
-For technical support, contact: support@sbs-integration.sa
+For technical support, contact: support@brainsait.cloud
+
+---
+
+**Production URL:** https://sbs.brainsait.cloud

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.brainsait.gateway</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/python3</string>
+        <string>/Users/fadil369/sbs/arduino-iot-gateway/src/serial_gateway.py</string>
+    </array>
+    
+    <key>WorkingDirectory</key>
+    <string>/Users/fadil369/sbs/arduino-iot-gateway</string>
+    
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>SERIAL_PORT</key>
+        <string>/dev/cu.usbmodem1201</string>
+        <key>BAUD_RATE</key>
+        <string>115200</string>
+        <key>API_URL</key>
+        <string>https://sbs.brainsait.cloud/api/v1/iot/events</string>
+        <key>API_TOKEN</key>
+        <string>YOUR_TOKEN_HERE</string>
+        <key>NODE_ID</key>
+        <string>BS-EDGE-001</string>
+        <key>FACILITY_CODE</key>
+        <string>HQ</string>
+        <key>PYTHONUNBUFFERED</key>
+        <string>1</string>
+    </dict>
+    
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+    
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    
+    <key>StandardOutPath</key>
+    <string>/Users/fadil369/sbs/arduino-iot-gateway/logs/gateway.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/fadil369/sbs/arduino-iot-gateway/logs/gateway.err</string>
+</dict>
+</plist>

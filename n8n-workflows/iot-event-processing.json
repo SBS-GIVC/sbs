@@ -1,0 +1,99 @@
+{
+  "name": "IoT Event Processing Pipeline",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "iot-events", "responseMode": "lastNode" },
+      "id": "webhook-iot-events",
+      "name": "Webhook: IoT Events",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": { "string": [{ "value1": "={{ $json.event }}", "operation": "equals", "value2": "alert" }] }
+      },
+      "id": "check-event-type",
+      "name": "Is Alert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": "public",
+        "table": "iot_events",
+        "columns": "node_id, event_type, payload, device_ts, gateway_ts, source_ip",
+        "options": {}
+      },
+      "id": "store-event-db",
+      "name": "Store Event in DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [650, 200],
+      "credentials": { "postgres": { "id": "sbs-postgres-cred", "name": "SBS PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": "public",
+        "table": "iot_alert_history",
+        "columns": "node_id, alert_severity, alert_message, metric_value",
+        "options": {}
+      },
+      "id": "store-alert-db",
+      "name": "Store Alert in DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [650, 400],
+      "credentials": { "postgres": { "id": "sbs-postgres-cred", "name": "SBS PostgreSQL" } }
+    },
+    {
+      "parameters": {
+        "conditions": { "string": [{ "value1": "={{ $json.data?.severity || 'info' }}", "operation": "equals", "value2": "critical" }] }
+      },
+      "id": "check-severity",
+      "name": "Is Critical?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.NOTIFICATION_WEBHOOK_URL }}",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{ \"text\": \"🚨 Critical IoT Alert: Node {{ $json.node }} - {{ $json.data?.message }}\" }"
+      },
+      "id": "send-notification",
+      "name": "Send Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1050, 350]
+    },
+    {
+      "parameters": {
+        "values": { "string": [{ "name": "status", "value": "processed" }, { "name": "event_id", "value": "={{ 'evt_' + $now.toMillis() }}" }] }
+      },
+      "id": "set-response",
+      "name": "Set Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    }
+  ],
+  "connections": {
+    "Webhook: IoT Events": { "main": [[{ "node": "Is Alert?", "type": "main", "index": 0 }]] },
+    "Is Alert?": { "main": [[{ "node": "Store Alert in DB", "type": "main", "index": 0 }], [{ "node": "Store Event in DB", "type": "main", "index": 0 }]] },
+    "Store Alert in DB": { "main": [[{ "node": "Is Critical?", "type": "main", "index": 0 }]] },
+    "Is Critical?": { "main": [[{ "node": "Send Notification", "type": "main", "index": 0 }], [{ "node": "Set Response", "type": "main", "index": 0 }]] },
+    "Send Notification": { "main": [[{ "node": "Set Response", "type": "main", "index": 0 }]] },
+    "Store Event in DB": { "main": [[{ "node": "Set Response", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "sbs-iot-workflow" },
+  "tags": [{ "name": "IoT", "id": "iot-tag" }, { "name": "SBS", "id": "sbs-tag" }]
+}

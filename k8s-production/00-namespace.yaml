@@ -1,0 +1,12 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sbs-prod
+  labels:
+    name: sbs-prod
+    environment: production
+    project: sbs
+    managed-by: kubernetes
+  annotations:
+    description: "SBS Production Environment - Smart Billing System"

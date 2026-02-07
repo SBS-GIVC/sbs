@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "n8n-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "supergateway",
+        "--streamableHttp",
+        "https://n8n.brainsait.cloud/mcp-server/http",
+        "--header",
+        "authorization:Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiYTk4MWVmMy0xOTU5LTQwYWMtYWQ1Ni03ODM2YjNhZjFhMDQiLCJpc3MiOiJuOG4iLCJhdWQiOiJtY3Atc2VydmVyLWFwaSIsImp0aSI6IjIyMjVhZTBkLTM0ODktNDU4NS05YjZlLTYzZjFkYmFlZWU3ZCIsImlhdCI6MTc3MDQyMzAwNn0.YHqDGTSXTVSPKNjroG4AaZQ4rFYHE_WbjIpkCagC268"
+      ]
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "integration_tests": {
+    "success": false,
+    "results_file": "integration_test_results_20260207_070659.json"
+  },
+  "edge_case_tests": {
+    "success": true,
+    "results_file": "edge_case_test_results_20260207_070659.json"
+  },
+  "summary": {
+    "all_tests_passed": false,
+    "integration_tests_passed": false,
+    "edge_case_tests_passed": true,
+    "timestamp": "2026-02-07T07:06:59.543078",
+    "environment": "development"
+  }
+}

@@ -1,0 +1,14 @@
+# BrainSAIT Arduino IoT Gateway - Dependencies
+# Core
+pyserial==3.5
+requests>=2.31.0
+
+# Environment
+python-dotenv==1.0.1
+
+# Testing
+pytest>=8.0.0
+pytest-cov>=4.1.0
+
+# Optional: for async support (future)
+# aiohttp>=3.9.0

@@ -1,0 +1,256 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: sbs-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-sbs_integration}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sbs-network
+
+  # Normalizer Service (AI-Powered)
+  normalizer-service:
+    build:
+      context: ./normalizer-service
+      dockerfile: Dockerfile
+    container_name: sbs-normalizer
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:-sbs_integration}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: 5432
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      ENABLE_DEEPSEEK: ${ENABLE_DEEPSEEK:-false}
+      # Optional: internal copilot gateway (recommended)
+      AI_COPILOT_URL: ${AI_COPILOT_URL:-}
+      AI_COPILOT_API_KEY: ${AI_COPILOT_API_KEY:-}
+      AI_COPILOT_TIMEOUT_SECONDS: ${AI_COPILOT_TIMEOUT_SECONDS:-12}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; r=requests.get('http://localhost:8000/health'); exit(0 if r.status_code==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sbs-network
+
+  # Eligibility Service
+  eligibility-service:
+    build:
+      context: ./eligibility-service
+      dockerfile: Dockerfile
+    container_name: sbs-eligibility
+    environment:
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      # Optional upstream integration
+      ELIGIBILITY_UPSTREAM_URL: ${ELIGIBILITY_UPSTREAM_URL:-}
+      ELIGIBILITY_UPSTREAM_API_KEY: ${ELIGIBILITY_UPSTREAM_API_KEY:-}
+    ports:
+      - "8004:8004"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; r=requests.get('http://localhost:8004/health'); exit(0 if r.status_code==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - sbs-network
+
+  # Financial Rules Engine
+  financial-rules-engine:
+    build:
+      context: ./financial-rules-engine
+      dockerfile: Dockerfile
+    container_name: sbs-financial-rules
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:-sbs_integration}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: 5432
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; r=requests.get('http://localhost:8002/health'); exit(0 if r.status_code==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sbs-network
+
+  # Signer Service
+  signer-service:
+    build:
+      context: ./signer-service
+      dockerfile: Dockerfile
+    container_name: sbs-signer
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:-sbs_integration}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: 5432
+      CERT_BASE_PATH: /certs
+      CERT_PASSWORD: ${CERT_PASSWORD:-}
+      SIGNER_PRIVATE_KEY_B64: ${SIGNER_PRIVATE_KEY_B64:-}
+      SIGNER_PRIVATE_KEY_PEM: ${SIGNER_PRIVATE_KEY_PEM:-}
+      SIGNER_CERT_SERIAL: ${SIGNER_CERT_SERIAL:-}
+      NPHIES_ENV: ${NPHIES_ENV:-sandbox}
+    volumes:
+      - ./certs:/certs
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; r=requests.get('http://localhost:8001/health'); exit(0 if r.status_code==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sbs-network
+
+  # NPHIES Bridge
+  nphies-bridge:
+    build:
+      context: ./nphies-bridge
+      dockerfile: Dockerfile
+    container_name: sbs-nphies-bridge
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:-sbs_integration}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PORT: 5432
+      NPHIES_BASE_URL: ${NPHIES_BASE_URL:-https://sandbox.nphies.sa/api/v1}
+      NPHIES_API_KEY: ${NPHIES_API_KEY}
+      NPHIES_TIMEOUT: ${NPHIES_TIMEOUT:-30}
+      NPHIES_MAX_RETRIES: ${NPHIES_MAX_RETRIES:-3}
+      # Local/dev default: avoid calling real NPHIES.
+      ENABLE_MOCK_NPHIES: ${ENABLE_MOCK_NPHIES:-true}
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; r=requests.get('http://localhost:8003/health'); exit(0 if r.status_code==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sbs-network
+
+  # n8n Workflow Engine
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: sbs-n8n
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-changeme}
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+      - GENERIC_TIMEZONE=${TIMEZONE:-Asia/Riyadh}
+      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL:-http://localhost:5678}
+      # DeepSeek direct (used by n8n-workflow-ai-copilot-gateway.json)
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-chat}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - ENABLE_DEEPSEEK=${ENABLE_DEEPSEEK:-false}
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./sbs-landing/n8n-workflow-sbs-complete.json:/home/node/.n8n/workflows/sbs-complete-pipeline.json:ro
+      - ./sbs-landing/n8n-workflow-ai-copilot-gateway.json:/home/node/.n8n/workflows/sbs-ai-chat.json:ro
+      - ./sbs-landing/n8n-workflow-eligibility-gateway.json:/home/node/.n8n/workflows/sbs-eligibility.json:ro
+    depends_on:
+      - normalizer-service
+      - financial-rules-engine
+      - signer-service
+      - nphies-bridge
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5678/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sbs-network
+
+  # AI Gateway (optional): internal endpoint for copilot calls
+  ai-gateway:
+    build:
+      context: ./ai-gateway
+      dockerfile: Dockerfile
+    container_name: sbs-ai-gateway
+    environment:
+      PORT: 8010
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Optional: require callers to provide Authorization: Bearer <token>
+      AI_GATEWAY_SHARED_SECRET: ${AI_GATEWAY_SHARED_SECRET:-}
+      # Option A: n8n webhook orchestration
+      N8N_WEBHOOK_URL: ${AI_GATEWAY_N8N_WEBHOOK_URL:-}
+      # Option B: Cloudflare AI Gateway (OpenAI-compatible)
+      CLOUDFLARE_AI_GATEWAY_URL: ${CLOUDFLARE_AI_GATEWAY_URL:-}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+    ports:
+      - "8010:8010"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8010/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - sbs-network
+
+volumes:
+  postgres_data:
+    driver: local
+  n8n_data:
+    driver: local
+
+networks:
+  sbs-network:
+    driver: bridge

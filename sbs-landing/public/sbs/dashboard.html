@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SBS Claims Dashboard - Monitor your insurance claim submissions in real-time">
+  <meta name="theme-color" content="#10b981">
+  
+  <title>Claims Dashboard - SBS Integration Engine</title>
+  
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            emerald: {
+              400: '#34d399',
+              500: '#10b981',
+              600: '#059669',
+            },
+          },
+          animation: {
+            'spin': 'spin 1s linear infinite',
+            'pulse-slow': 'pulse 3s ease-in-out infinite',
+            'fade-in': 'fadeIn 0.5s ease-out forwards',
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: '0', transform: 'translateY(10px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' },
+            },
+          },
+        },
+      },
+    };
+  </script>
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  
+  <!-- Additional Styles -->
+  <style>
+    /* Smooth scrolling */
+    html {
+      scroll-behavior: smooth;
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: #1e293b;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: #64748b;
+    }
+    
+    /* Table responsiveness */
+    @media (max-width: 768px) {
+      .overflow-x-auto {
+        -webkit-overflow-scrolling: touch;
+      }
+    }
+    
+    /* Skeleton loading */
+    .skeleton {
+      background: linear-gradient(90deg, #334155 25%, #475569 50%, #334155 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+    }
+    
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-white font-sans antialiased">
+  <!-- Navigation -->
+  <nav class="fixed top-0 left-0 right-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center gap-3">
+          <a href="index.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+            <div class="bg-gradient-to-tr from-emerald-400 to-cyan-500 p-2 rounded-lg">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+            </div>
+            <span class="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+              SBS Engine
+            </span>
+          </a>
+          <span class="text-slate-500">|</span>
+          <span class="text-slate-400 text-sm font-medium">Dashboard</span>
+        </div>
+        
+        <div class="flex items-center gap-4">
+          <a href="index.html" class="text-slate-300 hover:text-white transition-colors text-sm font-medium">
+            ← Back to Home
+          </a>
+          <button id="new-claim-btn" class="bg-emerald-500 hover:bg-emerald-400 text-slate-900 px-4 py-2 rounded-full font-bold text-sm transition-all shadow-lg shadow-emerald-500/20">
+            New Claim
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="pt-20">
+    <div id="dashboard-container">
+      <!-- Dashboard content will be rendered here -->
+      <div class="flex justify-center items-center min-h-[60vh]">
+        <svg class="w-8 h-8 text-emerald-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+      </div>
+    </div>
+  </main>
+
+  <!-- Scripts -->
+  <script src="config.js"></script>
+  <script src="api-client.js"></script>
+  <script src="landing.js"></script>
+  <script src="dashboard.js"></script>
+  
+  <script>
+    // Initialize dashboard
+    let dashboard;
+    
+    document.addEventListener('DOMContentLoaded', () => {
+      // Initialize dashboard
+      dashboard = new ClaimsDashboard();
+      dashboard.init();
+      
+      // Hook up new claim button to main app
+      document.getElementById('new-claim-btn').addEventListener('click', () => {
+        if (typeof app !== 'undefined' && app.openClaimModal) {
+          app.openClaimModal();
+        } else {
+          window.location.href = 'index.html#submit-claim';
+        }
+      });
+    });
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js')
+        .then(reg => console.log('Service Worker registered'))
+        .catch(err => console.log('Service Worker registration failed:', err));
+    }
+  </script>
+</body>
+</html>

@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   # PostgreSQL Database
@@ -6,21 +5,54 @@ services:
     image: postgres:14-alpine
     container_name: sbs-postgres
     environment:
-      POSTGRES_DB: ${DB_NAME:-sbs_integration}
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_DB: ${DB_NAME:?DB_NAME is required}
+      POSTGRES_USER: ${DB_USER:?DB_USER is required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required - use a strong password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"  # Bind to localhost only
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - sbs-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # Redis (for event streaming and agent coordination)
+  redis:
+    image: redis:7-alpine
+    container_name: sbs-redis
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - sbs-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 128M
+        reservations:
+          memory: 64M
 
   # Normalizer Service (AI-Powered)
   normalizer-service:
@@ -30,19 +62,32 @@ services:
     container_name: sbs-normalizer
     environment:
       DB_HOST: postgres
-      DB_NAME: ${DB_NAME:-sbs_integration}
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       DB_PORT: 5432
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"  # Bind to localhost only
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          memory: 256M
     networks:
       - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
 
   # Financial Rules Engine
   financial-rules-engine:
@@ -52,18 +97,31 @@ services:
     container_name: sbs-financial-rules
     environment:
       DB_HOST: postgres
-      DB_NAME: ${DB_NAME:-sbs_integration}
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       DB_PORT: 5432
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
     ports:
-      - "8002:8002"
+      - "127.0.0.1:8002:8002"  # Bind to localhost only
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 256M
+        reservations:
+          memory: 128M
     networks:
       - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
 
   # Signer Service
   signer-service:
@@ -73,23 +131,37 @@ services:
     container_name: sbs-signer
     environment:
       DB_HOST: postgres
-      DB_NAME: ${DB_NAME:-sbs_integration}
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       DB_PORT: 5432
       CERT_BASE_PATH: /certs
       CERT_PASSWORD: ${CERT_PASSWORD:-}
+      SIGNER_PRIVATE_KEY_B64: ${SIGNER_PRIVATE_KEY_B64:-}
+      SIGNER_PRIVATE_KEY_PEM: ${SIGNER_PRIVATE_KEY_PEM:-}
+      SIGNER_CERT_SERIAL: ${SIGNER_CERT_SERIAL:-}
       NPHIES_ENV: ${NPHIES_ENV:-sandbox}
+      ENABLE_TEST_CERTIFICATES: ${ENABLE_TEST_CERTIFICATES:-false}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
     volumes:
-      - ./certs:/certs
+      - ./certs:/certs:ro  # Mount certificates as read-only
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"  # Bind to localhost only
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+        reservations:
+          memory: 128M
     networks:
       - sbs-network
+    security_opt:
+      - no-new-privileges:true
 
   # NPHIES Bridge
   nphies-bridge:
@@ -99,21 +171,287 @@ services:
     container_name: sbs-nphies-bridge
     environment:
       DB_HOST: postgres
-      DB_NAME: ${DB_NAME:-sbs_integration}
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-changeme}
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       DB_PORT: 5432
       NPHIES_BASE_URL: ${NPHIES_BASE_URL:-https://sandbox.nphies.sa/api/v1}
-      NPHIES_API_KEY: ${NPHIES_API_KEY}
+      NPHIES_API_KEY: ${NPHIES_API_KEY:?NPHIES_API_KEY is required}
       NPHIES_TIMEOUT: ${NPHIES_TIMEOUT:-30}
       NPHIES_MAX_RETRIES: ${NPHIES_MAX_RETRIES:-3}
-      # Local/dev default: avoid calling real NPHIES.
-      ENABLE_MOCK_NPHIES: ${ENABLE_MOCK_NPHIES:-true}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
     ports:
-      - "8003:8003"
+      - "127.0.0.1:8003:8003"  # Bind to localhost only
     depends_on:
       postgres:
         condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+        reservations:
+          memory: 192M
+    networks:
+      - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+
+
+  # MasterLinc Bridge (BrainSAIT Linc Agent Coordinator)
+  masterlinc-bridge:
+    build:
+      context: ./services/masterlinc-bridge
+      dockerfile: Dockerfile
+    container_name: sbs-masterlinc-bridge
+    environment:
+      REDIS_URL: redis://redis:6379
+      CLAIMLINC_URL: http://claimlinc-agent:4001
+      AUTHLINC_URL: http://authlinc-agent:4002
+      COMPLIANCELINC_URL: http://compliancelinc-agent:4003
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      BRAINSAIT_OID_ROOT: ${BRAINSAIT_OID_ROOT:-1.3.6.1.4.1.61026}
+      BRAINSAIT_PEN: ${BRAINSAIT_PEN:-61026}
+    ports:
+      - "127.0.0.1:4000:4000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 384M
+        reservations:
+          memory: 192M
+    networks:
+      - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  # ClaimLinc Agent (Revenue Cycle Management)
+  claimlinc-agent:
+    build:
+      context: ./services/agents/claimlinc
+      dockerfile: Dockerfile
+    container_name: sbs-claimlinc-agent
+    environment:
+      NORMALIZER_URL: http://normalizer-service:8000
+      FINANCIAL_RULES_URL: http://financial-rules-engine:8002
+      SIGNER_URL: http://signer-service:8001
+      NPHIES_BRIDGE_URL: http://nphies-bridge:8003
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+    ports:
+      - "127.0.0.1:4001:4001"
+    depends_on:
+      - normalizer-service
+      - financial-rules-engine
+      - signer-service
+      - nphies-bridge
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: 384M
+        reservations:
+          memory: 192M
+    networks:
+      - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  # AuthLinc Agent (Eligibility and Pre-Authorization)
+  authlinc-agent:
+    build:
+      context: ./services/agents/authlinc
+      dockerfile: Dockerfile
+    container_name: sbs-authlinc-agent
+    environment:
+      NPHIES_BRIDGE_URL: http://nphies-bridge:8003
+      REDIS_URL: redis://redis:6379
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+    ports:
+      - "127.0.0.1:4002:4002"
+    depends_on:
+      - redis
+      - nphies-bridge
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+        reservations:
+          memory: 128M
+    networks:
+      - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  # ComplianceLinc Agent (Audit and Compliance)
+  compliancelinc-agent:
+    build:
+      context: ./services/agents/compliancelinc
+      dockerfile: Dockerfile
+    container_name: sbs-compliancelinc-agent
+    environment:
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+    ports:
+      - "127.0.0.1:4003:4003"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+        reservations:
+          memory: 128M
+    networks:
+      - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  # SBS Landing API
+  sbs-landing:
+    build:
+      context: ./sbs-landing
+      dockerfile: Dockerfile
+    container_name: sbs-landing
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://n8n:5678/webhook/sbs-claim-submission}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      - ENABLE_DIRECT_SBS=${ENABLE_DIRECT_SBS:-true}
+      - NORMALIZER_URL=http://normalizer-service:8000
+      - SIGNER_URL=http://signer-service:8001
+      - FINANCIAL_RULES_URL=http://financial-rules-engine:8002
+      - NPHIES_BRIDGE_URL=http://nphies-bridge:8003
+      - AI_PREDICTION_URL=http://ai-prediction-service:8004
+      - MASTERLINC_URL=http://masterlinc-bridge:4000
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "127.0.0.1:3005:3000"  # Bind to localhost only for security (Mapped to 3005 to avoid SSH tunnel conflicts on 3000)
+    depends_on:
+      - n8n
+      - redis
+      - normalizer-service
+      - financial-rules-engine
+      - signer-service
+      - nphies-bridge
+      - ai-prediction-service
+      - masterlinc-bridge
+      - claimlinc-agent
+      - authlinc-agent
+      - compliancelinc-agent
+    restart: unless-stopped
+    networks:
+      - sbs-network
+      - n8n_default
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.sbs.rule=Host(`brainsait.cloud`) || Host(`www.brainsait.cloud`)"
+      - "traefik.http.routers.sbs.entrypoints=websecure"
+      - "traefik.http.routers.sbs.tls=true"
+      - "traefik.http.routers.sbs.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.sbs.loadbalancer.server.port=3000"
+    security_opt:
+      - no-new-privileges:true
+
+  # AI Prediction Analytics Service
+  ai-prediction-service:
+    build:
+      context: ./ai-prediction-service
+      dockerfile: Dockerfile
+    container_name: sbs-ai-prediction
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      DB_PORT: 5432
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+    ports:
+      - "127.0.0.1:8004:8004"  # Bind to localhost only
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          memory: 256M
+    networks:
+      - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  # Simulation Service (for testing)
+  simulation-service:
+    build:
+      context: ./simulation-service
+      dockerfile: Dockerfile
+    container_name: sbs-simulation
+    environment:
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "127.0.0.1:8005:8005"
+    restart: unless-stopped
+    networks:
+      - sbs-network
+
+  # n8n Workflow Engine
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: sbs-n8n
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD:-changeme}
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+      - GENERIC_TIMEZONE=${TIMEZONE:-Asia/Riyadh}
+      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL:-http://localhost:5678}
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n-workflows/sbs-production-workflow.json:/home/node/.n8n/workflows/sbs-complete-pipeline.json:ro
+    depends_on:
+      - normalizer-service
+      - financial-rules-engine
+      - signer-service
+      - nphies-bridge
+      - ai-prediction-service
+      - simulation-service
     restart: unless-stopped
     networks:
       - sbs-network
@@ -123,11 +461,13 @@ services:
     image: dpage/pgadmin4:latest
     container_name: sbs-pgadmin
     environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@sbs.sa}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:?PGADMIN_EMAIL is required}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?PGADMIN_PASSWORD is required - use a strong password}
       PGADMIN_LISTEN_PORT: 80
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "True"
+      PGADMIN_CONFIG_LOGIN_BANNER: "'Authorized access only'"
     ports:
-      - "5050:80"
+      - "127.0.0.1:5050:80"  # Bind to localhost only
     depends_on:
       - postgres
     restart: unless-stopped
@@ -135,11 +475,19 @@ services:
       - sbs-network
     profiles:
       - tools
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  n8n_data:
     driver: local
 
 networks:
   sbs-network:
     driver: bridge
+  n8n_default:
+    external: true

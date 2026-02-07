@@ -1,365 +1,549 @@
-# 🏥 SBS Integration Engine - Backend
+# 🚀 SBS Landing Page - Complete Integration Guide
 
-**Saudi Billing System (SBS) Integration Engine** - A production-ready Express.js backend API with n8n workflow automation for processing health insurance claims through the NPHIES (National Platform for Health Insurance Exchange System).
+## 📋 Overview
 
-## ✨ Features
+This is the production-ready landing page for **brainsait.cloud** that integrates with your SBS microservices and n8n workflow automation.
 
-- ✅ **RESTful API** - Express.js backend with comprehensive endpoints
-- ✅ **n8n Workflow Integration** - Automated claim processing pipeline
-- ✅ **CORS Support** - Configured for GitHub Pages frontend
-- ✅ **File Upload Handling** - Multer for document uploads (10MB limit)
-- ✅ **Claim Tracking** - Real-time workflow status monitoring
-- ✅ **Error Handling** - Comprehensive error responses and logging
-- ✅ **Rate Limiting** - API rate limiting with express-rate-limit
-- ✅ **Security** - Helmet.js headers, CORS, input validation
-- ✅ **Production Ready** - Environment-based configuration, logging
-- ✅ **User-Centric Timeline** - Workflow timeline updates for tracking
-- ✅ **Workflow Hooks** - Optional webhooks for lifecycle events
+### ✨ Key Features
 
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Node.js 18.0+
-- npm 9.0+
-- Docker (optional, for containerized deployment)
-
-### Installation
-
-```bash
-# Clone repository
-git clone https://github.com/Fadil369/sbs.git
-cd sbs/sbs-landing
-
-# Install dependencies
-npm install
-
-# Copy environment variables
-cp .env.example .env
-
-# Update .env with your configuration
-nano .env
-
-# Start development server
-npm run dev
-
-# Or start production server
-npm start
-```
-
-### Using Docker
-
-```bash
-# Build Docker image
-docker build -t sbs-landing .
-
-# Run container
-docker run -p 5000:5000 --env-file .env sbs-landing
-```
-
-### Using Docker Compose
-
-```bash
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f sbs-api
-
-# Stop all services
-docker-compose down
-```
-
-## 📁 Project Structure
-
-                        ```
-                        sbs-landing/
-                        ├── public/                    # Frontend files
-                        │   ├── index.html            # Landing page
-                        │   ├── landing.js            # Frontend JavaScript
-                        │   ├── config.js             # Environment configuration
-                        │   └── api-client.js         # API client with retry logic
-                        ├── node_modules/             # Dependencies
-                        ├── server.js                 # Express backend server
-                        ├── package.json              # Dependencies and scripts
-                        ├── .env.example              # Environment variables template
-                        ├── Dockerfile                # Docker configuration
-                        ├── docker-compose.yml        # Docker Compose configuration
-                        ├── README.md                 # This file
-                        ├── deploy.sh                 # Deployment script
-                        ├── test-submit-claim.js      # API testing script
-                        └── n8n-workflow-sbs-complete.json  # n8n workflow definition
-                        ```
-
-                        ## 🔌 API Endpoints
-
-                        ### Health Check
-                        ```bash
-                        GET /health
-
-                        # Response
-                        {
-                          "status": "healthy",
-                          "timestamp": "2026-01-18T01:48:41Z",
-                          "version": "1.0.0",
-                          "environment": "development"
-                        }
-                        ```
-
-                        ### Submit Claim
-                        ```bash
-                        POST /api/submit-claim
-                        Content-Type: multipart/form-data
-
-                        Request:
-                        - patientName: string (required)
-                        - patientId: string (required)
-                        - memberId: string (optional)
-                        - payerId: string (optional)
-                        - claimType: string (required) - professional|institutional|pharmacy|vision
-                        - userEmail: string (required)
-                        - claimFile: file (optional) - PDF, DOC, XLS, JSON, XML (max 10MB)
-
-                        # Response
-                        {
-                          "success": true,
-                          "claimId": "CLM20260118001",
-                          "status": "validation_pending",
-                          "message": "Claim received and queued for processing"
-                        }
-                        ```
-
-                        ### Get Claim Status
-                        ```bash
-                        GET /api/claim-status/:claimId
-
-                        # Response
-                        {
-                          "success": true,
-                          "claimId": "CLM20260118001",
-                          "status": "in_progress",
-                          "progress": 40,
-                          "stages": {
-                            "received": { "status": "completed", "timestamp": "..." },
-                            "validation": { "status": "in_progress", "timestamp": "..." },
-                            "normalization": { "status": "pending", "timestamp": null },
-                            "signing": { "status": "pending", "timestamp": null },
-                            "nphies_submission": { "status": "pending", "timestamp": null }
-                          }
-                        }
-                        ```
-
-## ⚙️ Configuration
-
-### n8n Gateway (Eligibility + Copilot)
-
-This repo supports an **n8n-first gateway** setup for Eligibility and Copilot.
-See: `docs/N8N_GATEWAY_PRODUCTION.md`.
-
-### Environment Variables
-
-Copy `.env.example` to `.env` and update:
-
-```env
-# Server
-PORT=5000
-NODE_ENV=development
-
-# CORS (preferred)
-ALLOWED_ORIGINS=http://localhost:3000,https://fadil369.github.io
-
-# Backwards compatibility
-CORS_ORIGIN=http://localhost:3000,https://fadil369.github.io
-
-# Uploads
-UPLOAD_DIR=/tmp/sbs-uploads
-MAX_FILE_SIZE=10485760
-
-# Microservices
-SBS_NORMALIZER_URL=http://localhost:8000
-SBS_FINANCIAL_RULES_URL=http://localhost:8002
-SBS_SIGNER_URL=http://localhost:8001
-SBS_NPHIES_BRIDGE_URL=http://localhost:8003
-
-# Eligibility (optional real service)
-# If set, Landing proxies POST /api/eligibility/check to ${SBS_ELIGIBILITY_URL}/check
-SBS_ELIGIBILITY_URL=http://localhost:8004
-
-# Copilot wiring
-# auto (default): proxy to ${SBS_INTERNAL_COPILOT_URL} or ${SBS_NORMALIZER_URL}/copilot/chat, else deterministic fallback
-# deterministic: always use deterministic fallback
-SBS_COPILOT_MODE=auto
-SBS_INTERNAL_COPILOT_URL=
-
-# n8n
-N8N_BASE_URL=http://localhost:5678
-N8N_WORKFLOW_ID=sbs-claim-processing
-
-# Workflow hooks
-ENABLE_STAGE_HOOKS=false
-SBS_STAGE_HOOK_URL=
-
-# Logging
-LOG_LEVEL=debug
-```
-
-See `.env.example` for complete configuration options.
-
-## 🧪 Testing
-
-### Using npm script
-
-```bash
-npm test
-```
-
-### Using curl
-
-```bash
-# Health check
-curl http://localhost:5000/health
-
-# Submit test claim
-curl -X POST http://localhost:5000/api/submit-claim \
-  -F "patientName=Test Patient" \
-  -F "patientId=1234567890" \
-  -F "claimType=professional" \
-  -F "userEmail=test@example.com"
-```
-
-### Using the test script
-
-```bash
-node test-submit-claim.js
-```
-
-## 📊 Development Scripts
-
-```bash
-npm start          # Start production server
-npm run dev        # Start development server with nodemon
-npm test           # Run tests
-npm run lint       # Run ESLint
-npm run format     # Format code with Prettier
-npm run build      # Build (no-op for Node.js)
-```
-
-## 🔒 Security Features
-
-- ✅ **CORS** - Configured for specific origins
-- ✅ **Helmet.js** - Security headers
-- ✅ **Rate Limiting** - 100 requests per 15 minutes
-- ✅ **Input Validation** - Form data validation
-- ✅ **File Upload Limits** - 10MB max file size
-- ✅ **Environment Secrets** - Sensitive data in `.env`
-
-## 🚀 Deployment
-
-### Development
-
-```bash
-npm run dev
-```
-
-### Production
-
-```bash
-npm start
-```
-
-### Docker Production
-
-```bash
-docker build -t sbs-landing:1.0.0 .
-docker run -d -p 5000:5000 --env-file .env sbs-landing:1.0.0
-```
-
-### With Docker Compose
-
-```bash
-docker-compose -f docker-compose.yml up -d
-```
-
-## 📚 Documentation
-
-- [Complete Integration Setup Guide](../INTEGRATION_SETUP_GUIDE.md)
-- [Frontend Configuration](public/config.js)
-- [API Client](public/api-client.js)
-- [n8n Workflow](n8n-workflow-sbs-complete.json)
-
-## 🐛 Troubleshooting
-
-### Port 5000 already in use
-
-```bash
-lsof -i :5000
-kill -9 <PID>
-```
-
-### CORS errors
-
-- Check `ALLOWED_ORIGINS` in `.env`
-- Ensure frontend URL is in the list
-
-### File upload errors
-
-- Check file size (max 10MB)
-- Check file type (PDF, DOC, XLS, JSON, XML)
-- Check `UPLOAD_DIR` permissions
-
-### n8n connection issues
-
-- Verify `N8N_BASE_URL` in `.env`
-- Check n8n is running
-- Verify network connectivity
-
-## 📝 Logs
-
-Development:
-
-```bash
-npm run dev
-```
-
-Production:
-
-```bash
-LOG_LEVEL=debug npm start
-```
-
-View Docker logs:
-
-```bash
-docker-compose logs -f sbs-api
-```
-
-## 🤝 Contributing
-
-1. Create feature branch: `git checkout -b feature/name`
-2. Make changes
-3. Lint: `npm run lint`
-4. Format: `npm run format`
-5. Commit: `git commit -m "feat: description"`
-6. Push: `git push origin feature/name`
-7. Create Pull Request
-
-## 📄 License
-
-MIT License - See LICENSE file for details
-
-## 👨‍💻 Author
-
-**Dr. Mohamed El Fadil**
-BrainSAIT | Healthcare Technology
-
-## 📞 Support
-
-- 📖 [GitHub Issues](https://github.com/Fadil369/sbs/issues)
-- 💬 [GitHub Discussions](https://github.com/Fadil369/sbs/discussions)
-- 📧 Email: contact@brainsait.com
+- ✅ **Bilingual Support** - English & Arabic
+- ✅ **Claim Submission Form** - Upload and submit insurance claims
+- ✅ **n8n Workflow Integration** - Automatically triggers workflow on submission
+- ✅ **Direct SBS Integration** - Fallback to microservices if n8n unavailable
+- ✅ **Traefik Integration** - Auto SSL with Let's Encrypt
+- ✅ **Production Hardened** - Rate limiting, security headers, file validation
+- ✅ **Health Monitoring** - Built-in health checks and metrics
 
 ---
 
-**Last Updated:** January 2026
-**Version:** 1.0.0
-**Status:** Production Ready ✅
+## 📁 Project Structure
+
+```
+/root/sbs-landing/
+├── server.js                 # Express backend API
+├── public/
+│   ├── index.html           # Landing page HTML
+│   └── landing.js           # Frontend JavaScript
+├── Dockerfile               # Container configuration
+├── docker-compose.yml       # Deployment configuration
+├── deploy.sh                # Automated deployment script
+├── .env                     # Environment variables
+├── package.json             # Node.js dependencies
+└── README.md                # This file
+```
+
+---
+
+## 🔧 Architecture
+
+### Request Flow
+
+```
+User uploads claim
+     ↓
+Frontend (landing.js)
+     ↓
+Backend API (server.js)
+     ↓
+n8n Workflow Webhook
+     ↓
+├─→ 1. Normalizer Service (Port 8000)
+├─→ 2. Financial Rules (Port 8002)
+├─→ 3. Signer Service (Port 8001)
+└─→ 4. NPHIES Bridge (Port 8003)
+     ↓
+NPHIES Submission
+```
+
+### Technologies
+
+- **Frontend**: Vanilla JavaScript + Tailwind CSS
+- **Backend**: Node.js + Express
+- **Proxy**: Traefik (reverse proxy + SSL)
+- **Orchestration**: n8n workflows
+- **Containerization**: Docker
+
+---
+
+## 🚀 Quick Start
+
+### Option 1: Automated Deployment (Recommended)
+
+```bash
+cd /root/sbs-landing
+./deploy.sh
+```
+
+### Option 2: Manual Deployment
+
+```bash
+cd /root/sbs-landing
+
+# Build Docker image
+docker build -t sbs-landing:latest .
+
+# Deploy with Docker Compose
+docker compose up -d
+
+# Check status
+docker ps --filter "name=sbs-landing"
+
+# View logs
+docker logs sbs-landing -f
+```
+
+---
+
+## 🔗 n8n Workflow Integration
+
+### Step 1: Create Webhook in n8n
+
+1. Open n8n dashboard: https://n8n.srv791040.hstgr.cloud
+2. Create new workflow: "SBS Claim Submission"
+3. Add **Webhook** node:
+   - **Method**: POST
+   - **Path**: `sbs-claim-submission`
+   - **Response**: Return Data
+4. Configure workflow stages:
+
+```
+Webhook Trigger
+    ↓
+Data Validation
+    ↓
+Call Normalizer API
+    ↓
+Call Financial Rules API
+    ↓
+Call Signer API
+    ↓
+Call NPHIES Bridge API
+    ↓
+Send Notification Email
+    ↓
+Return Response
+```
+
+### Step 2: Update Environment Variables
+
+```bash
+# Edit .env file
+nano /root/sbs-landing/.env
+
+# Update this line with your webhook URL:
+N8N_WEBHOOK_URL=https://n8n.srv791040.hstgr.cloud/webhook/sbs-claim-submission
+```
+
+### Step 3: n8n Workflow Example (JSON)
+
+Save this as a new workflow in n8n:
+
+```json
+{
+  "nodes": [
+    {
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [250, 300],
+      "webhookId": "sbs-claim-submission",
+      "parameters": {
+        "path": "sbs-claim-submission",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "name": "Normalizer",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [450, 300],
+      "parameters": {
+        "url": "http://sbs-normalizer:8000/normalize",
+        "method": "POST",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={{ $json }}"
+      }
+    },
+    {
+      "name": "Financial Rules",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [650, 300],
+      "parameters": {
+        "url": "http://sbs-financial-rules:8002/validate",
+        "method": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "={{ $json }}"
+      }
+    },
+    {
+      "name": "Signer",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [850, 300],
+      "parameters": {
+        "url": "http://sbs-signer:8001/sign",
+        "method": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "={{ $json }}"
+      }
+    },
+    {
+      "name": "NPHIES Submit",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1050, 300],
+      "parameters": {
+        "url": "http://sbs-nphies-bridge:8003/submit",
+        "method": "POST",
+        "jsonParameters": true,
+        "bodyParametersJson": "={{ $json }}"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Normalizer", "type": "main", "index": 0}]]
+    },
+    "Normalizer": {
+      "main": [[{"node": "Financial Rules", "type": "main", "index": 0}]]
+    },
+    "Financial Rules": {
+      "main": [[{"node": "Signer", "type": "main", "index": 0}]]
+    },
+    "Signer": {
+      "main": [[{"node": "NPHIES Submit", "type": "main", "index": 0}]]
+    }
+  }
+}
+```
+
+---
+
+## 🌐 DNS Configuration
+
+### Current Setup
+
+```
+Domain: brainsait.cloud
+IP: 82.25.101.65
+IPv6: 2600:1901:0:84ef::
+```
+
+### Required DNS Records
+
+| Type | Name | Value | TTL |
+|------|------|-------|-----|
+| A | @ | 82.25.101.65 | 3600 |
+| A | www | 82.25.101.65 | 3600 |
+| AAAA | @ | 2600:1901:0:84ef:: | 3600 |
+| AAAA | www | 2600:1901:0:84ef:: | 3600 |
+
+✅ **DNS is already correctly configured!**
+
+---
+
+## 🔒 Security Features
+
+### Implemented
+
+- ✅ **Rate Limiting**: 100 requests per 15 minutes per IP
+- ✅ **File Validation**: Only allowed file types (PDF, DOC, XLS, JSON, XML, Images)
+- ✅ **File Size Limit**: Maximum 10MB
+- ✅ **Security Headers**: Helmet.js with strict CSP
+- ✅ **SSL/TLS**: Automatic Let's Encrypt certificates via Traefik
+- ✅ **CORS**: Configured for brainsait.cloud only
+- ✅ **Input Sanitization**: All form inputs validated
+
+### Traefik Security Headers
+
+```yaml
+- STSSeconds: 315360000 (10 years)
+- browserXSSFilter: true
+- contentTypeNosniff: true
+- forceSTSHeader: true
+- STSIncludeSubdomains: true
+- STSPreload: true
+- SSLRedirect: true
+```
+
+---
+
+## 📊 API Endpoints
+
+### Public Endpoints
+
+#### 1. Landing Page
+```
+GET https://brainsait.cloud/
+```
+
+#### 2. Submit Claim
+```
+POST https://brainsait.cloud/api/submit-claim
+Content-Type: multipart/form-data
+
+Fields:
+  - patientName: string (required)
+  - patientId: string (required)
+  - memberId: string
+  - payerId: string
+  - claimType: string (required) - professional|institutional|pharmacy|vision
+  - userEmail: string (required)
+  - claimFile: file (optional) - PDF, DOC, XLS, JSON, XML, images
+
+Response:
+{
+  "success": true,
+  "message": "Claim submitted successfully",
+  "claimId": "CLAIM-1737000000000",
+  "status": "processing",
+  "data": {
+    "patientId": "...",
+    "submissionId": "...",
+    "estimatedProcessingTime": "2-5 minutes"
+  }
+}
+```
+
+#### 3. Health Check
+```
+GET https://brainsait.cloud/health
+
+Response:
+{
+  "status": "healthy",
+  "service": "sbs-landing-api",
+  "timestamp": "2026-01-16T...",
+  "version": "1.0.0"
+}
+```
+
+#### 4. Service Status
+```
+GET https://brainsait.cloud/api/services/status
+
+Response:
+{
+  "success": true,
+  "timestamp": "...",
+  "services": [
+    { "service": "normalizer", "status": "healthy" },
+    { "service": "signer", "status": "healthy" },
+    ...
+  ],
+  "overallHealth": "healthy"
+}
+```
+
+#### 5. Claim Status
+```
+GET https://brainsait.cloud/api/claim-status/:claimId
+
+Response:
+{
+  "success": true,
+  "claimId": "CLAIM-123",
+  "status": "processing",
+  "lastUpdate": "...",
+  "stages": {
+    "validation": "completed",
+    "normalization": "completed",
+    "financialRules": "in-progress",
+    ...
+  }
+}
+```
+
+---
+
+## 🧪 Testing
+
+### 1. Test Landing Page
+
+```bash
+curl https://brainsait.cloud/
+```
+
+### 2. Test Health Endpoint
+
+```bash
+curl https://brainsait.cloud/health
+```
+
+### 3. Test Claim Submission
+
+```bash
+curl -X POST https://brainsait.cloud/api/submit-claim \
+  -F "patientName=Ahmed Hassan" \
+  -F "patientId=1234567890" \
+  -F "memberId=MEM123" \
+  -F "payerId=PAYER001" \
+  -F "claimType=professional" \
+  -F "userEmail=test@example.com" \
+  -F "claimFile=@sample-claim.pdf"
+```
+
+### 4. Test Services Status
+
+```bash
+curl https://brainsait.cloud/api/services/status | jq
+```
+
+---
+
+## 📈 Monitoring
+
+### View Logs
+
+```bash
+# Real-time logs
+docker logs sbs-landing -f
+
+# Last 100 lines
+docker logs sbs-landing --tail 100
+
+# Logs since 1 hour ago
+docker logs sbs-landing --since 1h
+```
+
+### Health Checks
+
+```bash
+# Container health
+docker ps --filter "name=sbs-landing" --format "{{.Status}}"
+
+# Application health
+curl -f https://brainsait.cloud/health
+```
+
+### Metrics
+
+```bash
+# Service metrics
+curl https://brainsait.cloud/api/metrics | jq
+
+# All SBS services
+curl https://brainsait.cloud/api/services/status | jq
+```
+
+---
+
+## 🛠 Maintenance
+
+### Restart Service
+
+```bash
+cd /root/sbs-landing
+docker compose restart
+```
+
+### Update Configuration
+
+```bash
+# Edit environment variables
+nano .env
+
+# Rebuild and redeploy
+docker compose down
+docker compose build
+docker compose up -d
+```
+
+### View Container Stats
+
+```bash
+docker stats sbs-landing
+```
+
+### Backup
+
+```bash
+# Backup entire directory
+tar -czf sbs-landing-backup-$(date +%Y%m%d).tar.gz /root/sbs-landing
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### Issue: Container won't start
+
+```bash
+# Check logs
+docker logs sbs-landing
+
+# Check if port 3000 is in use
+netstat -tlnp | grep 3000
+
+# Rebuild without cache
+docker compose build --no-cache
+docker compose up -d
+```
+
+### Issue: Can't access via domain
+
+```bash
+# Check Traefik logs
+docker logs n8n-traefik-1
+
+# Verify DNS
+host brainsait.cloud
+
+# Check SSL certificate
+curl -vI https://brainsait.cloud 2>&1 | grep -i "ssl\|certificate"
+```
+
+### Issue: n8n webhook not working
+
+```bash
+# Test webhook directly
+curl -X POST https://n8n.srv791040.hstgr.cloud/webhook/sbs-claim-submission \
+  -H "Content-Type: application/json" \
+  -d '{"test": "data"}'
+
+# Check n8n logs
+docker logs n8n-n8n-1
+
+# Verify webhook URL in .env
+cat /root/sbs-landing/.env | grep N8N_WEBHOOK_URL
+```
+
+---
+
+## 📞 Support
+
+### Documentation
+
+- **Full Audit Report**: `/root/SBS_N8N_INTEGRATION_AUDIT_REPORT.md`
+- **Production Guide**: `/root/PRODUCTION_READY_VERIFICATION.md`
+- **Next Steps**: `/root/NEXT_STEPS_PRODUCTION.md`
+
+### External Links
+
+- **Blog/Docs**: https://brainsait369.blogspot.com/
+- **BrainSAIT**: https://github.com/enterprises/brainsait
+- **Author**: https://github.com/Fadil369
+
+---
+
+## ✅ Deployment Checklist
+
+- [ ] DNS records configured correctly
+- [ ] Traefik running with SSL
+- [ ] n8n workflow created with webhook
+- [ ] Environment variables configured
+- [ ] Docker image built successfully
+- [ ] Container deployed and healthy
+- [ ] Landing page accessible at https://brainsait.cloud
+- [ ] Claim submission form working
+- [ ] n8n workflow triggered successfully
+- [ ] SBS microservices responding
+- [ ] Health checks passing
+- [ ] Metrics endpoint working
+
+---
+
+**Generated**: January 16, 2026  
+**Version**: 1.0.0  
+**Status**: ✅ Production Ready
+
+**Powered by BrainSAIT برينسايت**  
+**Author**: Dr. Mohamed El Fadil

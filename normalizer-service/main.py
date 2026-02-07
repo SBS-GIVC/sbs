@@ -8,13 +8,15 @@ Improvements:
 - Request ID tracking
 """
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, validator
 from typing import Optional
 import os
+import sys
 from dotenv import load_dotenv
+import hashlib
 import time
 from datetime import datetime
 import uuid
@@ -22,16 +24,18 @@ from contextlib import contextmanager
 import psycopg2
 from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
-from collections import deque
-from threading import Lock
-import logging
+
+# Add parent directory to path for shared module import
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from shared import RateLimiter, setup_logging, format_database_error
 
 from copilot_routes import router as copilot_router
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Setup structured logging
+logger = setup_logging("normalizer-service", log_level=os.getenv("LOG_LEVEL", "INFO"))
+
 app = FastAPI(
     title="SBS Normalizer Service - Enhanced",
     description="AI-Powered code normalization with rate limiting and monitoring",
@@ -41,7 +45,7 @@ app = FastAPI(
 # Internal copilot endpoint (safe-by-default). Used by Landing when available.
 app.include_router(copilot_router)
 
-# CORS middleware
+# CORS middleware (restricted)
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS") or os.getenv("CORS_ORIGIN")
 allowed_origins = (
     [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
@@ -54,8 +58,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=allow_credentials,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
 )
 
 # Database connection pool
@@ -69,42 +73,12 @@ try:
         password=os.getenv("DB_PASSWORD"),
         port=os.getenv("DB_PORT", "5432")
     )
-    print("✓ Database connection pool created")
+    logger.info("Database connection pool created successfully")
 except Exception as e:
-    print(f"✗ Failed to create connection pool: {e}")
+    logger.error(f"Failed to create connection pool: {format_database_error(e)}")
     db_pool = None
 
-
-# Rate limiter implementation
-class RateLimiter:
-    """Token bucket rate limiter"""
-    def __init__(self, max_requests: int = 100, time_window: int = 60):
-        self.max_requests = max_requests
-        self.time_window = time_window
-        self.requests = {}
-        self.lock = Lock()
-
-    def is_allowed(self, identifier: str) -> bool:
-        """Check if request is allowed for given identifier"""
-        with self.lock:
-            now = time.time()
-
-            if identifier not in self.requests:
-                self.requests[identifier] = deque()
-
-            # Remove old requests outside time window
-            while self.requests[identifier] and self.requests[identifier][0] < now - self.time_window:
-                self.requests[identifier].popleft()
-
-            # Check if under limit
-            if len(self.requests[identifier]) < self.max_requests:
-                self.requests[identifier].append(now)
-                return True
-
-            return False
-
-
-# Initialize rate limiter (100 requests per minute per IP)
+# Initialize rate limiter (100 requests per minute per IP) - using shared module
 rate_limiter = RateLimiter(max_requests=100, time_window=60)
 
 # Metrics storage (in production, use Prometheus)
@@ -117,7 +91,6 @@ metrics = {
     "cache_misses": 0,
     "ai_calls": 0
 }
-
 
 @contextmanager
 def get_db_connection():
@@ -138,7 +111,7 @@ def get_db_connection():
             )
             yield conn
     except Exception as e:
-        print(f"Database connection error: {e}")
+        logger.error(f"Database connection error: {format_database_error(e)}")
         raise
     finally:
         if conn and db_pool:
@@ -151,17 +124,38 @@ class InternalClaimItem(BaseModel):
     facility_id: int = Field(..., description="Unique facility identifier", ge=1)
     internal_code: str = Field(..., description="Internal service code from HIS", min_length=1, max_length=100)
     description: str = Field(..., description="Service description", min_length=1, max_length=500)
-
+    
     @validator('internal_code')
     def validate_code(cls, v):
-        # Prevent SQL injection attempts
-        if any(char in v for char in [';', '--', '/*', '*/']):
-            raise ValueError('Invalid characters in code')
+        import re
+        # Prevent SQL injection and command injection attempts
+        dangerous_patterns = [
+            r';', r'--', r'/\*', r'\*/', r'\\', r'\x00',  # SQL injection
+            r'\$\(', r'`', r'\|', r'&&', r'\|\|',  # Command injection
+            r'<script', r'javascript:', r'data:',  # XSS
+            r'\.\./', r'\.\.\\',  # Path traversal
+        ]
+        v_lower = v.lower()
+        for pattern in dangerous_patterns:
+            if re.search(pattern, v_lower):
+                raise ValueError('Invalid characters in code')
+        # Only allow alphanumeric, hyphen, underscore, and period
+        if not re.match(r'^[a-zA-Z0-9_\-\.]+$', v):
+            raise ValueError('Code must contain only alphanumeric characters, hyphens, underscores, and periods')
         return v.strip()
-
+    
     @validator('description')
     def validate_description(cls, v):
-        return v.strip()
+        import re
+        # Sanitize description - remove potentially dangerous content
+        dangerous_patterns = [
+            r'<script.*?>.*?</script>', r'javascript:', r'on\w+\s*=',  # XSS
+            r'\.\./', r'\.\.\\',  # Path traversal
+        ]
+        v_clean = v
+        for pattern in dangerous_patterns:
+            v_clean = re.sub(pattern, '', v_clean, flags=re.IGNORECASE)
+        return v_clean.strip()
 
 
 class NormalizedResponse(BaseModel):
@@ -181,13 +175,13 @@ async def add_request_id(request: Request, call_next):
     request_id = str(uuid.uuid4())
     request.state.request_id = request_id
     request.state.start_time = time.time()
-
+    
     response = await call_next(request)
-
+    
     response.headers["X-Request-ID"] = request_id
     processing_time = (time.time() - request.state.start_time) * 1000
     response.headers["X-Processing-Time-MS"] = f"{processing_time:.2f}"
-
+    
     return response
 
 
@@ -197,10 +191,10 @@ async def rate_limit_middleware(request: Request, call_next):
     # Skip rate limiting for health check
     if request.url.path == "/health" or request.url.path == "/metrics":
         return await call_next(request)
-
+    
     # Get client identifier (IP address)
     client_ip = request.client.host
-
+    
     if not rate_limiter.is_allowed(client_ip):
         metrics["rate_limited"] += 1
         return JSONResponse(
@@ -211,7 +205,7 @@ async def rate_limit_middleware(request: Request, call_next):
                 "retry_after_seconds": 60
             }
         )
-
+    
     return await call_next(request)
 
 
@@ -231,14 +225,40 @@ async def health_check():
             "version": "2.0.0",
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception:
-        logger.exception("Health check failed")
+    except Exception as e:
         return JSONResponse(
             status_code=503,
             content={
                 "status": "unhealthy",
                 "database": "disconnected",
-                "error": "Internal error during health check"
+                "error": str(e)
+            }
+        )
+
+
+@app.get("/ready")
+async def ready_check():
+    """Readiness probe endpoint for Kubernetes"""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.close()
+
+        return {
+            "status": "ready",
+            "database": "connected",
+            "pool_available": db_pool is not None,
+            "version": "2.0.0",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "not_ready",
+                "database": "disconnected",
+                "error": str(e)
             }
         )
 
@@ -261,19 +281,19 @@ async def normalize_code(claim_item: InternalClaimItem, request: Request):
     """
     start_time = time.time()
     metrics["requests_total"] += 1
-
+    
     request_id = request.state.request_id
-
+    
     try:
         # Step 1: Check local mapping database
         result = lookup_local_mapping(claim_item.facility_id, claim_item.internal_code)
-
+        
         if result:
             metrics["requests_success"] += 1
             metrics["cache_hits"] += 1
-
+            
             processing_time = (time.time() - start_time) * 1000
-
+            
             return NormalizedResponse(
                 sbs_mapped_code=result['sbs_code'],
                 official_description=result['description_en'],
@@ -284,11 +304,11 @@ async def normalize_code(claim_item: InternalClaimItem, request: Request):
                 request_id=request_id,
                 processing_time_ms=round(processing_time, 2)
             )
-
+        
         # If not found, return appropriate error
         metrics["cache_misses"] += 1
         metrics["requests_failed"] += 1
-
+        
         raise HTTPException(
             status_code=404,
             detail={
@@ -297,7 +317,7 @@ async def normalize_code(claim_item: InternalClaimItem, request: Request):
                 "request_id": request_id
             }
         )
-
+        
     except HTTPException:
         raise
     except Exception as e:
@@ -319,9 +339,9 @@ def lookup_local_mapping(facility_id: int, internal_code: str) -> Optional[dict]
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(cursor_factory=RealDictCursor)
-
+            
             query = """
-            SELECT
+            SELECT 
                 snm.sbs_code,
                 snm.confidence,
                 snm.mapping_source,
@@ -330,22 +350,22 @@ def lookup_local_mapping(facility_id: int, internal_code: str) -> Optional[dict]
             FROM sbs_normalization_map snm
             JOIN facility_internal_codes fic ON snm.internal_code_id = fic.internal_code_id
             JOIN sbs_master_catalogue smc ON snm.sbs_code = smc.sbs_id
-            WHERE fic.facility_id = %s
-              AND fic.internal_code = %s
+            WHERE fic.facility_id = %s 
+              AND fic.internal_code = %s 
               AND snm.is_active = TRUE
               AND fic.is_active = TRUE
             LIMIT 1
             """
-
+            
             cursor.execute(query, (facility_id, internal_code))
             result = cursor.fetchone()
-
+            
             cursor.close()
-
+            
             return dict(result) if result else None
-
+            
     except Exception as e:
-        print(f"Database lookup error: {e}")
+        logger.error(f"Database lookup error: {format_database_error(e)}")
         return None
 
 
@@ -354,7 +374,7 @@ def shutdown_event():
     """Cleanup on shutdown"""
     if db_pool:
         db_pool.closeall()
-        print("✓ Database connection pool closed")
+        logger.info("Database connection pool closed")
 
 
 if __name__ == "__main__":

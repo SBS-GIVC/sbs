@@ -42,9 +42,9 @@ jobs:
 
       - name: Check for breaking changes
         run: |
-          PR_TITLE="${{ github.event.pull_request.title }}"
-          PR_BODY="${{ github.event.pull_request.body }}"
-          
+          PR_TITLE="$(jq -r '.pull_request.title // ""' "$GITHUB_EVENT_PATH")"
+          PR_BODY="$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH")"
+
           if [[ "$PR_TITLE" == *"!"* ]] || [[ "$PR_BODY" == *"BREAKING CHANGE"* ]]; then
             echo "⚠️ This PR contains breaking changes!"
             echo "::warning::This PR contains breaking changes. Please ensure migration guide is provided."

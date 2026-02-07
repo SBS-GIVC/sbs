@@ -1,0 +1,10 @@
+{
+  "source": "CHI SBS V3 to SNOMED Map",
+  "count": 9943,
+  "mappings": [
+    {
+      "column_1": "SBS V3 to SNOMED CT"
+    },
+    {
+      "column_1": "Date Published",
+      "column_3": 
