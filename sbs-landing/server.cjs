@@ -466,8 +466,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID']
 }));
-app.use(express.json({ limit: '1mb' })); // Limit JSON body size
-app.use(express.urlencoded({ extended: true }));
+// Middleware moved to top
 
 // Serve static files
 app.use(express.static('public'));
