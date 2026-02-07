@@ -11,8 +11,6 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 import httpx
 import json
-import os
-import sys
 from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -20,10 +18,12 @@ from datetime import datetime
 import asyncio
 import uuid
 import time
+import sys
+import os
 
 # Add parent directory to path for shared module import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from shared import RateLimiter, setup_logging, format_database_error
+from shared import RateLimiter, setup_logging, format_database_error  # noqa: E402
 
 load_dotenv()
 

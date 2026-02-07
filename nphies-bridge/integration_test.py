@@ -165,7 +165,7 @@ class ComprehensiveIntegrationTest:
                 user_friendly=True
             )
             
-            if error_response.get("success") == False and "error" in error_response:
+            if error_response.get("success") is False and "error" in error_response:
                 print("  ✓ User-friendly error response created")
                 
                 self.test_results.append({

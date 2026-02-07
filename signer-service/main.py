@@ -12,8 +12,6 @@ from typing import Dict, Any
 import json
 import hashlib
 import base64
-import os
-import sys
 import uuid
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
@@ -23,10 +21,12 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
 import time
+import sys
+import os
 
 # Add parent directory to path for shared module import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from shared import RateLimiter, setup_logging, format_database_error
+from shared import RateLimiter, setup_logging, format_database_error  # noqa: E402
 
 load_dotenv()
 
