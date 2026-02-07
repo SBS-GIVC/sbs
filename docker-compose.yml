@@ -351,7 +351,7 @@ services:
       - MASTERLINC_URL=http://masterlinc-bridge:4000
       - REDIS_URL=redis://redis:6379
     ports:
-      - "127.0.0.1:3000:3000"  # Bind to localhost only for security
+      - "127.0.0.1:3005:3000"  # Bind to localhost only for security (Mapped to 3005 to avoid SSH tunnel conflicts on 3000)
     depends_on:
       - n8n
       - redis
