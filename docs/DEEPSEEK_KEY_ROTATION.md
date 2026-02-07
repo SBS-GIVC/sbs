@@ -51,7 +51,7 @@ export AI_PROVIDER=deepseek  # optional
 The normalizer service uses `feature_flags.py` to control AI provider selection:
 
 ```python
-from normalizer-service.feature_flags import get_ai_provider
+from feature_flags import get_ai_provider
 
 provider = get_ai_provider()
 # Returns: 'gemini' | 'deepseek' | 'disabled'

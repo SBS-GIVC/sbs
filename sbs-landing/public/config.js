@@ -14,6 +14,8 @@
     }
   })();
 
-  // If set, this should be an origin (e.g. https://landing.example.com)
+  // Default is same-origin (empty string => relative URLs).
+  // If you host the UI separately, set localStorage[SBS_API_BASE_URL] to an origin
+  // (e.g. https://landing.example.com). Never store API keys here.
   window.SBS_API_BASE_URL = (fromStorage || '').trim();
 })();

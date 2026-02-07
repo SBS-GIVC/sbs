@@ -60,11 +60,11 @@ cd sbs-integration-engine
 cp .env.example .env
 # Edit .env with your credentials
 
-# Start all services
-docker-compose up -d
+# Start the full stack (recommended)
+docker compose -f docker-compose.services.yml up -d
 
 # Check service health
-docker-compose ps
+docker compose -f docker-compose.services.yml ps
 ```
 
 ## 🔧 Environment Configuration

@@ -18,6 +18,7 @@ from typing import Any, Dict, Optional
 import os
 import re
 import time
+import json
 
 import requests
 
@@ -40,10 +41,24 @@ class CopilotChatResponse(BaseModel):
     safety: Dict[str, Any]
 
 
+# Ensure models are fully built even when this module is loaded dynamically.
+CopilotChatRequest.model_rebuild()
+CopilotChatResponse.model_rebuild()
+
+
 _SECRET_PATTERNS = [
     re.compile(r"sk-[A-Za-z0-9]{10,}"),
     re.compile(r"DEEPSEEK_API_KEY\s*=?\s*[A-Za-z0-9\-_.]{10,}", re.IGNORECASE),
     re.compile(r"GEMINI_API_KEY\s*=?\s*[A-Za-z0-9\-_.]{10,}", re.IGNORECASE),
+]
+
+_PHI_PATTERNS = [
+    # English hints
+    re.compile(r"\b(iqama|national\s*id|patient\s*name|mrn|medical\s*record)\b", re.IGNORECASE),
+    re.compile(r"\b(phone|email|address)\b", re.IGNORECASE),
+    re.compile(r"\b\d{7,}\b"),  # long numeric identifiers
+    # Arabic hints
+    re.compile(r"(هوية|إقامة|اقامة|اسم\s*المريض|رقم\s*الهوية|السجل\s*الطبي|جوال|عنوان|بريد)")
 ]
 
 
@@ -52,6 +67,57 @@ def _redact(text: str) -> str:
     for pat in _SECRET_PATTERNS:
         out = pat.sub("[REDACTED]", out)
     return out
+
+
+def _phi_suspected(text: str) -> bool:
+    if not text:
+        return False
+    hits = 0
+    for pat in _PHI_PATTERNS:
+        if pat.search(text):
+            hits += 1
+    # Require more than one signal to reduce false positives.
+    return hits >= 2
+
+
+def _ensure_structured_json_reply(raw: str) -> str:
+    """Ensure the reply is a strict JSON object string.
+
+    The system prompt asks for JSON-only responses, but we enforce it defensively.
+    """
+    raw = str(raw or "").strip()
+    if not raw:
+        raw = "{}"
+
+    def wrap(text: str) -> dict:
+        return {
+            "reply": text.strip() or "No response",
+            "category": "unknown",
+            "actions": [],
+            "warnings": [],
+            "confidence": 0.35,
+        }
+
+    try:
+        obj = json.loads(raw)
+        if not isinstance(obj, dict):
+            obj = wrap(raw)
+    except Exception:
+        obj = wrap(raw)
+
+    # Normalize keys
+    if "reply" not in obj:
+        obj["reply"] = raw
+    if obj.get("category") not in {"ops", "coding", "nphies", "security", "unknown"}:
+        obj["category"] = "unknown"
+    if not isinstance(obj.get("actions"), list):
+        obj["actions"] = []
+    if not isinstance(obj.get("warnings"), list):
+        obj["warnings"] = []
+    if not isinstance(obj.get("confidence"), (int, float)):
+        obj["confidence"] = 0.35
+
+    return json.dumps(obj, ensure_ascii=False)
 
 
 def _truncate(text: str, max_len: int = 2000) -> str:
@@ -131,6 +197,24 @@ def _call_llm_gateway(provider: str, message: str, context: Optional[Dict[str, A
 def copilot_chat(req: CopilotChatRequest):
     provider = feature_flags.get_ai_provider()
 
+    # Compliance: refuse PHI/PII content (never forward).
+    if _phi_suspected(req.message):
+        reply = {
+            "reply": "I can’t help with PHI/PII. Remove identifiers (patient name, national ID/Iqama, MRN, phone, email, address) and ask using de-identified inputs (claimId, stage names, codes, errors).",
+            "category": "security",
+            "actions": ["Redact identifiers", "Use claimId + stage status only"],
+            "warnings": ["PHI/PII suspected; request refused"],
+            "confidence": 0.95,
+        }
+        return {
+            "success": True,
+            "provider": "deterministic",
+            "model": "Deterministic Safety HUD (PHI refusal)",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "reply": _truncate(_redact(json.dumps(reply, ensure_ascii=False))),
+            "safety": {"mode": "offline", "redaction": True, "phiRefusal": True, "maxLen": 2000},
+        }
+
     # Safety: do not allow AI provider if disabled.
     if provider == "disabled":
         reply = _deterministic_reply(req.message, req.context)
@@ -171,7 +255,8 @@ def copilot_chat(req: CopilotChatRequest):
         if not reply:
             raise HTTPException(status_code=502, detail="Invalid copilot gateway response")
 
-        reply = _truncate(_redact(str(reply)))
+        reply = _ensure_structured_json_reply(str(reply))
+        reply = _truncate(_redact(reply))
         return {
             "success": True,
             "provider": provider,
@@ -191,4 +276,16 @@ def copilot_chat(req: CopilotChatRequest):
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "reply": reply,
             "safety": {"mode": "offline", "redaction": True, "maxLen": 2000, "gatewayError": str(e)},
+        }
+
+    except Exception as e:
+        # Fail closed: deterministic.
+        reply = _truncate(_redact(_ensure_structured_json_reply(_deterministic_reply(req.message, req.context))))
+        return {
+            "success": True,
+            "provider": "deterministic",
+            "model": "Deterministic Safety HUD (unexpected error)",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "reply": reply,
+            "safety": {"mode": "offline", "redaction": True, "maxLen": 2000, "error": str(e)},
         }

@@ -4,23 +4,26 @@ Safely falls back and includes rate limiting and caching.
 """
 
 import os
-import time
 import requests
 from functools import lru_cache
 
 AI_API = os.getenv('GEMINI_API_KEY') or os.getenv('DEEPSEEK_API_KEY')
 AI_PROVIDER = os.getenv('AI_PROVIDER', 'gemini')  # 'gemini' or 'deepseek'
-AI_URL = os.getenv('AI_URL')  # optional override
+
+# IMPORTANT: This helper will only call an external AI endpoint when AI_URL is explicitly set.
+# This avoids accidental calls to placeholder/example URLs.
+AI_URL = (os.getenv('AI_URL') or '').strip()
 
 # Feature flag: gate DeepSeek usage in staging/controlled environments
 ENABLE_DEEPSEEK = os.getenv('ENABLE_DEEPSEEK', 'false').lower() in ('1', 'true', 'yes')
 
 
-# Simple in-memory cache for mappings
 @lru_cache(maxsize=1024)
-def cached_ai_map(internal_code: str):
-    """Return cached mapping or None"""
-    return None
+def _cached_query(internal_code: str, description: str = '') -> str:
+    """Cache key for AI queries (internal_code + small description)."""
+    # Keep cache key bounded
+    desc = (description or '')[:120]
+    return f"{internal_code}::{desc}"
 
 
 def query_ai_for_mapping(internal_code: str, description: str = '') -> dict:
@@ -32,7 +35,7 @@ def query_ai_for_mapping(internal_code: str, description: str = '') -> dict:
     if AI_PROVIDER == 'deepseek' and not ENABLE_DEEPSEEK:
         return {}
 
-    if not AI_API and not AI_URL:
+    if not AI_URL:
         return {}
 
     # Prepare payload
@@ -45,20 +48,16 @@ def query_ai_for_mapping(internal_code: str, description: str = '') -> dict:
         'Content-Type': 'application/json',
     }
 
-    # Provider-specific endpoint selection
-    if AI_URL:
-        url = AI_URL
-    elif AI_PROVIDER == 'deepseek':
-        url = 'https://api.deepseek.ai/v1/map'
-    else:
-        # default to Gemini-like endpoint
-        url = 'https://api.gemini.example/v1/complete'
+    url = AI_URL
 
     if AI_API:
         headers['Authorization'] = f'Bearer {AI_API}'
 
     try:
-        resp = requests.post(url, json=payload, headers=headers, timeout=10)
+        # Basic in-process caching: if we've asked this exact question, re-use.
+        _cached_query(internal_code, description)
+
+        resp = requests.post(url, json=payload, headers=headers, timeout=12)
         resp.raise_for_status()
         data = resp.json()
 

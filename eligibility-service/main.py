@@ -13,6 +13,7 @@ or payer-specific endpoints) without changing the Landing UI.
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
@@ -94,13 +95,28 @@ def check(req: EligibilityRequest):
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
 
-        r = requests.post(url, json=req.model_dump(), headers=headers, timeout=12)
-        r.raise_for_status()
-        data = r.json()
-        # Pass-through but ensure expected fields exist.
+        try:
+            r = requests.post(url, json=req.model_dump(), headers=headers, timeout=12)
+            r.raise_for_status()
+            data = r.json()
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Eligibility upstream error: {e}")
+
         if not isinstance(data, dict) or "eligible" not in data:
-            raise ValueError("Invalid upstream eligibility response")
-        return data
+            raise HTTPException(status_code=502, detail="Invalid upstream eligibility response")
+
+        # Normalize into our schema with safe defaults.
+        return EligibilityResponse(
+            timestamp=str(data.get("timestamp") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
+            memberId=str(data.get("memberId") or req.memberId),
+            payerId=data.get("payerId") or req.payerId,
+            eligible=bool(data.get("eligible")),
+            plan=str(data.get("plan") or ("GOLD" if data.get("eligible") else "UNKNOWN")),
+            benefits=list(data.get("benefits") or []),
+            coverage=dict(data.get("coverage") or {}),
+            notes=str(data.get("notes") or "Eligibility verified (upstream)"),
+            source=str(data.get("source") or "upstream"),
+        )
 
     # Local deterministic behavior (safe, offline)
     eligible = not req.memberId.strip().endswith("0")
