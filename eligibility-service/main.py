@@ -105,18 +105,45 @@ def check(req: EligibilityRequest):
         if not isinstance(data, dict) or "eligible" not in data:
             raise HTTPException(status_code=502, detail="Invalid upstream eligibility response")
 
-        # Normalize into our schema with safe defaults.
-        return EligibilityResponse(
-            timestamp=str(data.get("timestamp") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
-            memberId=str(data.get("memberId") or req.memberId),
-            payerId=data.get("payerId") or req.payerId,
-            eligible=bool(data.get("eligible")),
-            plan=str(data.get("plan") or ("GOLD" if data.get("eligible") else "UNKNOWN")),
-            benefits=list(data.get("benefits") or []),
-            coverage=dict(data.get("coverage") or {}),
-            notes=str(data.get("notes") or "Eligibility verified (upstream)"),
-            source=str(data.get("source") or "upstream"),
-        )
+        # Normalize into our schema with safe defaults for missing fields
+        # Handles cases where upstream response is missing required EligibilityResponse fields
+        timestamp = data.get("timestamp") or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        member_id = data.get("memberId") or req.memberId
+        payer_id = data.get("payerId") or req.payerId
+        eligible = bool(data.get("eligible"))
+        plan = data.get("plan") or ("GOLD" if eligible else "UNKNOWN")
+        benefits = list(data.get("benefits") or [])
+        coverage = dict(data.get("coverage") or {})
+        notes = data.get("notes") or "Eligibility verified (upstream)"
+        source = data.get("source") or "upstream"
+
+        # Safe construction with explicit defaults to prevent validation errors
+        try:
+            return EligibilityResponse(
+                timestamp=str(timestamp),
+                memberId=str(member_id),
+                payerId=payer_id,
+                eligible=eligible,
+                plan=str(plan),
+                benefits=benefits,
+                coverage=coverage,
+                notes=str(notes),
+                source=str(source),
+            )
+        except Exception as e:
+            # If response validation still fails, use local fallback
+            eligible_fallback = not req.memberId.strip().endswith("0")
+            return EligibilityResponse(
+                timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                memberId=req.memberId,
+                payerId=req.payerId,
+                eligible=eligible_fallback,
+                plan="GOLD" if eligible_fallback else "UNKNOWN",
+                benefits=["OP", "IP", "PHARMACY"] if eligible_fallback else [],
+                coverage={"deductibleRemaining": 0 if eligible_fallback else None, "copay": 0.1 if eligible_fallback else None, "network": "IN" if eligible_fallback else "—"},
+                notes=f"Upstream validation failed ({str(e)}), using local fallback",
+                source="local-fallback",
+            )
 
     # Local deterministic behavior (safe, offline)
     eligible = not req.memberId.strip().endswith("0")

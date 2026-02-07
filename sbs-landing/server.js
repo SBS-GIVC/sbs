@@ -1041,6 +1041,11 @@ async function processDirectSBS(claim, claimData) {
     // The normalizer currently supports deterministic DB mappings only.
     // For end-to-end workflow testing, map claim types to sample internal codes
     // seeded in `database/schema.sql`.
+    // Configuration priority:
+    // 1. CLAIM_INTERNAL_CODE_MAP_JSON env variable (JSON format: {"professional":"CONS-...", ...})
+    // 2. Database facility_internal_codes table (requires DB connection)
+    // 3. Default fallback codes for each claim type
+
     const defaultInternalCodesByType = {
       professional: 'CONS-GEN-01',
       institutional: 'RAD-CXR-01',
@@ -1048,7 +1053,7 @@ async function processDirectSBS(claim, claimData) {
       vision: 'RAD-CXR-01'
     };
 
-    // Optional override (JSON): {"professional":"CONS-...","institutional":"RAD-..."}
+    // Load mapping from environment or use defaults
     let internalCodeMap = defaultInternalCodesByType;
     if (process.env.CLAIM_INTERNAL_CODE_MAP_JSON) {
       try {
@@ -1057,7 +1062,8 @@ async function processDirectSBS(claim, claimData) {
           internalCodeMap = { ...defaultInternalCodesByType, ...parsed };
         }
       } catch {
-        // ignore invalid JSON
+        // ignore invalid JSON, use defaults
+        console.warn('Invalid CLAIM_INTERNAL_CODE_MAP_JSON, using defaults');
       }
     }
 

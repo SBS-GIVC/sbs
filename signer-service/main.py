@@ -14,6 +14,7 @@ import hashlib
 import base64
 import os
 import sys
+import uuid
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.backends import default_backend
@@ -97,10 +98,7 @@ def get_facility_certificate(facility_id: int) -> Dict:
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
         query = """
-    rate_limiter = RateLimiter(
-        requests_per_minute=int(os.getenv("RATE_LIMIT_RPM", "60")),
-        burst_limit=int(os.getenv("RATE_LIMIT_BURST", "10"))
-    )
+        SELECT 
             cert_id,
             serial_number,
             private_key_path,
@@ -123,9 +121,19 @@ def get_facility_certificate(facility_id: int) -> Dict:
         conn.close()
         
         if not result:
+            error_id = str(uuid.uuid4())
+            logger.warning(
+                "No valid signing certificate found for facility %s (error_id=%s)",
+                facility_id,
+                error_id
+            )
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No valid signing certificate found for facility {facility_id}"
+                detail={
+                    "error": "No valid signing certificate found",
+                    "error_code": "SIGNER_CERT_NOT_FOUND",
+                    "error_id": error_id
+                }
             )
         
         return dict(result)
@@ -133,9 +141,20 @@ def get_facility_certificate(facility_id: int) -> Dict:
     except HTTPException:
         raise
     except Exception as e:
+        error_id = str(uuid.uuid4())
+        logger.exception(
+            "Error retrieving certificate for facility %s (error_id=%s): %s",
+            facility_id,
+            error_id,
+            str(e)
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving certificate: {str(e)}"
+            detail={
+                "error": "Error retrieving certificate",
+                "error_code": "SIGNER_CERT_RETRIEVE_ERROR",
+                "error_id": error_id
+            }
         )
 
 
@@ -152,14 +171,20 @@ def load_private_key(key_path: str) -> rsa.RSAPrivateKey:
         key_path = os.path.abspath(os.path.normpath(key_path))
 
         if os.path.commonpath([base_cert_dir, key_path]) != base_cert_dir:
+            error_id = str(uuid.uuid4())
             logger.warning(
-                "Blocked private key path traversal: base=%s resolved=%s",
+                "Blocked private key path traversal: base=%s resolved=%s (error_id=%s)",
                 base_cert_dir,
-                key_path
+                key_path,
+                error_id
             )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": "Invalid certificate path", "error_code": "SIGNER_CERT_PATH_INVALID"}
+                detail={
+                    "error": "Invalid certificate path",
+                    "error_code": "SIGNER_CERT_PATH_INVALID",
+                    "error_id": error_id
+                }
             )
 
         with open(key_path, "rb") as key_file:
@@ -172,18 +197,36 @@ def load_private_key(key_path: str) -> rsa.RSAPrivateKey:
         return private_key
         
     except FileNotFoundError:
-        logger.error("Private key file not found (resolved path=%s)", key_path)
+        error_id = str(uuid.uuid4())
+        logger.error(
+            "Private key file not found: %s (error_id=%s)",
+            key_path,
+            error_id
+        )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": "Private key file not found", "error_code": "SIGNER_PRIVATE_KEY_NOT_FOUND"}
+            detail={
+                "error": "Private key file not found",
+                "error_code": "SIGNER_PRIVATE_KEY_NOT_FOUND",
+                "error_id": error_id
+            }
         )
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Error loading private key (resolved path=%s)", key_path)
+        error_id = str(uuid.uuid4())
+        logger.exception(
+            "Error loading private key: %s (error_id=%s)",
+            key_path,
+            error_id
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "Error loading private key", "error_code": "SIGNER_PRIVATE_KEY_LOAD_ERROR"}
+            detail={
+                "error": "Error loading private key",
+                "error_code": "SIGNER_PRIVATE_KEY_LOAD_ERROR",
+                "error_id": error_id
+            }
         )
 
 def load_private_key_from_env() -> rsa.RSAPrivateKey | None:
