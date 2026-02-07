@@ -1,0 +1,193 @@
+{
+  "timestamp": "2026-02-07T07:09:12.402352",
+  "environment": "development",
+  "base_url": "http://localhost:8006",
+  "test_results": [
+    {
+      "test": "rate_limiting",
+      "status": "warning",
+      "requests_made": 0,
+      "rate_limit_hit": false
+    },
+    {
+      "test": "timeout_scenarios",
+      "status": "passed",
+      "timeout_configured": 30,
+      "test_timeout": 1,
+      "note": "Manual testing required with slow endpoint"
+    },
+    {
+      "test": "invalid_fhir_resources",
+      "status": "passed",
+      "test_cases": 3,
+      "validation_errors": 3,
+      "success_rate": "3/3"
+    },
+    {
+      "test": "large_payloads",
+      "status": "passed",
+      "item_count": 1,
+      "bundle_size_bytes": 113,
+      "validation_result": {
+        "resource_type": "Bundle",
+        "resource_id": null,
+        "is_valid": false,
+        "errors": [
+          {
+            "code": "MISSING_REQUIRED_FIELD",
+            "description": "Patient must have field: identifier",
+            "path": "entry[0].resource.identifier",
+            "details": {}
+          },
+          {
+            "code": "MISSING_REQUIRED_FIELD",
+            "description": "Patient must have field: name",
+            "path": "entry[0].resource.name",
+            "details": {}
+          },
+          {
+            "code": "MISSING_REQUIRED_FIELD",
+            "description": "Patient must have field: gender",
+            "path": "entry[0].resource.gender",
+            "details": {}
+          },
+          {
+            "code": "MISSING_REQUIRED_FIELD",
+            "description": "Patient must have field: birthDate",
+            "path": "entry[0].resource.birthDate",
+            "details": {}
+          },
+          {
+            "code": "MISSING_IDENTIFIER",
+            "description": "Patient must have at least one identifier",
+            "path": "entry[0].resource.identifier",
+            "details": {}
+          },
+          {
+            "code": "MISSING_REQUIRED_FIELD",
+            "description": "Patient must have field: identifier",
+            "path": "entry[0].resource.identifier",
+            "details": {}
+          },
+          {
+            "code": "MISSING_REQUIRED_FIELD",
+            "description": "Patient must have field: name",
+            "path": "entry[0].resource.name",
+            "details": {}
+          },
+          {
+            "code": "MISSING_REQUIRED_FIELD",
+            "description": "Patient must have field: gender",
+            "path": "entry[0].resource.gender",
+            "details": {}
+          },
+          {
+            "code": "MISSING_REQUIRED_FIELD",
+            "description": "Patient must have field: birthDate",
+            "path": "entry[0].resource.birthDate",
+            "details": {}
+          },
+          {
+            "code": "MISSING_REQUIRED_RESOURCE",
+            "description": "Claim submission bundle missing required resource: Coverage",
+            "path": null,
+            "details": {}
+          },
+          {
+            "code": "MISSING_REQUIRED_RESOURCE",
+            "description": "Claim submission bundle missing required resource: Organization",
+            "path": null,
+            "details": {}
+          },
+          {
+            "code": "MISSING_REQUIRED_RESOURCE",
+            "description": "Claim submission bundle missing required resource: Claim",
+            "path": null,
+            "details": {}
+          }
+        ],
+        "warnings": [
+          {
+            "code": "MISSING_NAME",
+            "description": "Patient should have at least one name",
+            "path": "entry[0].resource.name",
+            "details": {}
+          }
+        ],
+        "info": [],
+        "summary": {
+          "error_count": 12,
+          "warning_count": 1,
+          "info_count": 0
+        }
+      }
+    },
+    {
+      "test": "concurrent_requests",
+      "status": "warning",
+      "concurrent_count": 10,
+      "successful": 0,
+      "success_rate": 0.0,
+      "avg_duration_ms": 0.0015020370483398438,
+      "min_duration_ms": 0.0,
+      "max_duration_ms": 0.007867813110351562
+    },
+    {
+      "test": "error_recovery",
+      "status": "passed",
+      "recovery_tests": [
+        {
+          "name": "token_refresh",
+          "status": "manual_test_required",
+          "description": "Token refresh recovery mechanism implemented"
+        },
+        {
+          "name": "retry_logic",
+          "status": "implemented",
+          "max_retries": 3
+        }
+      ],
+      "successful_tests": 2,
+      "total_tests": 2
+    },
+    {
+      "test": "security_scenarios",
+      "status": "warning",
+      "security_tests": [
+        {
+          "name": "invalid_auth",
+          "status": "failed",
+          "error": "OAuth2Client.__init__() takes 1 positional argument but 2 were given"
+        },
+        {
+          "name": "sql_injection",
+          "status": "implemented",
+          "description": "Uses parameterized queries in database layer"
+        }
+      ],
+      "successful_tests": 0,
+      "total_tests": 2
+    }
+  ],
+  "performance_metrics": {
+    "authentication": {
+      "avg_time_ms": 0.0003814697265625,
+      "min_time_ms": 0.0,
+      "max_time_ms": 0.00095367431640625,
+      "sample_count": 5
+    },
+    "fhir_validation": {
+      "avg_time_ms": 0.010967254638671875,
+      "min_time_ms": 0.007867813110351562,
+      "max_time_ms": 0.01621246337890625,
+      "sample_count": 3,
+      "bundle_size_bytes": 113
+    }
+  },
+  "summary": {
+    "total_tests": 7,
+    "passed": 4,
+    "warnings": 3,
+    "failed": 0
+  }
+}

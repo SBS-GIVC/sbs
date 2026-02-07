@@ -1,0 +1,42 @@
+{
+  "timestamp": "2026-02-07T07:06:59.542034",
+  "environment": "development",
+  "base_url": "http://localhost:8006",
+  "test_results": [
+    {
+      "test": "fhir_validation_integration",
+      "status": "failed",
+      "valid_bundle_validated": false,
+      "invalid_bundle_rejected": false
+    },
+    {
+      "test": "error_handling_integration",
+      "status": "passed",
+      "error_handled": true,
+      "error_logged": true,
+      "user_friendly_response": true
+    },
+    {
+      "test": "logging_integration",
+      "status": "failed",
+      "error": "timed_operation() takes 1 positional argument but 2 were given"
+    },
+    {
+      "test": "end_to_end_workflow",
+      "status": "failed",
+      "error": "[NPHIES-VALIDATION-ERROR] FHIR validation failed",
+      "error_handled": true
+    },
+    {
+      "test": "module_interoperability",
+      "status": "failed",
+      "error": "timed_operation() takes 1 positional argument but 2 were given"
+    }
+  ],
+  "summary": {
+    "total_tests": 5,
+    "passed": 1,
+    "manual_required": 0,
+    "failed": 4
+  }
+}
