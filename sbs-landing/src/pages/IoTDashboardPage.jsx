@@ -370,6 +370,50 @@ export function IoTDashboardPage() {
   
   const dashboardStats = dashboard?.dashboard || {};
   
+// Skeleton loader component
+function DashboardSkeleton() {
+  return (
+    <div className="flex-1 overflow-auto p-6 bg-slate-50 dark:bg-slate-900 animate-pulse">
+      {/* Header Skeleton */}
+      <div className="mb-6 flex justify-between items-center">
+        <div>
+          <div className="h-8 w-64 bg-slate-200 dark:bg-slate-700 rounded-lg mb-2"></div>
+          <div className="h-4 w-48 bg-slate-200 dark:bg-slate-700 rounded-lg"></div>
+        </div>
+        <div className="flex gap-3">
+          <div className="h-10 w-10 bg-slate-200 dark:bg-slate-700 rounded-lg"></div>
+          <div className="h-10 w-24 bg-slate-200 dark:bg-slate-700 rounded-lg"></div>
+        </div>
+      </div>
+      
+      {/* Stats Grid Skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="h-32 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
+        ))}
+      </div>
+      
+      {/* Devices Section Skeleton */}
+      <div className="mb-6">
+        <div className="h-6 w-48 bg-slate-200 dark:bg-slate-700 rounded-lg mb-4"></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-40 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Events/Alerts Skeleton */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
+        <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded-xl"></div>
+      </div>
+    </div>
+  );
+}
+
+  if (loading && !dashboard) return <DashboardSkeleton />;
+
   return (
     <div className="flex-1 overflow-auto p-6 bg-slate-50 dark:bg-slate-900">
       {/* Header */}
