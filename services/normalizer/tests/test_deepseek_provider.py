@@ -3,9 +3,12 @@ from services.normalizer import ai_fallback
 import importlib.util
 import sys
 import requests
+from pathlib import Path
 
 def load_ai_assistant_module():
-    spec = importlib.util.spec_from_file_location("ai_assistant", "./normalizer-service/ai_assistant.py")
+    repo_root = Path(__file__).resolve().parents[3]
+    target = repo_root / "normalizer-service" / "ai_assistant.py"
+    spec = importlib.util.spec_from_file_location("ai_assistant", str(target))
     assert spec is not None, "Failed to create spec for ai_assistant"
     ai_assistant = importlib.util.module_from_spec(spec)
     assert ai_assistant is not None
@@ -28,7 +31,7 @@ class DummyResp:
 def test_deepseek_smoke(monkeypatch):
     # Simulate enabling DeepSeek via env and having its API key
     monkeypatch.setenv('AI_PROVIDER', 'deepseek')
-    monkeypatch.setenv('DEEPSEEK_API_KEY', 'sk-test-deepseek')
+    monkeypatch.setenv('DEEPSEEK_API_KEY', 'test-deepseek-key')
     monkeypatch.setenv('ENABLE_DEEPSEEK', 'true')
 
     called = {}

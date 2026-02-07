@@ -25,6 +25,8 @@ app = FastAPI(
     version="1.0.0"
 )
 
+ALLOWED_MOCK_OUTCOMES = {"accepted", "rejected", "error"}
+
 # NPHIES API Configuration
 NPHIES_BASE_URL = os.getenv("NPHIES_BASE_URL", "https://nphies.sa/api/v1")
 NPHIES_TIMEOUT = int(os.getenv("NPHIES_TIMEOUT", "30"))
@@ -227,6 +229,8 @@ async def submit_claim(submission: ClaimSubmission, background_tasks: Background
     # Local/dev testing mode: avoid external NPHIES dependency.
     if ENABLE_MOCK_NPHIES:
         desired = (submission.mock_outcome or "accepted").lower()
+        if desired not in ALLOWED_MOCK_OUTCOMES:
+            desired = "accepted"
 
         if desired == "rejected":
             http_status = 400

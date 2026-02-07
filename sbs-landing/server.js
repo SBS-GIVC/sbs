@@ -1048,9 +1048,22 @@ async function processDirectSBS(claim, claimData) {
       vision: 'RAD-CXR-01'
     };
 
+    // Optional override (JSON): {"professional":"CONS-...","institutional":"RAD-..."}
+    let internalCodeMap = defaultInternalCodesByType;
+    if (process.env.CLAIM_INTERNAL_CODE_MAP_JSON) {
+      try {
+        const parsed = JSON.parse(process.env.CLAIM_INTERNAL_CODE_MAP_JSON);
+        if (parsed && typeof parsed === 'object') {
+          internalCodeMap = { ...defaultInternalCodesByType, ...parsed };
+        }
+      } catch {
+        // ignore invalid JSON
+      }
+    }
+
     const internalCode =
       claimData.internalCode ||
-      defaultInternalCodesByType[String(claimData.claimType || '').toLowerCase()] ||
+      internalCodeMap[String(claimData.claimType || '').toLowerCase()] ||
       'CONS-GEN-01';
 
     const normalizeResponse = await axios.post(

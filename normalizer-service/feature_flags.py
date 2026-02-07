@@ -4,6 +4,9 @@ Controls which AI providers and features are enabled based on environment.
 Recommended: enable in staging/dev, disable or carefully gate in production.
 """
 import os
+import logging
+
+logger = logging.getLogger("normalizer.feature_flags")
 
 def is_feature_enabled(feature_name: str, default: bool = False) -> bool:
     """Check if a feature flag is enabled via environment variable.
@@ -15,11 +18,15 @@ def is_feature_enabled(feature_name: str, default: bool = False) -> bool:
     Returns:
         True if enabled, False otherwise
     """
-    env_val = os.getenv(feature_name, '').lower()
+    raw_val = os.getenv(feature_name, '')
+    env_val = raw_val.lower()
     if env_val in ('1', 'true', 'yes', 'on'):
         return True
     elif env_val in ('0', 'false', 'no', 'off'):
         return False
+    if raw_val == '':
+        # Visible during staging/prod debugging, but low-noise.
+        logger.debug("Feature flag %s not set; using default=%s", feature_name, default)
     return default
 
 

@@ -17,8 +17,11 @@ from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime
+import logging
 
 load_dotenv()
+
+logger = logging.getLogger("signer")
 
 app = FastAPI(
     title="SBS Security & Signer Service",
@@ -110,9 +113,14 @@ def load_private_key(key_path: str) -> rsa.RSAPrivateKey:
         key_path = os.path.abspath(os.path.normpath(key_path))
 
         if os.path.commonpath([base_cert_dir, key_path]) != base_cert_dir:
+            logger.warning(
+                "Blocked private key path traversal: base=%s resolved=%s",
+                base_cert_dir,
+                key_path
+            )
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid certificate path"
+                detail={"error": "Invalid certificate path", "error_code": "SIGNER_CERT_PATH_INVALID"}
             )
 
         with open(key_path, "rb") as key_file:
@@ -125,14 +133,16 @@ def load_private_key(key_path: str) -> rsa.RSAPrivateKey:
         return private_key
 
     except FileNotFoundError:
+        logger.error("Private key file not found (resolved path=%s)", key_path)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Private key file not found"
+            detail={"error": "Private key file not found", "error_code": "SIGNER_PRIVATE_KEY_NOT_FOUND"}
         )
     except Exception as e:
+        logger.exception("Error loading private key (resolved path=%s)", key_path)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error loading private key: {str(e)}"
+            detail={"error": "Error loading private key", "error_code": "SIGNER_PRIVATE_KEY_LOAD_ERROR"}
         )
 
 
