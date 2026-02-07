@@ -134,6 +134,7 @@ class WorkflowResult:
     signed_bundle: Optional[Dict[str, Any]] = None
     priced_bundle: Optional[Dict[str, Any]] = None
     nphies_response: Optional[Dict[str, Any]] = None
+    signature: Optional[str] = None
 
     @property
     def total_duration_ms(self) -> Optional[float]:
@@ -175,7 +176,8 @@ class WorkflowSimulator:
         financial_url: str = "http://localhost:8002",
         nphies_url: str = "http://localhost:8003",
         timeout: int = 30,
-        verify_ssl: bool = False
+        verify_ssl: bool = False,
+        mock_outcome: Optional[str] = None,
     ):
         self.normalizer_url = normalizer_url
         self.signer_url = signer_url
@@ -183,6 +185,7 @@ class WorkflowSimulator:
         self.nphies_url = nphies_url
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self.verify_ssl = verify_ssl
+        self.mock_outcome = mock_outcome
         self._session: Optional[aiohttp.ClientSession] = None
 
     async def __aenter__(self):
@@ -449,7 +452,8 @@ class WorkflowSimulator:
                 "sequence": idx,
                 "productOrService": {
                     "coding": [{
-                        "system": "http://nphies.sa/codesystem/sbs",
+                        # financial-rules-engine extracts SBS codes only from this system
+                        "system": "http://sbs.sa/coding/services",
                         "code": service.get("sbs_code", service["internal_code"]),
                         "display": service.get("sbs_description", service["description"])
                     }]
@@ -489,6 +493,8 @@ class WorkflowSimulator:
         claim_resource = {
             "resourceType": "Claim",
             "id": claim.claim_id,
+            # required by financial-rules-engine
+            "facility_id": claim.facility_id,
             "status": "active",
             "type": {
                 "coding": [{
@@ -563,32 +569,38 @@ class WorkflowSimulator:
         )
 
         try:
-            payload = {
-                "bundle": result.normalized_bundle,
-                "facility_id": result.normalized_bundle.get("facility_id", 1)
-            }
+            # Extract Claim resource from bundle and send to /validate.
+            claim_resource = None
+            for entry in (result.normalized_bundle or {}).get("entry", []):
+                res = entry.get("resource")
+                if isinstance(res, dict) and res.get("resourceType") == "Claim":
+                    claim_resource = res
+                    break
 
-            step.request = {"bundle_id": result.normalized_bundle.get("id")}
+            if not claim_resource:
+                raise RuntimeError("No Claim resource found in normalized bundle")
+
+            step.request = {"claim_id": claim_resource.get("id")}
 
             async with self._session.post(
                 f"{self.financial_url}/validate",
-                json=payload
+                json=claim_resource,
             ) as response:
                 if response.status == 200:
                     data = await response.json()
-                    result.priced_bundle = data.get("priced_bundle", result.normalized_bundle)
+                    # financial-rules-engine returns a validated Claim
+                    result.priced_bundle = data
                     step.response = {
-                        "validation_passed": data.get("is_valid", True),
-                        "applied_rules": data.get("applied_rules", []),
-                        "total_price": data.get("total_price")
+                        "total": (data.get("total") or {}).get("value"),
+                        "bundle_applied": (data.get("extensions") or {}).get("bundle_applied"),
                     }
                     step.status = WorkflowStatus.SUCCESS
                 else:
-                    # Service might not be running - use bundle as-is
-                    result.priced_bundle = result.normalized_bundle
-                    step.response = {"fallback": True}
+                    # Service might not be running - use original Claim
+                    result.priced_bundle = claim_resource
+                    step.response = {"fallback": True, "status_code": response.status}
                     step.status = WorkflowStatus.SUCCESS
-                    logger.warning("Financial rules service unavailable, using bundle as-is")
+                    logger.warning("Financial rules returned %s, using unpriced claim", response.status)
 
         except aiohttp.ClientError as e:
             # Service not available - proceed with unpriced bundle
@@ -619,31 +631,33 @@ class WorkflowSimulator:
 
         try:
             payload = {
-                "bundle": result.priced_bundle,
-                "facility_id": facility_id
+                "payload": result.priced_bundle,
+                "facility_id": facility_id,
             }
 
-            step.request = {"bundle_id": result.priced_bundle.get("id")}
+            step.request = {"claim_id": (result.priced_bundle or {}).get("id")}
 
             async with self._session.post(
                 f"{self.signer_url}/sign",
-                json=payload
+                json=payload,
             ) as response:
                 if response.status == 200:
                     data = await response.json()
-                    result.signed_bundle = data.get("signed_bundle", result.priced_bundle)
+                    result.signature = data.get("signature")
+                    # keep naming for backward compatibility
+                    result.signed_bundle = result.priced_bundle
                     step.response = {
                         "signed": True,
                         "signature_algorithm": data.get("algorithm", "SHA256withRSA"),
-                        "signature_length": len(data.get("signature", ""))
+                        "signature_length": len(data.get("signature", "")),
                     }
                     step.status = WorkflowStatus.SUCCESS
                 else:
-                    # Signing service might be unavailable
+                    result.signature = None
                     result.signed_bundle = result.priced_bundle
-                    step.response = {"signed": False, "reason": "Service unavailable"}
-                    step.status = WorkflowStatus.SUCCESS
-                    logger.warning("Signer service unavailable, proceeding without signature")
+                    step.response = {"signed": False, "status_code": response.status}
+                    step.status = WorkflowStatus.FAILED
+                    step.error = await response.text()
 
         except aiohttp.ClientError as e:
             result.signed_bundle = result.priced_bundle
@@ -673,16 +687,18 @@ class WorkflowSimulator:
 
         try:
             payload = {
-                "bundle": result.signed_bundle,
                 "facility_id": facility_id,
-                "request_type": "Claim"
+                "fhir_payload": result.signed_bundle,
+                "signature": result.signature or "",
+                "resource_type": "Claim",
+                "mock_outcome": self.mock_outcome,
             }
 
-            step.request = {"bundle_id": result.signed_bundle.get("id")}
+            step.request = {"claim_id": (result.signed_bundle or {}).get("id")}
 
             async with self._session.post(
-                f"{self.nphies_url}/submit",
-                json=payload
+                f"{self.nphies_url}/submit-claim",
+                json=payload,
             ) as response:
                 data = await response.json() if response.content_type == 'application/json' else {}
 
@@ -691,7 +707,7 @@ class WorkflowSimulator:
                     step.response = {
                         "submitted": True,
                         "status_code": response.status,
-                        "transaction_id": data.get("transaction_id"),
+                        "transaction_id": data.get("transaction_uuid") or data.get("transaction_id"),
                         "nphies_status": data.get("status")
                     }
                     step.status = WorkflowStatus.SUCCESS
@@ -737,7 +753,8 @@ async def run_simulation(args):
         normalizer_url=args.normalizer_url,
         signer_url=args.signer_url,
         financial_url=args.financial_url,
-        nphies_url=args.nphies_url
+        nphies_url=args.nphies_url,
+        mock_outcome=getattr(args, "mock_outcome", None),
     ) as simulator:
         # Check service health
         print("🏥 Checking service health...")
@@ -820,6 +837,13 @@ def main():
     parser.add_argument(
         "-o", "--output",
         help="Output file for workflow report"
+    )
+
+    parser.add_argument(
+        "--mock-outcome",
+        choices=["accepted", "rejected", "error"],
+        default=None,
+        help="When ENABLE_MOCK_NPHIES=true, force a deterministic NPHIES outcome"
     )
 
     args = parser.parse_args()

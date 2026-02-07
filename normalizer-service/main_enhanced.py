@@ -10,6 +10,11 @@ Improvements:
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_client import Counter, Histogram
+# `normalizer-service/` is not a Python package (hyphenated folder name), so
+# relative imports will fail when running `uvicorn main_enhanced:app`.
+import ai_assistant  # local AI helper
+from utils.retry_circuit import retry, CircuitBreaker
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, validator
 from typing import Optional
@@ -26,6 +31,8 @@ from psycopg2.extras import RealDictCursor
 from collections import deque
 from threading import Lock
 
+from copilot_routes import router as copilot_router
+
 load_dotenv()
 
 app = FastAPI(
@@ -34,16 +41,24 @@ app = FastAPI(
     version="2.0.0"
 )
 
+# Internal copilot endpoint (safe-by-default). Used by Landing when available.
+app.include_router(copilot_router)
+
 # CORS middleware - Restrict to allowed origins (security fix: no wildcards)
 # In production, ALLOWED_ORIGINS must be explicitly set via environment variable
 _default_origins = "http://localhost:3000,http://localhost:3001"
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", _default_origins).split(",")
-if ALLOWED_ORIGINS == _default_origins.split(",") and os.getenv("PRODUCTION", "").lower() == "true":
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS") or os.getenv("CORS_ORIGIN") or _default_origins
+allowed_origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
+
+if allowed_origins == _default_origins.split(",") and os.getenv("PRODUCTION", "").lower() == "true":
     print("⚠️ WARNING: Using default localhost origins in production. Set ALLOWED_ORIGINS environment variable.")
+
+allow_credentials = "*" not in allowed_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=allow_credentials,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
 )

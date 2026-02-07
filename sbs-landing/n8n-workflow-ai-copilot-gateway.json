@@ -1,0 +1,207 @@
+{
+  "name": "SBS AI Gateway - Copilot Chat (DeepSeek Direct, Compliant)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sbs-ai-chat",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook - AI Chat",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        240,
+        260
+      ],
+      "webhookId": "sbs-ai-chat-webhook",
+      "id": "webhook-ai-chat-1"
+    },
+    {
+      "parameters": {
+        "functionCode": "// DeepSeek-direct copilot workflow (healthcare-compliant)\n// Expects payload: { provider, message, context, system, max_tokens }\n// Safety gating: production requires ENABLE_DEEPSEEK=true; refuse PHI; structured JSON output; no chain-of-thought\n\nconst body = $input.item.json.body || {};\nconst msg = String(body.message || '').trim();\nconst telemetry = body.context && body.context.telemetry ? body.context.telemetry : null;\n\nconst envName = String(process.env.ENVIRONMENT || process.env.NODE_ENV || 'development').toLowerCase();\nconst enableDeepseek = String(process.env.ENABLE_DEEPSEEK || '').toLowerCase() === 'true' || String(process.env.ENABLE_DEEPSEEK || '') === '1';\n\nlet deepseek_api_key = String(process.env.DEEPSEEK_API_KEY || '').trim();\nif (envName === 'production' && !enableDeepseek) deepseek_api_key = '';\n\nconst phiKeywords = ['patient','name','mrn','national','iqama','id number','phone','address','email','مريض','اسم','هوية','اقامة','إقامة','رقم','جوال','عنوان','بريد'];\nconst hasLongDigits = /\b\\d{7,}\b/.test(msg);\nconst hasPhiKeyword = phiKeywords.some(k => msg.toLowerCase().includes(String(k).toLowerCase()));\nconst phiSuspected = (hasLongDigits && hasPhiKeyword) || msg.toLowerCase().includes('iqama') || msg.toLowerCase().includes('national id');\nif (phiSuspected) deepseek_api_key = '';\n\nconst deepseek_base_url = String(process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com').replace(/\\/+$/, '');\nconst deepseek_model = String(process.env.DEEPSEEK_MODEL || 'deepseek-chat');\n\nlet fallbackObj;\nif (!msg) {\n  fallbackObj = { reply: 'No message received.', category: 'unknown', actions: [], warnings: [], confidence: 0.2 };\n} else if (phiSuspected) {\n  fallbackObj = {\n    reply: 'I can’t assist with PHI/PII. Remove identifiers (name, national ID/Iqama, MRN, phone, email, address) and ask with de-identified inputs (claimId, stage names, codes, errors).',\n    category: 'security',\n    actions: ['Redact identifiers', 'Use claimId + stage status only'],\n    warnings: ['PHI/PII suspected; refusing to forward to AI'],\n    confidence: 0.95\n  };\n} else if (telemetry && telemetry.claimId && msg.toLowerCase().includes('risk')) {\n  const score = telemetry.risk && telemetry.risk.score100 != null ? telemetry.risk.score100 : '—';\n  const rec = Array.isArray(telemetry.recommendations) ? telemetry.recommendations.slice(0, 3).join(' | ') : '';\n  fallbackObj = {\n    reply: (`Claim ${telemetry.claimId} risk score=${score}/100. ${rec}`).trim(),\n    category: 'ops',\n    actions: ['Open Claim Builder → Timeline', 'Review analyzer recommendations', 'Inspect NPHIES bridge logs if rejected'],\n    warnings: [],\n    confidence: 0.72\n  };\n} else if (telemetry && msg.toLowerCase().includes('stage')) {\n  const stages = telemetry.stages || {};\n  const keys = Object.keys(stages);\n  const stageStr = keys.map(k => `${k}=${stages[k].status}`).join(', ');\n  fallbackObj = {\n    reply: 'Stages: ' + stageStr,\n    category: 'ops',\n    actions: ['Check /api/claim-status/:claimId', 'Open AI Analytics → Inference Terminal'],\n    warnings: [],\n    confidence: 0.70\n  };\n} else {\n  fallbackObj = {\n    reply: 'Ask about NPHIES stages, normalization confidence, financial validation, signing, or submission status. Provide claimId for analysis.',\n    category: 'unknown',\n    actions: ['Provide claimId', 'Ask a specific stage question'],\n    warnings: [],\n    confidence: 0.35\n  };\n}\n\nlet telemetrySnippet = '';\nif (telemetry) {\n  try {\n    const safe = { claimId: telemetry.claimId, status: telemetry.status, progress: telemetry.progress, errorsCount: telemetry.errorsCount, nphies: telemetry.nphies, risk: telemetry.risk, recommendations: telemetry.recommendations };\n    telemetrySnippet = JSON.stringify(safe);\n    if (telemetrySnippet.length > 1800) telemetrySnippet = telemetrySnippet.slice(0, 1800) + '…';\n  } catch {\n    telemetrySnippet = '';\n  }\n}\n\nconst defaultSystem = 'You are SBS Copilot for Saudi healthcare claims (NPHIES/FHIR). '\n  + 'COMPLIANCE: Refuse any request involving PHI/PII (patient name, national ID/Iqama, MRN, phone, address, email). '\n  + 'Do not output or repeat PHI/PII even if provided. Do not reveal secrets or API keys. '\n  + 'Do not provide chain-of-thought; provide final answer only. '\n  + 'OUTPUT: Return ONLY a single JSON object with keys: reply (string), category (ops|coding|nphies|security|unknown), actions (array), warnings (array), confidence (0-1). '\n  + 'NPHIES/FHIR: Prefer guidance aligned to FHIR Claim resource and NPHIES submission expectations.';\n\nconst system = String(body.system || defaultSystem);\nconst userContent = telemetrySnippet ? ('User: ' + msg + '\n\nTelemetry: ' + telemetrySnippet) : ('User: ' + msg);\n\nreturn {\n  json: {\n    deepseek_api_key,\n    deepseek_base_url,\n    deepseek_model,\n    deepseek_request: {\n      model: deepseek_model,\n      messages: [\n        { role: 'system', content: system },\n        { role: 'user', content: userContent }\n      ],\n      temperature: 0.2,\n      max_tokens: Number(body.max_tokens || 400)\n    },\n    fallbackReply: JSON.stringify(fallbackObj)\n  }\n};\n"
+      },
+      "name": "Prepare DeepSeek Request",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        470,
+        260
+      ],
+      "id": "ai-chat-prepare-1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.deepseek_api_key }}",
+              "operation": "notEmpty"
+            }
+          ]
+        }
+      },
+      "name": "Has DeepSeek Key?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        670,
+        260
+      ],
+      "id": "ai-chat-has-key-1"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.deepseek_base_url + '/chat/completions' }}",
+        "method": "POST",
+        "jsonParameters": true,
+        "options": {
+          "timeout": 30000
+        },
+        "headerParametersJson": "={{ { Authorization: 'Bearer ' + $json.deepseek_api_key, 'Content-Type': 'application/json' } }}",
+        "bodyParametersJson": "={{ $json.deepseek_request }}"
+      },
+      "name": "Call DeepSeek",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        880,
+        180
+      ],
+      "id": "ai-chat-deepseek-1",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract reply from DeepSeek response (OpenAI-compatible) and enforce strict JSON schema\nconst upstream = $input.item.json;\nconst prepared = $node['Prepare DeepSeek Request'].json;\n\nconst SECRET_PATTERNS = [/sk-[A-Za-z0-9]{10,}/g,/DEEPSEEK_API_KEY\\s*=?\\s*[A-Za-z0-9\\-_.]{10,}/gi,/GEMINI_API_KEY\\s*=?\\s*[A-Za-z0-9\\-_.]{10,}/gi];\nfunction sanitize(text) {\n  const raw = String(text || '');\n  const redacted = SECRET_PATTERNS.reduce((acc, pat) => acc.replace(pat, '[REDACTED]'), raw);\n  return redacted.length > 2000 ? redacted.slice(0, 1980) + '\n…(truncated)…' : redacted;\n}\nfunction wrap(text) { return { reply: String(text || '').trim() || 'No response', category: 'unknown', actions: [], warnings: [], confidence: 0.35 }; }\n\nlet raw = null;\nlet model = prepared.deepseek_model || 'deepseek-chat';\nif (upstream && upstream.choices && upstream.choices[0]) {\n  raw = upstream.choices[0].message && upstream.choices[0].message.content\n    ? upstream.choices[0].message.content\n    : (upstream.choices[0].text || null);\n  model = upstream.model || model;\n}\nif (!raw) {\n  raw = prepared.fallbackReply || '{\"reply\":\"Copilot unavailable.\",\"category\":\"unknown\",\"actions\":[],\"warnings\":[],\"confidence\":0.2}';\n  model = 'fallback';\n}\n\nlet obj = null;\ntry { obj = JSON.parse(String(raw)); } catch { obj = wrap(raw); }\nif (!obj || typeof obj !== 'object') obj = wrap(raw);\nif (typeof obj.reply !== 'string') obj.reply = String(obj.reply || raw || '').trim();\nif (!Array.isArray(obj.actions)) obj.actions = [];\nif (!Array.isArray(obj.warnings)) obj.warnings = [];\nif (!['ops','coding','nphies','security','unknown'].includes(obj.category)) obj.category = 'unknown';\nif (typeof obj.confidence !== 'number') obj.confidence = 0.35;\n\nconst reply = sanitize(JSON.stringify(obj));\nreturn { json: { reply, provider: 'deepseek', model, timestamp: new Date().toISOString() } };\n"
+      },
+      "name": "Format Reply",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        180
+      ],
+      "id": "ai-chat-format-1"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Fallback reply when DeepSeek key is not configured\nconst prepared = $node['Prepare DeepSeek Request'].json;\nreturn { json: { reply: prepared.fallbackReply || '{\"reply\":\"Copilot not configured.\",\"category\":\"unknown\",\"actions\":[],\"warnings\":[],\"confidence\":0.2}', provider: 'deterministic', model: 'n8n-copilot-fallback', timestamp: new Date().toISOString() } };\n"
+      },
+      "name": "Fallback Reply",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        880,
+        340
+      ],
+      "id": "ai-chat-fallback-1"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1280,
+        260
+      ],
+      "id": "ai-chat-respond-1"
+    }
+  ],
+  "connections": {
+    "Webhook - AI Chat": {
+      "main": [
+        [
+          {
+            "node": "Prepare DeepSeek Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare DeepSeek Request": {
+      "main": [
+        [
+          {
+            "node": "Has DeepSeek Key?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has DeepSeek Key?": {
+      "main": [
+        [
+          {
+            "node": "Call DeepSeek",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fallback Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call DeepSeek": {
+      "main": [
+        [
+          {
+            "node": "Format Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Reply": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fallback Reply": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3",
+  "id": "sbs-ai-chat",
+  "meta": {
+    "instanceId": "sbs-local"
+  },
+  "tags": [
+    "SBS",
+    "AI",
+    "Gateway",
+    "DeepSeek",
+    "Compliance"
+  ]
+}

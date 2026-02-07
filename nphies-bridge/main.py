@@ -62,10 +62,13 @@ async def rate_limit_middleware(request: Request, call_next):
         )
     return await call_next(request)
 
+ALLOWED_MOCK_OUTCOMES = {"accepted", "rejected", "error"}
+
 # NPHIES API Configuration
 NPHIES_BASE_URL = os.getenv("NPHIES_BASE_URL", "https://nphies.sa/api/v1")
 NPHIES_TIMEOUT = int(os.getenv("NPHIES_TIMEOUT", "30"))
 MAX_RETRIES = int(os.getenv("NPHIES_MAX_RETRIES", "3"))
+ENABLE_MOCK_NPHIES = os.getenv("ENABLE_MOCK_NPHIES", "false").lower() in ("1", "true", "yes", "on")
 
 
 def get_db_connection():
@@ -83,6 +86,9 @@ class ClaimSubmission(BaseModel):
     fhir_payload: Dict[str, Any] = Field(..., description="FHIR Claim payload")
     signature: str = Field(..., description="Digital signature")
     resource_type: str = Field(default="Claim", description="FHIR resource type")
+    # Testing-only: when ENABLE_MOCK_NPHIES=true, caller can request an outcome.
+    # Valid values: accepted | rejected | error
+    mock_outcome: Optional[str] = Field(default=None, description="Mock outcome for local testing")
 
 
 class SubmissionResponse(BaseModel):
@@ -274,7 +280,45 @@ async def submit_claim(submission: ClaimSubmission, background_tasks: Background
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid FHIR payload: resourceType must be 'Claim'"
         )
-    
+
+    # Local/dev testing mode: avoid external NPHIES dependency.
+    if ENABLE_MOCK_NPHIES:
+        desired = (submission.mock_outcome or "accepted").lower()
+        if desired not in ALLOWED_MOCK_OUTCOMES:
+            desired = "accepted"
+
+        if desired == "rejected":
+            http_status = 400
+            response_data = {"id": f"MOCK-{uuid.uuid4().hex[:8]}", "status": "rejected"}
+            error_msg = "Mock rejection"
+        elif desired == "error":
+            http_status = 503
+            response_data = {"status": "error"}
+            error_msg = "Mock upstream error"
+        else:
+            http_status = 200
+            response_data = {"id": f"MOCK-{uuid.uuid4().hex[:8]}", "status": "accepted"}
+            error_msg = None
+
+        txn_uuid = log_transaction(
+            facility_id=submission.facility_id,
+            request_type=submission.resource_type,
+            fhir_payload=submission.fhir_payload,
+            signature=submission.signature,
+            response_data=response_data,
+            http_status=http_status,
+            nphies_txn_id=response_data.get("id"),
+            error_msg=error_msg,
+        )
+
+        return SubmissionResponse(
+            transaction_id=response_data.get("id") or "N/A",
+            transaction_uuid=txn_uuid,
+            status=response_data.get("status") or "error",
+            nphies_response=response_data,
+            http_status=http_status,
+            message=f"Mock NPHIES response ({response_data.get('status')})",
+        )
     # Submit to NPHIES
     response_data, http_status, error_msg = await submit_to_nphies_with_retry(
         endpoint="Claim",

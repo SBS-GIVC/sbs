@@ -2,56 +2,37 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BrainSAIT SBS Landing</title>
-    <meta name="description" content="BrainSAIT landing page for Saudi Billing System workflows and enterprise healthcare integration.">
-
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>SBS Integration Engine - BrainSAIT برينسايت</title>
+    <meta name="description" content="The Ultimate Saudi Billing System Integration Engine - Powered by BrainSAIT">
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#22d3ee">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SBS Engine">
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="SBS Integration Engine">
+    <meta property="og:description" content="AI-powered bridge between your hospital system and NPHIES">
+    <!-- og:image intentionally omitted (no icon assets shipped) -->
+    
+    <!-- No build step: UI uses ultra.css for layout + theme (no Tailwind runtime) -->
+    
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
-
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            padding: 0;
-        }
-        [dir="rtl"] body {
-            font-family: 'IBM Plex Sans Arabic', sans-serif;
-        }
-        html { scroll-behavior: smooth; }
-
-        .file-upload-area {
-            border: 2px dashed #10b981;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-        .file-upload-area:hover {
-            border-color: #06b6d4;
-            background-color: rgba(16, 185, 129, 0.05);
-        }
-        .file-upload-area.dragover {
-            border-color: #06b6d4;
-            background-color: rgba(16, 185, 129, 0.1);
-            transform: scale(1.02);
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in { animation: fadeIn 0.6s ease-out forwards; }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: .5; }
-        }
-        .animate-pulse-slow {
-            animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-    </style>
+    
+    <!-- Ultra-Premium Cinematic Design System -->
+    <link rel="stylesheet" href="./ultra.css">
 </head>
-<body class="bg-slate-950">
+<body>
     <div id="app"></div>
-    <script src="/landing.js"></script>
+
+    <!-- External scripts only (CSP-friendly) -->
+    <script src="./config.js"></script>
+    <script src="./api-client.js"></script>
+    <script src="./landing.js"></script>
 </body>
 </html>

@@ -1,0 +1,10 @@
+{
+  "runs": 50,
+  "scenarios_executed": 250,
+  "successful_runs": 50,
+  "failed_runs": 0,
+  "total_claims": 250,
+  "retries": 45,
+  "avg_processing_time_ms": 5403.9840269088745,
+  "per_scenario": {}
+}

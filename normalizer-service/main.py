@@ -29,6 +29,8 @@ from psycopg2.extras import RealDictCursor
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from shared import RateLimiter, setup_logging, format_database_error
 
+from copilot_routes import router as copilot_router
+
 load_dotenv()
 
 # Setup structured logging
@@ -40,12 +42,22 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# CORS middleware - Restrict to allowed origins
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
+# Internal copilot endpoint (safe-by-default). Used by Landing when available.
+app.include_router(copilot_router)
+
+# CORS middleware (restricted)
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS") or os.getenv("CORS_ORIGIN")
+allowed_origins = (
+    [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+    if allowed_origins_env
+    else ["http://localhost:3000", "http://localhost:3001"]
+)
+allow_credentials = "*" not in allowed_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=allow_credentials,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
 )

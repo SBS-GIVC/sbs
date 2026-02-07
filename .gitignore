@@ -1,3 +1,11 @@
+# Environment files
+.env
+.env.local
+.env.production
+.env.*.local
+config/.env
+deploy/vps/.env
+
 # Test results and logs
 sbs_test_report_*.json
 sbs_test_execution*.log
@@ -18,6 +26,8 @@ workflow_test_report_*.json
 .npm/
 .nvm/
 __pycache__/
+.mypy_cache/
+.venv/
 *.pyc
 *.pyo
 *.py[cod]
@@ -37,18 +47,32 @@ __pycache__/
 
 # SSH and certificates
 .ssh/
+
+# Logs directory (local)
+logs/
+*.log.*
+
+# Local stack runtime artifacts (no Docker)
+.pgdata/
+.pg.log
+.runlogs/
+
+# Certificates (DO NOT COMMIT)
+certs/**/*.key
+certs/**/*.p12
+certs/**/*.pfx
 *.key
 *.crt
 *.pem
 
-# Environment files
-.env.local
-.env.*.local
-.env
-config/.env
-
 # Backup files
 *.backup
+*.sql.gz
+backups/
+
+# Deployment artifacts
+deploy.tar.gz
+*.tar.gz
 *.backup-*
 *~
 *.old

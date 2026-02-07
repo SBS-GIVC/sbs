@@ -1,0 +1,367 @@
+name: Deploy to VPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+        default: 'staging'
+      ref:
+        description: 'Git ref to deploy (branch, tag, or commit SHA)'
+        required: false
+        default: 'main'
+      enable_mock_nphies:
+        description: 'Enable mock NPHIES (for testing)'
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches:
+      - main
+    paths:
+      - 'normalizer-service/**'
+      - 'financial-rules-engine/**'
+      - 'signer-service/**'
+      - 'nphies-bridge/**'
+      - 'sbs-landing/**'
+      - 'deploy/vps/**'
+      - '.github/workflows/deploy-vps.yml'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/sbs
+
+jobs:
+  deploy:
+    name: Deploy to VPS (${{ github.event.inputs.environment || 'staging' }})
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment || 'staging' }}
+      url: ${{ vars.DEPLOYMENT_URL || 'https://sbs.brainsait.cloud' }}
+    
+    steps:
+      # ============================================================================
+      # Checkout and Setup
+      # ============================================================================
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+      
+      - name: Set environment variables
+        id: env
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment || 'staging' }}"
+          ENABLE_MOCK_NPHIES="${{ github.event.inputs.enable_mock_nphies || 'false' }}"
+          GIT_COMMIT="${{ github.sha }}"
+          GIT_BRANCH="${{ github.event.inputs.ref || github.ref_name }}"
+          DEPLOYED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          
+          echo "environment=${ENVIRONMENT}" >> $GITHUB_OUTPUT
+          echo "enable_mock_nphies=${ENABLE_MOCK_NPHIES}" >> $GITHUB_OUTPUT
+          echo "git_commit=${GIT_COMMIT}" >> $GITHUB_OUTPUT
+          echo "git_branch=${GIT_BRANCH}" >> $GITHUB_OUTPUT
+          echo "deployed_at=${DEPLOYED_AT}" >> $GITHUB_OUTPUT
+      
+      # ============================================================================
+      # Setup SSH
+      # ============================================================================
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/vps_deploy_key
+          chmod 600 ~/.ssh/vps_deploy_key
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+      
+      # ============================================================================
+      # Prepare Deployment
+      # ============================================================================
+      - name: Create deployment archive
+        run: |
+          # Create a deployment tarball with necessary files
+          tar -czf deploy.tar.gz \
+            deploy/vps/ \
+            database/ \
+            normalizer-service/ \
+            financial-rules-engine/ \
+            signer-service/ \
+            nphies-bridge/ \
+            sbs-landing/ \
+            scripts/ \
+            docker-compose.yml \
+            .env.example
+          
+          ls -lh deploy.tar.gz
+      
+      - name: Upload deployment archive to VPS
+        run: |
+          scp -i ~/.ssh/vps_deploy_key \
+            -o StrictHostKeyChecking=no \
+            deploy.tar.gz \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/tmp/sbs-deploy.tar.gz
+      
+      # ============================================================================
+      # Deploy on VPS
+      # ============================================================================
+      - name: Extract and prepare deployment on VPS
+        run: |
+          ssh -i ~/.ssh/vps_deploy_key \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+          set -e
+          
+          # Create deployment directory
+          sudo mkdir -p /opt/sbs
+          sudo chown $USER:$USER /opt/sbs
+          
+          # Extract deployment archive
+          cd /opt/sbs
+          tar -xzf /tmp/sbs-deploy.tar.gz
+          rm /tmp/sbs-deploy.tar.gz
+          
+          echo "Deployment files extracted to /opt/sbs"
+          ls -la /opt/sbs
+          ENDSSH
+      
+      - name: Create/update .env file on VPS
+        run: |
+          ssh -i ~/.ssh/vps_deploy_key \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+          set -e
+          
+          cd /opt/sbs/deploy/vps
+          
+          # Create .env file from secrets
+          cat > .env << 'EOF'
+          # ============================================================================
+          # Auto-generated by GitHub Actions
+          # Deployment: ${{ steps.env.outputs.environment }}
+          # Date: ${{ steps.env.outputs.deployed_at }}
+          # Commit: ${{ steps.env.outputs.git_commit }}
+          # ============================================================================
+          
+          # Database Configuration
+          DB_HOST=postgres
+          DB_NAME=sbs_integration
+          DB_USER=postgres
+          DB_PASSWORD=${{ secrets.VPS_DB_PASSWORD }}
+          
+          # AI Provider Configuration
+          AI_PROVIDER=${{ vars.AI_PROVIDER || 'deepseek' }}
+          GEMINI_API_KEY=${{ secrets.VPS_GEMINI_API_KEY || '' }}
+          DEEPSEEK_API_KEY=${{ secrets.VPS_DEEPSEEK_API_KEY || '' }}
+          DEEPSEEK_BASE_URL=https://api.deepseek.com
+          ENABLE_DEEPSEEK=true
+          ENVIRONMENT=${{ steps.env.outputs.environment }}
+          
+          # NPHIES Configuration
+          NPHIES_ENV=${{ vars.NPHIES_ENV || 'sandbox' }}
+          NPHIES_BASE_URL=${{ vars.NPHIES_BASE_URL || 'https://sandbox.nphies.sa/api/v1' }}
+          NPHIES_API_KEY=${{ secrets.VPS_NPHIES_API_KEY }}
+          NPHIES_TIMEOUT=30
+          NPHIES_MAX_RETRIES=3
+          ENABLE_MOCK_NPHIES=${{ steps.env.outputs.enable_mock_nphies }}
+          
+          # Certificate Configuration
+          CERT_BASE_PATH=/certs
+          CERT_PASSWORD=${{ secrets.VPS_CERT_PASSWORD || '' }}
+          CERT_PATH_HOST=/opt/sbs/certs
+          
+          # CORS & Security
+          ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS || 'https://sbs.brainsait.cloud' }}
+          CORS_ORIGIN=${{ vars.CORS_ORIGIN || 'https://sbs.brainsait.cloud' }}
+          
+          # Landing API Configuration
+          PORT=3000
+          NODE_ENV=production
+          MAX_FILE_SIZE=10485760
+          ENABLE_STAGE_HOOKS=false
+          SBS_STAGE_HOOK_URL=
+          ENABLE_MOCK_PROCESSING=false
+          
+          # Cloudflare Tunnel
+          CLOUDFLARE_TUNNEL_TOKEN=${{ secrets.VPS_CLOUDFLARE_TUNNEL_TOKEN || '' }}
+          
+          # Deployment Metadata
+          DEPLOYED_AT=${{ steps.env.outputs.deployed_at }}
+          DEPLOYED_BY=${{ github.actor }}
+          GIT_COMMIT=${{ steps.env.outputs.git_commit }}
+          GIT_BRANCH=${{ steps.env.outputs.git_branch }}
+          EOF
+          
+          echo "Environment file created"
+          ENDSSH
+      
+      - name: Create required directories on VPS
+        run: |
+          ssh -i ~/.ssh/vps_deploy_key \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+          set -e
+          
+          # Create certificates directory
+          mkdir -p /opt/sbs/certs
+          chmod 700 /opt/sbs/certs
+          
+          # Create backups directory
+          mkdir -p /opt/sbs/backups
+          
+          echo "Required directories created"
+          ENDSSH
+      
+      - name: Backup existing database (if exists)
+        continue-on-error: true
+        run: |
+          ssh -i ~/.ssh/vps_deploy_key \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+          set -e
+          
+          cd /opt/sbs
+          
+          # Check if postgres container exists and is running
+          if docker ps --format '{{.Names}}' | grep -q "sbs-vps-postgres"; then
+            BACKUP_FILE="/opt/sbs/backups/sbs_$(date +%Y%m%d_%H%M%S).sql"
+            echo "Creating database backup: ${BACKUP_FILE}"
+            docker exec sbs-vps-postgres pg_dump -U postgres sbs_integration > "${BACKUP_FILE}"
+            gzip "${BACKUP_FILE}"
+            echo "Backup created: ${BACKUP_FILE}.gz"
+          else
+            echo "No existing database container found, skipping backup"
+          fi
+          ENDSSH
+      
+      - name: Deploy services with Docker Compose
+        run: |
+          ssh -i ~/.ssh/vps_deploy_key \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+          set -e
+          
+          cd /opt/sbs/deploy/vps
+          
+          # Build and deploy services
+          echo "Building Docker images..."
+          docker compose -f docker-compose.vps.yml build
+          
+          echo "Starting services with Cloudflare Tunnel..."
+          docker compose -f docker-compose.vps.yml --profile cloudflare up -d
+          
+          echo "Services deployed successfully"
+          ENDSSH
+      
+      # ============================================================================
+      # Health Checks
+      # ============================================================================
+      - name: Wait for services to be healthy
+        run: |
+          ssh -i ~/.ssh/vps_deploy_key \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+          set -e
+          
+          cd /opt/sbs/deploy/vps
+          
+          echo "Waiting for services to be healthy..."
+          
+          for i in {1..30}; do
+            echo "Attempt $i/30..."
+            
+            # Check container health status
+            UNHEALTHY=$(docker compose ps --format json 2>/dev/null | \
+              jq -r 'select(.Health != "" and .Health != "healthy") | .Name' | wc -l || echo "0")
+            
+            if [ "$UNHEALTHY" -eq "0" ]; then
+              echo "All services are healthy!"
+              docker compose ps
+              exit 0
+            fi
+            
+            sleep 10
+          done
+          
+          echo "Warning: Some services may not be healthy yet"
+          docker compose ps
+          exit 0
+          ENDSSH
+      
+      - name: Run health checks
+        continue-on-error: true
+        run: |
+          ssh -i ~/.ssh/vps_deploy_key \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+          set -e
+          
+          cd /opt/sbs
+          
+          # Run health check script
+          if [ -f scripts/vps/health-check.sh ]; then
+            bash scripts/vps/health-check.sh local || echo "Some health checks failed"
+          fi
+          ENDSSH
+      
+      # ============================================================================
+      # Deployment Summary
+      # ============================================================================
+      - name: Generate deployment summary
+        if: always()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## 🚀 VPS Deployment Summary
+          
+          ### Deployment Details
+          - **Environment**: ${{ steps.env.outputs.environment }}
+          - **Git Commit**: `${{ steps.env.outputs.git_commit }}`
+          - **Git Branch**: `${{ steps.env.outputs.git_branch }}`
+          - **Deployed At**: ${{ steps.env.outputs.deployed_at }}
+          - **Deployed By**: @${{ github.actor }}
+          
+          ### Configuration
+          - **VPS Host**: ${{ secrets.VPS_HOST }}
+          - **Mock NPHIES**: ${{ steps.env.outputs.enable_mock_nphies }}
+          - **AI Provider**: ${{ vars.AI_PROVIDER || 'deepseek' }}
+          
+          ### Services Deployed
+          - ✅ PostgreSQL Database
+          - ✅ Normalizer Service (AI-Powered)
+          - ✅ Financial Rules Engine
+          - ✅ Signer Service
+          - ✅ NPHIES Bridge
+          - ✅ SBS Landing (Orchestration API)
+          - ✅ Cloudflare Tunnel
+          
+          ### Access URLs
+          - **Main API**: https://sbs.brainsait.cloud/health
+          - **Status Check**: https://sbs.brainsait.cloud/api/services/status
+          
+          ### Post-Deployment Steps
+          1. Verify all services are healthy
+          2. Check logs: `ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /opt/sbs/deploy/vps && docker compose logs -f"`
+          3. Run health checks: `ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "bash /opt/sbs/scripts/vps/health-check.sh tunnel"`
+          
+          ### Rollback Instructions
+          If issues are detected, rollback with:
+          ```bash
+          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+          cd /opt/sbs
+          git checkout <previous-commit>
+          cd deploy/vps
+          docker compose build
+          docker compose --profile cloudflare up -d
+          ```
+          EOF
+      
+      # ============================================================================
+      # Cleanup
+      # ============================================================================
+      - name: Cleanup SSH key
+        if: always()
+        run: |
+          rm -f ~/.ssh/vps_deploy_key

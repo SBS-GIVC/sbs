@@ -1,0 +1,57 @@
+name: DeepSeek smoke tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check-and-test:
+    runs-on: ubuntu-latest
+    env:
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check DEEPSEEK_API_KEY secret is set
+        run: |
+          if [ -z "${DEEPSEEK_API_KEY}" ]; then
+            echo "⚠️  DEEPSEEK_API_KEY secret is not set in repository secrets."
+            echo "To configure: Repo > Settings > Secrets > Actions > New repository secret"
+            echo "Skipping DeepSeek tests (will use deterministic fallback)."
+            exit 0
+          else
+            echo "✓ DEEPSEEK_API_KEY secret is configured"
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          pip install -U pip
+          pip install -r normalizer-service/requirements.txt
+          pip install pytest
+
+      - name: Run AI fallback unit tests (deterministic)
+        run: |
+          . .venv/bin/activate
+          PYTHONPATH=$(pwd) python -m pytest services/normalizer/tests/test_ai_fallback.py -v
+
+      - name: Run feature flags tests
+        run: |
+          . .venv/bin/activate
+          PYTHONPATH=$(pwd) python -m pytest services/normalizer/tests/test_feature_flags.py -v
+
+      - name: Run DeepSeek provider smoke test
+        if: env.DEEPSEEK_API_KEY != ''
+        env:
+          ENABLE_DEEPSEEK: 'true'
+          AI_PROVIDER: 'deepseek'
+          ENVIRONMENT: 'staging'
+        run: |
+          . .venv/bin/activate
+          PYTHONPATH=$(pwd) python -m pytest services/normalizer/tests/test_deepseek_provider.py -v
