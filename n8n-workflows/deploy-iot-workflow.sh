@@ -16,7 +16,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Configuration
-N8N_HOST="${N8N_HOST:-https://n8n.srv791040.hstgr.cloud}"
+N8N_HOST="${N8N_HOST:-https://n8n.brainsait.cloud}"
 WORKFLOW_FILE="${1:-$(dirname "$0")/iot-event-processing.json}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 

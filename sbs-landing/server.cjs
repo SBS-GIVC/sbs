@@ -1651,10 +1651,10 @@ app.listen(PORT, '0.0.0.0', () => {
    - Verify eligibility: http://localhost:${PORT}/api/verify-eligibility
    - Audit claim: http://localhost:${PORT}/api/audit-claim
    - Agent status: http://localhost:${PORT}/api/agents/status
-
-🔗 n8n webhook: ${process.env.N8N_WEBHOOK_URL || 'Not configured'}
-🔗 MasterLinc: ${process.env.MASTERLINC_URL || 'Not configured'}
-🌍 Environment: ${process.env.NODE_ENV || 'development'}
+   
+   🔗 n8n webhook: ${process.env.N8N_WEBHOOK_URL || 'https://n8n.brainsait.cloud/webhook/iot-events'}
+   🔗 MasterLinc: ${process.env.MASTERLINC_URL || 'Not configured'}
+   🌍 Environment: ${process.env.NODE_ENV || 'development'}
 
 Ready to process claims! 📋
 `);
