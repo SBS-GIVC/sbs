@@ -22,6 +22,7 @@ const UnifiedCodeBrowser = lazy(() => import('./pages/UnifiedCodeBrowser').then(
 const AIHubPage = lazy(() => import('./pages/AIHubPage').then(m => ({ default: m.AIHubPage })));
 const PredictiveAnalyticsPage = lazy(() => import('./pages/PredictiveAnalyticsPage').then(m => ({ default: m.PredictiveAnalyticsDashboard })));
 const AIAnalyticsHub = lazy(() => import('./pages/AIAnalyticsHub').then(m => ({ default: m.default })));
+const IoTDashboardPage = lazy(() => import('./pages/IoTDashboardPage').then(m => ({ default: m.IoTDashboardPage })));
 
 // Loading component for Suspense
 function PageLoader() {
@@ -149,6 +150,11 @@ export default function App() {
             setSubtitle('Comprehensive AI-powered claim analytics');
             setBreadcrumbs(['Home', 'AI Tools', 'Analytics Hub']);
             break;
+        case 'iot-dashboard':
+            setPageTitle('IoT Monitoring');
+            setSubtitle('Real-time device monitoring and event streaming');
+            setBreadcrumbs(['Home', 'IoT', 'Dashboard']);
+            break;
         default:
             setPageTitle('Dashboard');
     }
@@ -218,6 +224,7 @@ export default function App() {
             {(currentView === 'ai-copilot' || currentView === 'claim-optimizer') && <AIHubPage />}
             {currentView === 'predictive-analytics' && <PredictiveAnalyticsPage />}
             {currentView === 'ai-analytics' && <AIAnalyticsHub />}
+            {currentView === 'iot-dashboard' && <IoTDashboardPage />}
           </Suspense>
         </main>
       </div>

@@ -143,6 +143,14 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose }) {
         {/* System Section */}
         <SidebarSection title="System" />
         <SidebarItem 
+          icon="sensors" 
+          label="IoT Monitoring" 
+          active={currentView === 'iot-dashboard'} 
+          onClick={() => setCurrentView('iot-dashboard')}
+          badge="NEW"
+          badgeColor="blue"
+        />
+        <SidebarItem 
           icon="tune" 
           label="Configuration" 
           active={currentView === 'mapping_rules'} 
