@@ -58,12 +58,24 @@ python -m venv "$ROOT/nphies-bridge/.venv" || true
 "$ROOT/nphies-bridge/.venv/bin/python" -m pip install -U pip >/dev/null
 "$ROOT/nphies-bridge/.venv/bin/python" -m pip install -r "$ROOT/nphies-bridge/requirements.txt" >/dev/null
 
+python -m venv "$ROOT/eligibility-service/.venv" || true
+"$ROOT/eligibility-service/.venv/bin/python" -m pip install -U pip >/dev/null
+"$ROOT/eligibility-service/.venv/bin/python" -m pip install -r "$ROOT/eligibility-service/requirements.txt" >/dev/null
+
 python -m venv "$ROOT/tests/.venv" || true
 "$ROOT/tests/.venv/bin/python" -m pip install -U pip >/dev/null
 "$ROOT/tests/.venv/bin/python" -m pip install -r "$ROOT/tests/requirements.txt" >/dev/null
 
 echo "[bootstrap] installing Landing dependencies"
 cd "$ROOT/sbs-landing"
+if [ -f package-lock.json ]; then
+  npm ci
+else
+  npm install
+fi
+
+echo "[bootstrap] installing AI Gateway dependencies"
+cd "$ROOT/ai-gateway"
 if [ -f package-lock.json ]; then
   npm ci
 else

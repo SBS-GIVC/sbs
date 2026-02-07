@@ -1,0 +1,9 @@
+{
+  "name": "SBS Integration Engine",
+  "short_name": "SBS Engine",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#05070c",
+  "theme_color": "#22d3ee",
+  "icons": []
+}

@@ -10,6 +10,10 @@ This guide describes best practices for managing, rotating, and securing the Dee
 - Never commit `.env` to version control
 - Use `.env.example` as a template
 
+If you use **n8n DeepSeek-direct** workflows, `DEEPSEEK_API_KEY` is also loaded
+into the n8n runtime environment (compose env / secrets manager). Rotate it
+there as well.
+
 ### Staging/Production
 Use a dedicated secrets manager:
 - **AWS**: AWS Secrets Manager or Systems Manager Parameter Store
@@ -30,14 +34,14 @@ Use a dedicated secrets manager:
 #### Staging (DeepSeek enabled by default)
 ```bash
 export ENVIRONMENT=staging
-export DEEPSEEK_API_KEY=sk-your-actual-key
+export DEEPSEEK_API_KEY=<YOUR_DEEPSEEK_API_KEY>
 export AI_PROVIDER=deepseek  # optional, auto-detected
 ```
 
 #### Production (Requires explicit opt-in)
 ```bash
 export ENVIRONMENT=production
-export DEEPSEEK_API_KEY=sk-your-actual-key
+export DEEPSEEK_API_KEY=<YOUR_DEEPSEEK_API_KEY>
 export ENABLE_DEEPSEEK=true  # REQUIRED in production
 export AI_PROVIDER=deepseek  # optional
 ```
@@ -225,6 +229,38 @@ The normalizer sends:
 - Patient names, IDs, or PHI
 - Claim amounts or financial data
 - Authentication credentials
+
+## Copilot Gateway & Additional Secrets
+
+The SBS Copilot can optionally call an internal gateway (recommended) instead of
+calling an external provider directly.
+
+### Normalizer Copilot gateway variables
+
+Set these on **normalizer-service**:
+
+```bash
+export AI_COPILOT_URL=http://ai-gateway:8010/chat
+export AI_COPILOT_API_KEY=   # optional; if empty, provider key is used when applicable
+export AI_COPILOT_TIMEOUT_SECONDS=12
+```
+
+### AI Gateway routing (n8n / Cloudflare)
+
+If you run `ai-gateway`, you may store one of the following:
+
+**n8n webhook**
+```bash
+export AI_GATEWAY_N8N_WEBHOOK_URL=https://<n8n>/webhook/<id>
+```
+
+**Cloudflare AI Gateway**
+```bash
+export CLOUDFLARE_AI_GATEWAY_URL=https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/openai
+export CLOUDFLARE_API_TOKEN=<token>
+```
+
+These secrets should follow the same rotation standards (90 days recommended).
 
 ### Regional Considerations
 - DeepSeek may process data outside Saudi Arabia

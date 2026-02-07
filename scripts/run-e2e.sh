@@ -17,7 +17,21 @@ if [ ! -x "$PY" ]; then
 fi
 
 # Quick readiness checks
-for url in http://localhost:3000/health http://localhost:8000/health http://localhost:8001/health http://localhost:8002/health http://localhost:8003/health; do
+# Required services for E2E suite
+required_urls="http://localhost:3000/health http://localhost:8000/health http://localhost:8001/health http://localhost:8002/health http://localhost:8003/health"
+
+# Optional services (only enforced when explicitly configured)
+optional_urls=""
+if [ "${SBS_ELIGIBILITY_URL:-}" != "" ]; then
+  # If user configured eligibility URL, require it.
+  optional_urls="$optional_urls http://localhost:8004/health"
+fi
+if [ "${AI_COPILOT_URL:-}" != "" ] || [ "${AI_GATEWAY_N8N_WEBHOOK_URL:-}" != "" ] || [ "${CLOUDFLARE_AI_GATEWAY_URL:-}" != "" ]; then
+  # If user configured an AI gateway, require it.
+  optional_urls="$optional_urls http://localhost:8010/health"
+fi
+
+for url in $required_urls $optional_urls; do
   code=$(curl -s -o /dev/null -w "%{http_code}" "$url" || true)
   if [ "$code" != "200" ]; then
     echo "ERROR: $url not ready (HTTP $code)" >&2

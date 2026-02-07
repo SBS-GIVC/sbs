@@ -31,6 +31,8 @@ from collections import deque
 from threading import Lock
 import logging
 
+from copilot_routes import router as copilot_router
+
 load_dotenv()
 
 # Configure logger for proper exception logging
@@ -46,6 +48,9 @@ app = FastAPI(
     description="AI-Powered code normalization with rate limiting and monitoring",
     version="2.0.0"
 )
+
+# Internal copilot endpoint (safe-by-default). Used by Landing when available.
+app.include_router(copilot_router)
 
 # CORS middleware
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS") or os.getenv("CORS_ORIGIN")

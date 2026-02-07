@@ -9,6 +9,10 @@ This repo is typically run via Docker Compose. For devcontainers/environments **
 - nphies-bridge (8003) in **mock mode**
 - sbs-landing (3000) with rate limiting disabled for test runs
 
+Optional (recommended for the Command Center UI):
+- eligibility-service (8004)
+- ai-gateway (8010) for Copilot routing (n8n-first)
+
 ## One-time bootstrap
 
 ```bash
@@ -46,4 +50,23 @@ Notes:
 
 - `DISABLE_RATE_LIMIT=true` or `NODE_ENV=test` disables Landing API rate limiting (needed for polling-heavy E2E matrices).
 - `ENABLE_MOCK_NPHIES=true` makes the NPHIES bridge return deterministic mock responses.
+
+### Optional: Eligibility service
+
+If you run the eligibility service locally, point Landing to it:
+
+```bash
+export SBS_ELIGIBILITY_URL=http://localhost:8004
+```
+
+### Optional: Copilot gateway (n8n-first)
+
+If you run `ai-gateway` locally and want Copilot to route via n8n:
+
+```bash
+export AI_COPILOT_URL=http://localhost:8010/chat
+export AI_GATEWAY_N8N_WEBHOOK_URL=http://localhost:5678/webhook/<your-webhook>
+```
+
+See also: `docs/N8N_GATEWAY_PRODUCTION.md` for production-grade n8n gateway wiring.
 

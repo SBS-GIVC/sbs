@@ -52,7 +52,9 @@ pkill -f "uvicorn .*--port 8000" 2>/dev/null || true
 pkill -f "uvicorn .*--port 8001" 2>/dev/null || true
 pkill -f "uvicorn .*--port 8002" 2>/dev/null || true
 pkill -f "uvicorn .*--port 8003" 2>/dev/null || true
+pkill -f "uvicorn .*--port 8004" 2>/dev/null || true
 pkill -f "node server\.js" 2>/dev/null || true
+pkill -f "node .*ai-gateway/server\.js" 2>/dev/null || true
 sleep 1
 
 echo "[services] starting normalizer (8000)"
@@ -83,6 +85,27 @@ echo "[services] starting nphies bridge (8003, mock)"
     nohup ./.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8003 > "$LOGDIR/nphies.log" 2>&1 &
 )
 
+echo "[services] starting eligibility (8004)"
+(
+  cd "$ROOT/eligibility-service"
+  ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001 \
+    ELIGIBILITY_UPSTREAM_URL="${ELIGIBILITY_UPSTREAM_URL:-}" \
+    ELIGIBILITY_UPSTREAM_API_KEY="${ELIGIBILITY_UPSTREAM_API_KEY:-}" \
+    nohup ./.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8004 > "$LOGDIR/eligibility.log" 2>&1 &
+)
+
+echo "[services] starting ai-gateway (8010)"
+(
+  cd "$ROOT/ai-gateway"
+  PORT=8010 \
+    LOG_LEVEL=${LOG_LEVEL:-info} \
+    AI_GATEWAY_SHARED_SECRET="${AI_GATEWAY_SHARED_SECRET:-}" \
+    AI_GATEWAY_N8N_WEBHOOK_URL="${AI_GATEWAY_N8N_WEBHOOK_URL:-}" \
+    CLOUDFLARE_AI_GATEWAY_URL="${CLOUDFLARE_AI_GATEWAY_URL:-}" \
+    CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN:-}" \
+    nohup node server.js > "$LOGDIR/ai-gateway.log" 2>&1 &
+)
+
 echo "[services] starting landing (3000, no rate-limit)"
 (
   cd "$ROOT/sbs-landing"
@@ -100,6 +123,6 @@ sleep 2
 curl -sS -X POST "http://localhost:8001/generate-test-cert?facility_id=1" >/dev/null || true
 
 echo "[start-local-stack] listening ports:"
-netstat -tlnp 2>/dev/null | grep -E ':(3000|8000|8001|8002|8003)\\b' || true
+netstat -tlnp 2>/dev/null | grep -E ':(3000|8000|8001|8002|8003|8004|8010)\\b' || true
 
 echo "[start-local-stack] OK"

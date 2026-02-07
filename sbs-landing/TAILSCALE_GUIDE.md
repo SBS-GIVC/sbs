@@ -79,6 +79,8 @@ echo "Normalizer:      http://$TAILSCALE_IP:8000"
 echo "Signer:          http://$TAILSCALE_IP:8001"
 echo "Financial Rules: http://$TAILSCALE_IP:8002"
 echo "NPHIES Bridge:   http://$TAILSCALE_IP:8003"
+echo "Eligibility:     http://$TAILSCALE_IP:8004"
+echo "AI Gateway:      http://$TAILSCALE_IP:8010"
 echo "Landing Page:    http://$TAILSCALE_IP:3000"
 ```
 
@@ -155,10 +157,17 @@ Update `.env` to use Tailscale IPs for internal service communication:
 
 ```bash
 # If accessing from other Tailscale devices
-NORMALIZER_URL=http://YOUR_TAILSCALE_IP:8000
-SIGNER_URL=http://YOUR_TAILSCALE_IP:8001
-FINANCIAL_RULES_URL=http://YOUR_TAILSCALE_IP:8002
-NPHIES_BRIDGE_URL=http://YOUR_TAILSCALE_IP:8003
+SBS_NORMALIZER_URL=http://YOUR_TAILSCALE_IP:8000
+SBS_SIGNER_URL=http://YOUR_TAILSCALE_IP:8001
+SBS_FINANCIAL_RULES_URL=http://YOUR_TAILSCALE_IP:8002
+SBS_NPHIES_BRIDGE_URL=http://YOUR_TAILSCALE_IP:8003
+
+# Optional services
+SBS_ELIGIBILITY_URL=http://YOUR_TAILSCALE_IP:8004
+
+# Optional copilot gateway (only if you run ai-gateway)
+# Used by normalizer-service when AI_COPILOT_URL is configured
+AI_COPILOT_URL=http://YOUR_TAILSCALE_IP:8010/chat
 ```
 
 ---

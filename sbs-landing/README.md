@@ -151,6 +151,11 @@ docker-compose down
 
 ## ⚙️ Configuration
 
+### n8n Gateway (Eligibility + Copilot)
+
+This repo supports an **n8n-first gateway** setup for Eligibility and Copilot.
+See: `docs/N8N_GATEWAY_PRODUCTION.md`.
+
 ### Environment Variables
 
 Copy `.env.example` to `.env` and update:
@@ -175,6 +180,16 @@ SBS_NORMALIZER_URL=http://localhost:8000
 SBS_FINANCIAL_RULES_URL=http://localhost:8002
 SBS_SIGNER_URL=http://localhost:8001
 SBS_NPHIES_BRIDGE_URL=http://localhost:8003
+
+# Eligibility (optional real service)
+# If set, Landing proxies POST /api/eligibility/check to ${SBS_ELIGIBILITY_URL}/check
+SBS_ELIGIBILITY_URL=http://localhost:8004
+
+# Copilot wiring
+# auto (default): proxy to ${SBS_INTERNAL_COPILOT_URL} or ${SBS_NORMALIZER_URL}/copilot/chat, else deterministic fallback
+# deterministic: always use deterministic fallback
+SBS_COPILOT_MODE=auto
+SBS_INTERNAL_COPILOT_URL=
 
 # n8n
 N8N_BASE_URL=http://localhost:5678

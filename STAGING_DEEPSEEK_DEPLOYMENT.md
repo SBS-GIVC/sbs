@@ -110,7 +110,7 @@ Update the staging environment configuration to enable DeepSeek.
 cat >> /path/to/staging/.env <<EOF
 
 # DeepSeek AI Configuration (added $(date +%Y-%m-%d))
-DEEPSEEK_API_KEY=sk-your-staging-key
+DEEPSEEK_API_KEY=<YOUR_DEEPSEEK_API_KEY>
 AI_PROVIDER=deepseek
 ENABLE_DEEPSEEK=true  # Optional in staging, auto-enabled if key present
 ENVIRONMENT=staging
@@ -219,7 +219,7 @@ curl -X GET http://staging.sbs.local:8000/health
 docker exec sbs-normalizer printenv | grep -E "(DEEPSEEK|AI_PROVIDER|ENVIRONMENT)"
 
 # Expected output:
-# DEEPSEEK_API_KEY=sk-***
+# DEEPSEEK_API_KEY=<YOUR_DEEPSEEK_API_KEY>
 # AI_PROVIDER=deepseek
 # ENVIRONMENT=staging
 ```
@@ -316,7 +316,7 @@ curl -X POST http://staging.sbs.local:8000/normalize \
 docker logs sbs-normalizer --tail 20 | grep -i fallback
 
 # Restore valid key
-docker exec sbs-normalizer sh -c 'export DEEPSEEK_API_KEY=sk-valid-key'
+docker exec sbs-normalizer sh -c 'export DEEPSEEK_API_KEY=<YOUR_DEEPSEEK_API_KEY>'
 docker restart sbs-normalizer
 ```
 

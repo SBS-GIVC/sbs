@@ -22,6 +22,7 @@ const MAX_FILE_SIZE = Number.parseInt(process.env.MAX_FILE_SIZE || '10485760', 1
 const SBS_SIGNER_URL = process.env.SBS_SIGNER_URL || 'http://localhost:8001';
 const SBS_FINANCIAL_RULES_URL = process.env.SBS_FINANCIAL_RULES_URL || 'http://localhost:8002';
 const SBS_NPHIES_BRIDGE_URL = process.env.SBS_NPHIES_BRIDGE_URL || 'http://localhost:8003';
+const SBS_ELIGIBILITY_URL = process.env.SBS_ELIGIBILITY_URL || '';
 const ENABLE_STAGE_HOOKS = process.env.ENABLE_STAGE_HOOKS === 'true';
 const SBS_STAGE_HOOK_URL = process.env.SBS_STAGE_HOOK_URL || '';
 const ENABLE_MOCK_PROCESSING = process.env.ENABLE_MOCK_PROCESSING === 'true';
@@ -302,6 +303,24 @@ if (process.env.NODE_ENV === 'development') {
 // Serve static files
 app.use(express.static('public'));
 
+// SPA workspace routes (Command Center)
+// Serve index.html for UI workspaces so direct navigation works.
+const spaRoutes = [
+  '/',
+  '/claim-builder',
+  '/eligibility',
+  '/prior-auth',
+  '/code-browser',
+  '/ai-analytics',
+  '/copilot'
+];
+
+spaRoutes.forEach(route => {
+  app.get(route, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  });
+});
+
 // File upload configuration
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
@@ -352,6 +371,417 @@ app.get('/api/metrics', (req, res) => {
     uptime: process.uptime(),
     memory: process.memoryUsage(),
     timestamp: new Date().toISOString()
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Claim Analyzer API
+// Computes risk vectors from validation/normalization outputs + workflow telemetry.
+// ---------------------------------------------------------------------------
+
+const STAGE_SLA_SECONDS = {
+  validation: 30,
+  normalization: 45,
+  financialRules: 45,
+  signing: 30,
+  nphiesSubmission: 60
+};
+
+function clamp01(x) {
+  return Math.max(0, Math.min(1, x));
+}
+
+function toNumberOrNull(x) {
+  const n = Number(x);
+  return Number.isFinite(n) ? n : null;
+}
+
+function getStageDurationsFromTimeline(claim) {
+  // Compute durations using timeline events (in_progress -> completed/failed)
+  const events = Array.isArray(claim.timeline) ? claim.timeline : [];
+  const startTimes = {};
+  const durations = {};
+
+  for (const e of events) {
+    const ev = String(e.event || '');
+    if (!ev.startsWith('stage_')) continue;
+    const stage = ev.replace('stage_', '');
+    const status = e.status;
+    const ts = new Date(e.timestamp).getTime();
+    if (!Number.isFinite(ts)) continue;
+
+    if (status === 'in_progress') {
+      startTimes[stage] = ts;
+    }
+    if ((status === 'completed' || status === 'failed') && startTimes[stage]) {
+      durations[stage] = Math.max(0, ts - startTimes[stage]);
+      delete startTimes[stage];
+    }
+  }
+
+  return durations; // ms
+}
+
+function computeClaimAnalysis(claim) {
+  const stages = claim.stages || {};
+  const errors = Array.isArray(claim.errors) ? claim.errors : [];
+
+  const norm = stages.normalization?.data || {};
+  const normConfidence = toNumberOrNull(norm.confidence);
+  const normHasUnknown = String(norm.sbsCode || '').toUpperCase() === 'UNKNOWN';
+
+  const fin = stages.financialRules?.data || {};
+  const totalVal = toNumberOrNull(fin.total);
+
+  const nph = claim.nphiesResponse || {};
+  const nphStatus = String(nph.status || claim.status || '').toLowerCase();
+
+  const durations = getStageDurationsFromTimeline(claim);
+  const slaBreaches = Object.entries(STAGE_SLA_SECONDS)
+    .map(([stage, slaS]) => {
+      const ms = durations[stage];
+      if (!ms) return null;
+      const sec = ms / 1000;
+      return sec > slaS ? { stage, durationSeconds: sec, slaSeconds: slaS } : null;
+    })
+    .filter(Boolean);
+
+  // Subscores (0 = low risk, 1 = high risk)
+  const dataCompletenessRisk = clamp01(
+    (claim.data?.patient?.id ? 0 : 0.6) + (claim.data?.patient?.name ? 0 : 0.4) + (claim.data?.metadata?.submittedBy ? 0 : 0.3)
+  );
+
+  const codeMappingRisk = (() => {
+    if (normHasUnknown) return 0.95;
+    if (normConfidence === null) return 0.6;
+    // assume confidence 0..1
+    return clamp01(1 - normConfidence);
+  })();
+
+  const financialRisk = (() => {
+    if (totalVal === null) return 0.35;
+    if (totalVal <= 0) return 0.55;
+    if (totalVal > 25000) return 0.85;
+    if (totalVal > 10000) return 0.70;
+    if (totalVal > 5000) return 0.58;
+    return 0.30;
+  })();
+
+  const submissionRisk = (() => {
+    if (nphStatus.includes('accepted')) return 0.20;
+    if (nphStatus.includes('rejected')) return 0.92;
+    if (nphStatus.includes('error')) return 0.98;
+    // submitted/unknown
+    return 0.45;
+  })();
+
+  const slaRisk = clamp01(slaBreaches.length ? 0.75 : 0.25);
+
+  // Fraud signals: based on error count + high amount + unknown mapping.
+  const fraudSignalsRisk = clamp01(
+    (errors.length ? Math.min(0.55, errors.length * 0.12) : 0.20) +
+    (totalVal !== null && totalVal > 20000 ? 0.25 : 0) +
+    (normHasUnknown ? 0.20 : 0)
+  );
+
+  const overall = clamp01(
+    (dataCompletenessRisk * 0.12) +
+    (codeMappingRisk * 0.26) +
+    (financialRisk * 0.18) +
+    (slaRisk * 0.18) +
+    (submissionRisk * 0.26)
+  );
+
+  const recommendations = [];
+  if (normHasUnknown || codeMappingRisk > 0.6) {
+    recommendations.push('Review normalization mapping; low confidence/UNKNOWN SBS code detected.');
+  }
+  if (slaBreaches.length) {
+    recommendations.push(`Investigate SLA breach in stages: ${slaBreaches.map(b => b.stage).join(', ')}`);
+  }
+  if (submissionRisk > 0.8) {
+    recommendations.push('NPHIES outcome indicates rejection/error. Review payload + bridge logs.');
+  }
+  if (financialRisk > 0.7) {
+    recommendations.push('High financial total detected; validate bundling and tier markup results.');
+  }
+
+  return {
+    success: true,
+    claimId: claim.claimId,
+    timestamp: new Date().toISOString(),
+    signals: {
+      normalization: {
+        internalCode: norm.internalCode || null,
+        sbsCode: norm.sbsCode || null,
+        confidence: normConfidence,
+        mappingSource: norm.mappingSource || null
+      },
+      financial: {
+        total: totalVal,
+        currency: fin.currency || null
+      },
+      nphies: {
+        status: nph.status || null,
+        transactionId: nph.transaction_uuid || nph.transactionId || null
+      },
+      errorsCount: errors.length,
+      slaBreaches
+    },
+    risk: {
+      overall,
+      score100: Math.round(overall * 100),
+      subscores: {
+        dataCompleteness: dataCompletenessRisk,
+        codeMapping: codeMappingRisk,
+        eligibility: 0.50, // not currently part of workflow; reserved for future
+        fraudSignals: fraudSignalsRisk,
+        slaRisk
+      }
+    },
+    recommendations
+  };
+}
+
+app.get('/api/claims/:claimId/analyzer', (req, res) => {
+  const { claimId } = req.params;
+
+  if (!claimId || !claimIdRegex.test(claimId)) {
+    return res.status(400).json({ success: false, error: 'Invalid claim ID format' });
+  }
+
+  const claim = getClaim(claimId);
+  if (!claim) {
+    return res.status(404).json({ success: false, error: 'Claim not found', claimId });
+  }
+
+  return res.json(computeClaimAnalysis(claim));
+});
+
+// ---------------------------------------------------------------------------
+// Demo operational APIs for unified workspaces
+// ---------------------------------------------------------------------------
+
+app.post('/api/eligibility/check', async (req, res) => {
+  const { memberId, payerId, dateOfService, facilityId } = req.body || {};
+
+  // Prefer real eligibility service if configured.
+  if (SBS_ELIGIBILITY_URL) {
+    try {
+      const response = await axios.post(
+        `${SBS_ELIGIBILITY_URL.replace(/\/+$/, '')}/check`,
+        { memberId, payerId, dateOfService, facilityId },
+        { timeout: 12000 }
+      );
+      return res.json(response.data);
+    } catch (error) {
+      // Fail closed to deterministic fallback (do not error out UI).
+      console.warn('[ELIGIBILITY] Upstream eligibility service unavailable, using fallback:', error.message);
+    }
+  }
+
+  // Deterministic fallback behavior
+  const eligible = Boolean(memberId) && !String(memberId).endsWith('0');
+  return res.json({
+    success: true,
+    timestamp: new Date().toISOString(),
+    memberId: memberId || null,
+    payerId: payerId || null,
+    eligible,
+    plan: eligible ? 'GOLD' : 'UNKNOWN',
+    benefits: eligible ? ['OP', 'IP', 'PHARMACY'] : [],
+    notes: eligible
+      ? 'Eligibility verified (fallback)'
+      : 'Member not eligible (fallback rule: IDs ending with 0)'
+  });
+});
+
+app.post('/api/prior-auth/submit', (req, res) => {
+  const { memberId, procedureCode } = req.body || {};
+  const ts = Date.now().toString(36).toUpperCase();
+  const authId = `PA-${ts}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+  res.json({
+    success: true,
+    timestamp: new Date().toISOString(),
+    authId,
+    status: memberId && procedureCode ? 'submitted' : 'rejected',
+    eta: '2m',
+    notes: 'Prior auth request accepted (demo)'
+  });
+});
+
+// Proxy normalize endpoint to the normalizer service (keeps UI same-origin).
+app.post('/api/normalizer/normalize', async (req, res) => {
+  try {
+    const response = await axios.post(`${SBS_NORMALIZER_URL}/normalize`, req.body, { timeout: 15000 });
+    res.json(response.data);
+  } catch (error) {
+    const status = error.response?.status || 502;
+    res.status(status).json({
+      error: 'Normalizer proxy failed',
+      message: error.response?.data || error.message
+    });
+  }
+});
+
+// AI Copilot (DeepSeek V4) — safe demo implementation.
+// Safety defaults:
+// - Fail-closed deterministic reply if upstream copilot is unavailable
+// - Redacts obvious secret patterns
+// - Optional proxy to internal copilot service (normalizer-service) when exposed
+app.post('/api/copilot/chat', async (req, res) => {
+  const { message, context } = req.body || {};
+  const text = String(message || '').trim();
+
+  const SECRET_PATTERNS = [
+    /sk-[A-Za-z0-9]{10,}/g,
+    /DEEPSEEK_API_KEY\s*=?\s*[A-Za-z0-9\-_.]{10,}/gi,
+    /GEMINI_API_KEY\s*=?\s*[A-Za-z0-9\-_.]{10,}/gi
+  ];
+
+  function sanitizeReply(input) {
+    const raw = String(input || '');
+    const redacted = SECRET_PATTERNS.reduce((acc, pat) => acc.replace(pat, '[REDACTED]'), raw);
+    return redacted.length > 2000 ? `${redacted.slice(0, 1980)}\n…(truncated)…` : redacted;
+  }
+
+  function buildTelemetryForClaim(claim) {
+    if (!claim) return null;
+    const analysis = computeClaimAnalysis(claim);
+
+    // Carefully select safe fields only. Never include attachments/base64.
+    const stages = claim.stages || {};
+    const stageSummary = Object.fromEntries(
+      Object.entries(stages).map(([k, v]) => [
+        k,
+        {
+          status: v?.status || null,
+          timestamp: v?.timestamp || null,
+          message: v?.message || null,
+          // include only small, safe per-stage data
+          data: k === 'normalization'
+            ? {
+              internalCode: v?.data?.internalCode || null,
+              sbsCode: v?.data?.sbsCode || null,
+              confidence: v?.data?.confidence ?? null,
+              mappingSource: v?.data?.mappingSource || null,
+              requestId: v?.data?.requestId || null
+            }
+            : k === 'financialRules'
+              ? {
+                total: v?.data?.total ?? null,
+                currency: v?.data?.currency || null
+              }
+              : undefined
+        }
+      ])
+    );
+
+    return {
+      claimId: claim.claimId,
+      status: claim.status,
+      progress: getClaimProgress(claim),
+      stages: stageSummary,
+      errorsCount: Array.isArray(claim.errors) ? claim.errors.length : 0,
+      nphies: {
+        status: claim.nphiesResponse?.status || null,
+        transactionId: claim.nphiesResponse?.transaction_uuid || null
+      },
+      risk: analysis?.risk,
+      recommendations: analysis?.recommendations || []
+    };
+  }
+
+  function enrichContextWithTelemetry(inputContext) {
+    const ctx = (inputContext && typeof inputContext === 'object') ? inputContext : {};
+    const claimId = ctx.claimId;
+    if (!claimId || !claimIdRegex.test(String(claimId))) {
+      return ctx;
+    }
+    const claim = getClaim(String(claimId));
+    if (!claim) {
+      return ctx;
+    }
+    return {
+      ...ctx,
+      telemetry: buildTelemetryForClaim(claim)
+    };
+  }
+
+  async function tryInternalCopilot() {
+    const mode = (process.env.SBS_COPILOT_MODE || 'auto').toLowerCase(); // auto|normalizer|deterministic
+    if (mode === 'deterministic') {
+      return null;
+    }
+
+    const url = process.env.SBS_INTERNAL_COPILOT_URL || `${SBS_NORMALIZER_URL}/copilot/chat`;
+    try {
+      const enrichedContext = enrichContextWithTelemetry(context);
+      const upstream = await axios.post(url, { message: text, context: enrichedContext || {} }, { timeout: 7000 });
+      if (!upstream?.data) {
+        return null;
+      }
+
+      // Accept either {reply,...} or {success:true, reply,...}
+      const payload = upstream.data;
+      if (payload.reply) {
+        return {
+          provider: payload.provider || 'internal',
+          model: payload.model || 'internal-copilot',
+          reply: sanitizeReply(payload.reply),
+          safety: payload.safety || { mode: 'internal' }
+        };
+      }
+      return null;
+    } catch (err) {
+      // Only use deterministic fallback.
+      return null;
+    }
+  }
+
+  const internal = await tryInternalCopilot();
+  if (internal) {
+    return res.json({
+      success: true,
+      provider: internal.provider,
+      model: internal.model,
+      timestamp: new Date().toISOString(),
+      reply: internal.reply,
+      safety: internal.safety
+    });
+  }
+
+  // Deterministic fallback (no network).
+  const deepseekKeyPresent = Boolean(process.env.DEEPSEEK_API_KEY);
+  const deepseekEnabled = (process.env.ENABLE_DEEPSEEK || '').toLowerCase() === 'true' || (process.env.ENABLE_DEEPSEEK || '') === '1';
+  const provider = deepseekKeyPresent && deepseekEnabled ? 'deepseek' : 'deterministic';
+  const model = provider === 'deepseek' ? 'DeepSeek V4 (gated)' : 'Deterministic Safety HUD';
+
+  // Lightweight, deterministic responder (no secrets, no network).
+  const normalized = text.toLowerCase();
+  let reply = '';
+
+  if (!text) {
+    reply = 'No input received. Provide a question or an instruction.';
+  } else if (normalized.includes('status') || normalized.includes('health')) {
+    reply = 'Use AI Analytics → Service Cards for live health, or call GET /api/services/status.';
+  } else if (normalized.includes('normalize') || normalized.includes('code')) {
+    reply = 'Use Code Browser workspace. It calls POST /api/normalizer/normalize (proxy to normalizer-service).';
+  } else if (normalized.includes('sla') || normalized.includes('slow')) {
+    reply = 'SLA signals are derived from stage timestamps. In Claim Builder → Safety Hub, watch slaRisk and timeline.';
+  } else if (normalized.includes('claim') && context?.claimId) {
+    reply = `I see a tracked claimId=${context.claimId}. Open Claim Builder to view timeline and risk vectors.`;
+  } else {
+    reply = 'HUD tip: ask about "workflow stages", "services status", "normalization", or provide a claimId for tracking.';
+  }
+
+  res.json({
+    success: true,
+    provider,
+    model,
+    timestamp: new Date().toISOString(),
+    reply: sanitizeReply(reply),
+    safety: { mode: 'offline', redaction: true, maxLen: 2000 }
   });
 });
 
@@ -634,8 +1064,13 @@ async function processDirectSBS(claim, claimData) {
     );
 
     claim.updateStage('normalization', 'completed', 'Code normalization completed', {
+      internalCode,
       sbsCode: normalizeResponse.data.sbs_mapped_code,
-      confidence: normalizeResponse.data.confidence
+      officialDescription: normalizeResponse.data.official_description,
+      confidence: normalizeResponse.data.confidence,
+      mappingSource: normalizeResponse.data.mapping_source,
+      requestId: normalizeResponse.data.request_id,
+      processingTimeMs: normalizeResponse.data.processing_time_ms
     });
     claim.setStatus(WORKFLOW_STAGES.NORMALIZED);
     saveClaim(claim);

@@ -33,7 +33,7 @@
         "options": {
           "timeout": 30000
         },
-        "bodyParametersJson": "={{ $json }}"
+        "bodyParametersJson": "={{ $json.normalizerRequest }}"
       },
       "name": "1. Normalizer Service",
       "type": "n8n-nodes-base.httpRequest",
@@ -43,13 +43,13 @@
     },
     {
       "parameters": {
-        "url": "http://sbs-financial-rules:8002/apply-rules",
+        "url": "http://sbs-financial-rules:8002/validate",
         "method": "POST",
         "jsonParameters": true,
         "options": {
           "timeout": 30000
         },
-        "bodyParametersJson": "={{ $json }}"
+        "bodyParametersJson": "={{ $json.fhirClaim }}"
       },
       "name": "2. Financial Rules Engine",
       "type": "n8n-nodes-base.httpRequest",
@@ -65,7 +65,7 @@
         "options": {
           "timeout": 30000
         },
-        "bodyParametersJson": "={{ $json }}"
+        "bodyParametersJson": "={{ {\n  facility_id: 1,\n  payload: $json.validatedClaim\n} }}"
       },
       "name": "3. Digital Signer",
       "type": "n8n-nodes-base.httpRequest",
@@ -75,13 +75,13 @@
     },
     {
       "parameters": {
-        "url": "http://sbs-nphies-bridge:8003/submit",
+        "url": "http://sbs-nphies-bridge:8003/submit-claim",
         "method": "POST",
         "jsonParameters": true,
         "options": {
           "timeout": 60000
         },
-        "bodyParametersJson": "={{ $json }}"
+        "bodyParametersJson": "={{ {\n  facility_id: 1,\n  fhir_payload: $json.validatedClaim,\n  signature: $json.signature\n} }}"
       },
       "name": "4. NPHIES Submission",
       "type": "n8n-nodes-base.httpRequest",
@@ -91,7 +91,47 @@
     },
     {
       "parameters": {
-        "functionCode": "// Format success response\nconst result = $input.item.json;\n\nreturn {\n  json: {\n    success: true,\n    claimId: result.claimId || result.claim_id,\n    message: 'Claim submitted successfully to NPHIES',\n    nphiesResponse: result.nphiesResponse || result,\n    timestamp: new Date().toISOString(),\n    processingTime: `${Date.now() - new Date($node['Validate Input'].json.timestamp).getTime()}ms`\n  }\n};"
+        "functionCode": "// Shape internal code request + keep original claim metadata\nconst body = $input.item.json.body;\n\nconst claimType = (body.claimType || 'professional').toLowerCase();\nconst fallbackInternalCodesByType = {\n  professional: 'CONS-GEN-01',\n  institutional: 'RAD-CXR-01',\n  pharmacy: 'LAB-CBC-01',\n  vision: 'RAD-CXR-01'\n};\n\nconst firstProc = Array.isArray(body.procedures) && body.procedures.length ? body.procedures[0] : null;\nconst internalCode = (firstProc && (firstProc.internal_code || firstProc.internalCode || firstProc.code)) || fallbackInternalCodesByType[claimType] || 'CONS-GEN-01';\nconst description = (firstProc && (firstProc.description || firstProc.display)) || `Procedure for ${body.patientName || 'patient'}`;\n\nreturn {\n  json: {\n    claimId: `CLM-${Date.now()}`,\n    timestamp: new Date().toISOString(),\n    patientName: body.patientName,\n    patientId: body.patientId,\n    memberId: body.memberId || body.patientId,\n    claimType,\n    userEmail: body.userEmail,\n    diagnoses: body.diagnoses || [],\n    normalizerRequest: {\n      facility_id: 1,\n      internal_code: internalCode,\n      description\n    },\n    status: 'received'\n  }\n};"
+      },
+      "name": "Prepare Normalizer Request",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [450, 200],
+      "id": "prep-normalizer-1"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Build minimal FHIR Claim expected by Financial Rules Engine\nconst input = $input.item.json;\nconst norm = $node['1. Normalizer Service'].json;\n\nconst fhirClaim = {\n  resourceType: 'Claim',\n  status: 'active',\n  facility_id: 1,\n  type: {\n    coding: [{\n      system: 'http://terminology.hl7.org/CodeSystem/claim-type',\n      code: input.claimType\n    }]\n  },\n  patient: { reference: `Patient/${input.patientId}` },\n  created: input.timestamp,\n  provider: { reference: 'Organization/DEFAULT_PROVIDER' },\n  insurer: { reference: 'Organization/DEFAULT_PAYER' },\n  priority: { coding: [{ code: 'normal' }] },\n  item: [{\n    sequence: 1,\n    productOrService: {\n      coding: [{\n        system: 'http://sbs.sa/coding/services',\n        code: norm.sbs_mapped_code || 'UNKNOWN',\n        display: norm.official_description || input.claimType\n      }]\n    },\n    quantity: { value: 1 },\n    unitPrice: { value: 0, currency: 'SAR' }\n  }]\n};\n\nreturn {\n  json: {\n    ...input,\n    normalized: norm,\n    fhirClaim\n  }\n};"
+      },
+      "name": "Build FHIR Claim",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [850, 120],
+      "id": "build-fhir-1"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Store validated claim payload for signing/submission\n// NOTE: HTTP Request nodes typically return only the response body, so we must\n// re-attach metadata from previous nodes.\nconst meta = $node['Prepare Normalizer Request'].json;\nconst norm = $node['1. Normalizer Service'].json;\nconst validatedClaim = $input.item.json;\n\nreturn {\n  json: {\n    ...meta,\n    normalized: norm,\n    validatedClaim\n  }\n};"
+      },
+      "name": "Capture Validated Claim",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1050, 120],
+      "id": "capture-validated-1"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Merge signature with validated claim for NPHIES submission\nconst meta = $node['Prepare Normalizer Request'].json;\nconst norm = $node['1. Normalizer Service'].json;\nconst validated = $node['Capture Validated Claim'].json.validatedClaim;\nconst sig = $input.item.json;\n\nreturn {\n  json: {\n    ...meta,\n    normalized: norm,\n    validatedClaim: validated,\n    signature: sig.signature,\n    algorithm: sig.algorithm,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "name": "Prepare NPHIES Payload",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1150, 120],
+      "id": "prep-nphies-1"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Format success response\nconst result = $input.item.json;\n\nreturn {\n  json: {\n    success: true,\n    claimId: $node['Prepare Normalizer Request'].json.claimId,\n    message: 'Claim submitted successfully to NPHIES',\n    nphiesResponse: result.nphiesResponse || result,\n    timestamp: new Date().toISOString(),\n    processingTime: `${Date.now() - new Date($node['Prepare Normalizer Request'].json.timestamp).getTime()}ms`\n  }\n};"
       },
       "name": "Format Success Response",
       "type": "n8n-nodes-base.function",
@@ -112,7 +152,7 @@
     },
     {
       "parameters": {
-        "functionCode": "// Handle errors\nconst error = $input.item.json.error || $input.item.json;\n\nreturn {\n  json: {\n    success: false,\n    error: error.message || 'Processing failed',\n    details: error,\n    timestamp: new Date().toISOString(),\n    claimId: $node['Validate Input'].json.claimId\n  }\n};"
+        "functionCode": "// Handle errors\nconst error = $input.item.json.error || $input.item.json;\n\nreturn {\n  json: {\n    success: false,\n    error: error.message || 'Processing failed',\n    details: error,\n    timestamp: new Date().toISOString(),\n    claimId: $node['Prepare Normalizer Request'].json.claimId\n  }\n};"
       },
       "name": "Handle Error",
       "type": "n8n-nodes-base.function",
@@ -122,11 +162,21 @@
     },
     {
       "parameters": {
+        "functionCode": "// Normalize NPHIES bridge status so the IF node can check one value\nconst input = $input.item.json;\nconst s = String(input.status || '').toLowerCase();\n\nreturn {\n  json: {\n    ...input,\n    _normalizedStatus: (s === 'error' || s === 'rejected') ? 'rejected' : 'ok'\n  }\n};"
+      },
+      "name": "Normalize Outcome",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1350, 300],
+      "id": "normalize-outcome-1"
+    },
+    {
+      "parameters": {
         "conditions": {
           "string": [
             {
-              "value1": "={{ $json.status }}",
-              "value2": "error"
+              "value1": "={{ $json._normalizedStatus }}",
+              "value2": "rejected"
             }
           ]
         }
@@ -140,21 +190,33 @@
   ],
   "connections": {
     "Webhook - Claim Submission": {
-      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Prepare Normalizer Request", "type": "main", "index": 0 }]]
     },
-    "Validate Input": {
+    "Prepare Normalizer Request": {
       "main": [[{ "node": "1. Normalizer Service", "type": "main", "index": 0 }]]
     },
     "1. Normalizer Service": {
+      "main": [[{ "node": "Build FHIR Claim", "type": "main", "index": 0 }]]
+    },
+    "Build FHIR Claim": {
       "main": [[{ "node": "2. Financial Rules Engine", "type": "main", "index": 0 }]]
     },
     "2. Financial Rules Engine": {
+      "main": [[{ "node": "Capture Validated Claim", "type": "main", "index": 0 }]]
+    },
+    "Capture Validated Claim": {
       "main": [[{ "node": "3. Digital Signer", "type": "main", "index": 0 }]]
     },
     "3. Digital Signer": {
+      "main": [[{ "node": "Prepare NPHIES Payload", "type": "main", "index": 0 }]]
+    },
+    "Prepare NPHIES Payload": {
       "main": [[{ "node": "4. NPHIES Submission", "type": "main", "index": 0 }]]
     },
     "4. NPHIES Submission": {
+      "main": [[{ "node": "Normalize Outcome", "type": "main", "index": 0 }]]
+    },
+    "Normalize Outcome": {
       "main": [[
         { "node": "Format Success Response", "type": "main", "index": 0 },
         { "node": "Check for Errors", "type": "main", "index": 0 }

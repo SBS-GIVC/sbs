@@ -539,7 +539,7 @@ vault kv put secret/sbs/normalizer \
 docker exec sbs-normalizer printenv | grep -E "(DEEPSEEK|AI_PROVIDER|ENABLE_DEEPSEEK)"
 
 # Expected output:
-# DEEPSEEK_API_KEY=sk-***
+# DEEPSEEK_API_KEY=<YOUR_DEEPSEEK_API_KEY>
 # ENABLE_DEEPSEEK=true
 # AI_PROVIDER=deepseek
 ```

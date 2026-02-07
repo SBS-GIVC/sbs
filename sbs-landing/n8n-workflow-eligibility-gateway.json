@@ -1,0 +1,58 @@
+{
+  "name": "SBS Eligibility Gateway",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sbs-eligibility-check",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook - Eligibility",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 260],
+      "webhookId": "sbs-eligibility-webhook",
+      "id": "webhook-elig-1"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Eligibility gateway (placeholder rules)\n// Expected request: { memberId, payerId, dateOfService, facilityId, context }\n\nconst body = $input.item.json.body || {};\nconst memberId = String(body.memberId || '').trim();\nconst payerId = body.payerId ? String(body.payerId) : null;\n\n// Deterministic placeholder: IDs ending with 0 are not eligible\nconst eligible = Boolean(memberId) && !memberId.endsWith('0');\n\nreturn {\n  json: {\n    success: true,\n    timestamp: new Date().toISOString(),\n    memberId,\n    payerId,\n    eligible,\n    plan: eligible ? 'GOLD' : 'UNKNOWN',\n    benefits: eligible ? ['OP', 'IP', 'PHARMACY'] : [],\n    coverage: {\n      network: eligible ? 'IN' : '-',\n      copay: eligible ? 0.1 : null\n    },\n    notes: eligible ? 'Eligibility verified (n8n gateway)' : 'Member not eligible (n8n rule)',\n    source: 'n8n'\n  }\n};"
+      },
+      "name": "Compute Eligibility",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [470, 260],
+      "id": "elig-compute-1"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [690, 260],
+      "id": "elig-respond-1"
+    }
+  ],
+  "connections": {
+    "Webhook - Eligibility": {
+      "main": [[{ "node": "Compute Eligibility", "type": "main", "index": 0 }]]
+    },
+    "Compute Eligibility": {
+      "main": [[{ "node": "Respond", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "id": "sbs-eligibility",
+  "meta": {
+    "instanceId": "sbs-local"
+  },
+  "tags": ["SBS", "Eligibility", "Gateway"]
+}
