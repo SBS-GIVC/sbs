@@ -39,5 +39,27 @@ __pycache__/
 
 # Backup files
 *.backup
+*.backup-*
 *~
+*.old
+
+# Dependencies
 node_modules/
+.venv/
+venv/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Archive (cleanup directory)
+.archive/
+
+# Build outputs
+dist/
+build/
+
+# Wrangler
+.wrangler/
+*.pid
+*.log

@@ -15,29 +15,50 @@ This solution implements a decoupled, microservices-based architecture with the 
 
 ### Core Services
 
-1. **Normalizer Service** (AI-Powered)
-   - Translates internal hospital codes to official SBS codes
-   - Uses local mapping database (Gemini legacy optional)
-   - Port: 8000
-
-2. **Financial Rules Engine**
-   - Applies CHI-mandated business rules
-   - Calculates bundles, validates coverage, applies pricing tiers
-   - Port: 8002
-
-3. **Security & Signer Service**
-   - Manages digital certificates and payload signing
-   - Implements SHA-256 hashing with RSA signing
-   - Port: 8001
-
-4. **NPHIES Bridge**
-   - Handles all communications with NPHIES platform
-   - Implements retry logic and transaction logging
-   - Port: 8003
+| Service | Port | Description |
+|---------|------|-------------|
+| **Normalizer Service** | 8000 | AI-powered translation of hospital codes to SBS codes |
+| **Signer Service** | 8001 | Digital certificates and SHA-256/RSA signing |
+| **Financial Rules Engine** | 8002 | CHI-mandated business rules and pricing |
+| **NPHIES Bridge** | 8003 | NPHIES platform communication and logging |
+| **SBS Landing** | 3000/3001 | Web UI and REST API |
 
 ### Orchestration
 
 - **n8n Workflow Engine**: Orchestrates end-to-end claim submission pipeline
+
+## 📁 Project Structure
+
+```
+sbs/
+├── normalizer-service/      # AI-powered code normalization
+├── financial-rules-engine/  # CHI business rules
+├── signer-service/          # Digital signing & certificates
+├── nphies-bridge/           # NPHIES API integration
+├── ai-prediction-service/   # AI prediction service
+├── sbs-landing/             # Web UI & Landing API
+├── services/                # Supporting microservices
+│   ├── agents/              # AI agents (AuthLinc, ClaimLinc, ComplianceLinc)
+│   └── masterlinc-bridge/   # MasterLinc integration
+├── database/                # Schema and migrations
+├── docker/                  # Docker Compose configurations
+├── docs/                    # 📚 All documentation
+│   ├── architecture/        # System architecture
+│   ├── deployment/          # Deployment guides
+│   ├── api/                 # API documentation
+│   ├── testing/             # Testing guides
+│   ├── security/            # Security docs
+│   ├── guides/              # Development guides
+│   └── reports/             # Audit reports
+├── scripts/                 # 🔧 All scripts
+│   ├── deploy/              # Deployment scripts
+│   ├── test/                # Test scripts
+│   └── maintenance/         # Maintenance scripts
+├── n8n-workflows/           # n8n workflow definitions
+├── k8s-production/          # Kubernetes manifests
+├── tests/                   # Test suite
+└── docker-compose.yml       # Main orchestration
+```
 
 ## 🚀 Quick Start
 
@@ -54,7 +75,7 @@ This solution implements a decoupled, microservices-based architecture with the 
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd sbs-integration-engine
+cd sbs
 
 # Configure environment variables
 cp .env.example .env
@@ -65,9 +86,10 @@ docker-compose up -d
 
 # Check service health
 docker-compose ps
-```
 
-Note: GitHub Pages deployment is intentionally disabled to avoid conflicts with the production domain at https://sbs.brainsait.cloud.
+# For production
+docker-compose -f docker/docker-compose.production.yml up -d
+```
 
 ## 📊 Database Schema
 
@@ -88,31 +110,14 @@ See `/database/schema.sql` for complete schema.
 ## 🧪 Testing
 
 ```bash
-# Sandbox Environment (Development)
-export NPHIES_ENV=sandbox
-docker-compose -f docker-compose.sandbox.yml up
+# Run quick test
+./scripts/test/quick_test_single_claim.sh
 
-# Run integration tests
-pytest tests/integration/
+# Run full integration tests
+pytest tests/
 
-# Production Environment
-export NPHIES_ENV=production
-docker-compose up -d
-```
-
-## 📁 Project Structure
-
-```
-sbs-integration-engine/
-├── normalizer-service/       # AI-powered code normalization
-├── financial-rules-engine/   # CHI business rules
-├── signer-service/           # Digital signing & certificates
-├── nphies-bridge/            # NPHIES API integration
-├── database/                 # Schema and migrations
-├── sbs-landing/              # Landing API & n8n workflows
-├── docker/                   # Docker configurations
-├── docs/                     # Documentation
-└── docker-compose.yml        # Orchestration
+# Run n8n workflow tests
+./scripts/test/test_n8n_integration.sh
 ```
 
 ## 🛠️ API Endpoints
@@ -131,14 +136,33 @@ sbs-integration-engine/
 
 ## 📚 Documentation
 
-- [PRD](docs/PRD.md) - Product Requirements Document
-- [API Reference](docs/API.md) - Complete API documentation
-- [Security Guide](docs/SECURITY.md) - Security implementation details
-- [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment
+See [docs/README.md](docs/README.md) for the complete documentation index.
 
-## 🤝 Contributing
+**Key Documents:**
+- [Architecture Overview](docs/architecture/ARCHITECTURE.md)
+- [API Reference](docs/api/API.md)
+- [Deployment Guide](docs/deployment/DEPLOYMENT.md)
+- [Security Guide](docs/security/SECURITY.md)
+- [Getting Started](docs/guides/START_HERE.md)
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+## 🔧 Scripts
+
+See [scripts/README.md](scripts/README.md) for available scripts.
+
+**Quick Commands:**
+```bash
+# Deploy
+./scripts/deploy/quickstart.sh          # Local development
+./scripts/deploy/deploy-production.sh   # Production
+
+# Test
+./scripts/test/quick_test_single_claim.sh
+./scripts/test/test_full_workflow.sh
+
+# Maintenance
+./scripts/maintenance/check_sbs_status.sh
+./scripts/maintenance/production-health-check.sh
+```
 
 ## 📄 License
 
@@ -146,4 +170,8 @@ Proprietary - All rights reserved
 
 ## 📞 Support
 
-For technical support, contact: support@sbs-integration.sa
+For technical support, contact: support@brainsait.cloud
+
+---
+
+**Production URL:** https://sbs.brainsait.cloud

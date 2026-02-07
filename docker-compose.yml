@@ -444,7 +444,7 @@ services:
       - "5678:5678"
     volumes:
       - n8n_data:/home/node/.n8n
-      - ./sbs-landing/n8n-workflow-sbs-complete.json:/home/node/.n8n/workflows/sbs-complete-pipeline.json:ro
+      - ./n8n-workflows/sbs-production-workflow.json:/home/node/.n8n/workflows/sbs-complete-pipeline.json:ro
     depends_on:
       - normalizer-service
       - financial-rules-engine
