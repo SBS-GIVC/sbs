@@ -1,20 +1,27 @@
 import React from 'react';
 
-export function SectionHeader({ title, subtitle, badge, actions }) {
+/**
+ * Premium Section Header Component
+ * Optimized for GIVC-SBS Ultra-Premium Design System
+ */
+export function SectionHeader({ title, subtitle, badge, className = '' }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className={`mb-6 flex flex-col gap-1.5 ${className}`}>
       <div className="flex items-center gap-3">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white">{title}</h2>
-          {subtitle && <p className="text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
-        </div>
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tighter">
+          {title}
+        </h2>
         {badge && (
-          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-primary/10 text-primary border border-primary/20">
+          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-600/10 text-blue-600 border border-blue-600/20 uppercase tracking-wider">
             {badge}
           </span>
         )}
       </div>
-      {actions}
+      {subtitle && (
+        <p className="text-base font-medium text-slate-500 dark:text-slate-400 max-w-2xl leading-relaxed">
+          {subtitle}
+        </p>
+      )}
     </div>
   );
 }

@@ -1,252 +1,214 @@
 import React from 'react';
+import { Card, CardBody, CardHeader } from '../components/ui/Card';
+import { SectionHeader } from '../components/ui/SectionHeader';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 
+/**
+ * Premium Facility Usage & Quota Management
+ * Optimized for GIVC-SBS Ultra-Premium Design System
+ */
 export function FacilityUsagePage() {
   return (
-    <div className="flex-1 px-4 py-8 md:px-8 lg:px-12 xl:px-40 bg-background-light dark:bg-background-dark overflow-y-auto w-full">
-        <div className="mx-auto max-w-7xl">
-            {/* Page Heading */}
-            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white sm:text-4xl">Facility Usage & Quota Management</h1>
-                    <p className="mt-2 text-base text-slate-500 dark:text-slate-400">Monitor API limits, adjust throughput quotas, and configure burst settings across hospital nodes.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button onClick={() => alert("Usage Report Exported.")} className="flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-border-dark dark:bg-surface-dark dark:text-slate-200 dark:hover:bg-slate-800 transition-all">
-                        <span className="material-symbols-outlined text-[18px]">file_download</span>
-                        Export Report
-                    </button>
-                    <button className="flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-600 transition-all">
-                        <span className="material-symbols-outlined text-[18px]">add_circle</span>
-                        Add Facility
-                    </button>
-                </div>
-            </div>
+    <div className="flex-1 overflow-y-auto bg-grid scrollbar-hide">
+      <main className="max-w-[1400px] mx-auto p-6 sm:p-8 space-y-8 stagger-children">
+        
+        {/* Header Section */}
+        <section className="animate-premium-in">
+           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <SectionHeader 
+                title="Usage & Quota Management" 
+                subtitle="Orchestrate API throughput limits and manage burst quotas across your clinical network."
+                badge="Operational Governance"
+              />
+              <div className="flex gap-3">
+                 <Button variant="secondary" icon="analytics">Usage Report</Button>
+                 <Button icon="add_location">Provision Node</Button>
+              </div>
+           </div>
 
-            {/* Stats Overview */}
-            <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                 <StatCard title="Global Throughput" val="1.2M" sub="req/day" trend="12%" icon="network_check" color="primary" />
-                 <StatCard title="Avg Quota Usage" val="64%" sub="across all nodes" trend="5%" icon="pie_chart" color="indigo" />
-                 <StatCard title="Active Facilities" val="142" sub="connected nodes" trend="+2 new" icon="domain" color="emerald" />
-                 <StatCard title="Critical Alerts" val="3" sub="near quota limits" trend="Action needed" icon="warning" color="red" />
-            </div>
+           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
+              <UsageStat title="Global Throughput" value="1.2M" unit="req/day" trend="+12%" color="blue" />
+              <UsageStat title="Network Utilization" value="64%" unit="capacity" trend="+5%" color="indigo" />
+              <UsageStat title="Active Endpoints" value="142" unit="nodes" trend="+2 new" color="emerald" />
+              <UsageStat title="Limit Violation" value="3" unit="critical" trend="Action Required" color="rose" />
+           </div>
+        </section>
 
-            <div className="flex flex-col gap-6 lg:flex-row">
-                {/* Main Facility List */}
-                <div className="flex-1">
-                    {/* Controls & Filters */}
-                    <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                        <div className="relative w-full max-w-md">
-                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[20px] text-slate-400">search</span>
-                            <input className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary dark:border-border-dark dark:bg-surface-dark dark:text-white dark:placeholder-slate-500" placeholder="Search facilities by Name or ID..." type="text"/>
-                        </div>
-                        <div className="flex items-center gap-2">
-                             <FilterBtn icon="filter_list" label="Filters" />
-                             <FilterBtn icon="sort" label="Sort: Usage High to Low" />
-                        </div>
+        <div className="grid lg:grid-cols-3 gap-8">
+           <div className="lg:col-span-2 space-y-8">
+              {/* Controls */}
+              <Card className="animate-premium-in" style={{ animationDelay: '100ms' }}>
+                 <CardBody className="flex flex-col sm:flex-row gap-4 items-end">
+                    <div className="flex-1">
+                       <Input icon="search" placeholder="Filter nodes by identifier or facility name..." />
                     </div>
-                    {/* Grid of Facility Cards */}
-                    <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                        <FacilityCard name="Dammam General" id="HOSP-DAM-003" usage={95} current="95,000" max="100,000" status="Critical Usage" color="red" cap={100000} rpm={300} />
-                        <FacilityCard name="King Fahd Medical City" id="HOSP-RIY-001" usage={45} current="45,200" max="100,000" status="Healthy" color="emerald" cap={100000} rpm={500} />
-                        <FacilityCard name="Jeddah Clinic Main" id="CLINIC-JED-05" usage={82} current="41,000" max="50,000" status="Warning" color="orange" cap={50000} rpm={250} />
-                        <FacilityCard name="Riyadh Specialized" id="HOSP-RIY-004" usage={14} current="28,000" max="200,000" status="Healthy" color="emerald" cap={200000} rpm={1000} />
+                    <div className="flex gap-2">
+                       <Button variant="secondary" icon="tune">Governance</Button>
+                       <Button variant="secondary" icon="sort">Priority Sort</Button>
+                    </div>
+                 </CardBody>
+              </Card>
+
+              {/* Facility Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-premium-in" style={{ animationDelay: '200ms' }}>
+                 <FacilityUsageCard name="Dammam General Hospital" id="HOSP-DAM-003" usage={95} current="95k" max="100k" color="rose" region="East" rpm={300} />
+                 <FacilityUsageCard name="King Fahd Medical City" id="HOSP-RIY-001" usage={45} current="45k" max="100k" color="blue" region="Central" rpm={500} />
+                 <FacilityUsageCard name="Jeddah Clinic Main" id="CLINIC-JED-05" usage={82} current="41k" max="50k" color="amber" region="West" rpm={250} />
+                 <FacilityUsageCard name="National Guard Health" id="HOSP-RIY-004" usage={14} current="28k" max="200k" color="emerald" region="Central" rpm={1000} />
+              </div>
+           </div>
+
+           {/* Sidebar Config */}
+           <div className="space-y-6">
+              <Card className="animate-premium-in sticky top-8" style={{ animationDelay: '300ms' }}>
+                 <CardHeader title="Registry Governance" subtitle="Global threshold configuration for network relaying." />
+                 <CardBody className="space-y-8">
+                    <div className="space-y-6">
+                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Trigger Thresholds</p>
+                       <ConfigRange label="Warning Alert" val="80%" color="amber" />
+                       <ConfigRange label="Critical Throttle" val="95%" color="rose" />
                     </div>
 
-                    <div className="mt-8 flex items-center justify-between border-t border-slate-200 pt-4 dark:border-border-dark">
-                         <p className="text-sm text-slate-500 dark:text-slate-400">Showing <span className="font-medium text-slate-900 dark:text-white">1</span> to <span className="font-medium text-slate-900 dark:text-white">4</span> of <span className="font-medium text-slate-900 dark:text-white">142</span> results</p>
-                         <div className="flex items-center gap-2">
-                            <button className="rounded-lg border border-slate-200 px-3 py-1 text-sm font-medium text-slate-500 hover:bg-slate-50 dark:border-border-dark dark:text-slate-400 dark:hover:bg-slate-800">Previous</button>
-                            <button className="rounded-lg border border-slate-200 px-3 py-1 text-sm font-medium text-slate-500 hover:bg-slate-50 dark:border-border-dark dark:text-slate-400 dark:hover:bg-slate-800">Next</button>
-                         </div>
+                    <div className="space-y-4">
+                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Notifications</p>
+                       <CheckToggle label="Network Admin Relay" active />
+                       <CheckToggle label="SMS Critical Alert" active />
+                       <CheckToggle label="Webhook Integrations" />
                     </div>
-                </div>
 
-                {/* Right Sidebar: Quota Alerting */}
-                <div className="lg:w-80">
-                    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-border-dark dark:bg-surface-dark sticky top-24">
-                        <div className="mb-5 flex items-center justify-between">
-                            <h3 className="font-bold text-slate-900 dark:text-white">Quota Alerting</h3>
-                            <span className="material-symbols-outlined text-slate-400">notifications_active</span>
-                        </div>
-                        <div className="space-y-6">
-                            <div>
-                                <p className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">Triggers</p>
-                                <SliderRange label="Warning Threshold" val="80%" color="orange" />
-                                <SliderRange label="Critical Threshold" val="90%" color="red" />
-                            </div>
-                            <div>
-                                <p className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">Notifications</p>
-                                <div className="space-y-3">
-                                    <CheckItem label="Email Admins" desc="Send alerts to system administrators." checked />
-                                    <CheckItem label="Webhook" desc="POST to Slack/Teams integration." />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="mb-2 block text-xs font-medium uppercase tracking-wider text-slate-500">Recipients</label>
-                                <textarea className="block w-full rounded-lg border-slate-200 bg-slate-50 p-3 text-sm text-slate-900 focus:border-primary focus:ring-primary dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder-slate-500" placeholder="admin@gateway.health, alerts@hospital.com" rows="3"></textarea>
-                            </div>
-                            <button className="w-full rounded-lg bg-primary py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-600 transition-colors">Save Configuration</button>
-                        </div>
+                    <div className="space-y-2">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Relay Recipients</label>
+                       <textarea className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-600/20" rows="3" placeholder="admin@health.sa, ops@relay.sa" />
                     </div>
-                </div>
-            </div>
+
+                    <Button className="w-full py-4 rounded-2xl shadow-xl shadow-blue-600/10">Apply Global Rule</Button>
+                 </CardBody>
+              </Card>
+           </div>
         </div>
+      </main>
     </div>
   );
 }
 
-function StatCard({ title, val, sub, trend, icon, color }) {
-    const bgMap = {
-        primary: "bg-primary/10 text-primary border-primary/20",
-        indigo: "bg-indigo-500/10 text-indigo-500 border-indigo-500/20",
-        emerald: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-        red: "bg-red-500/10 text-red-500 border-red-500/20",
-    }
-    const barMap = {
-        primary: "bg-primary",
-        indigo: "bg-indigo-500",
-        emerald: "bg-emerald-500",
-        red: "bg-red-500"
-    }
+function UsageStat({ title, value, unit, trend, color }) {
+  const colors = {
+    blue: 'text-blue-600 bg-blue-600/10',
+    indigo: 'text-indigo-600 bg-indigo-600/10',
+    emerald: 'text-emerald-600 bg-emerald-600/10',
+    rose: 'text-rose-600 bg-rose-600/10',
+  };
 
-    // simplified trend color
-    const trendColor = color === 'red' ? 'text-red-500' : 'text-emerald-500';
+  return (
+    <div className="glass-card p-6 rounded-[32px] border border-slate-200/50 dark:border-slate-800/50 hover:border-blue-600/30 transition-all group overflow-hidden relative">
+       <div className={`absolute bottom-0 left-0 h-1 bg-current opacity-20 ${colors[color].split(' ')[0]}`} style={{ width: '100%' }}></div>
+       <div className={`absolute bottom-0 left-0 h-1 bg-current ${colors[color].split(' ')[0]}`} style={{ width: value.includes('%') ? value : '65%' }}></div>
+       
+       <div className="flex justify-between items-start mb-2">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{title}</p>
+          <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border border-current ${colors[color]}`}>{trend}</span>
+       </div>
+       <div className="flex items-baseline gap-2">
+          <h4 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{value}</h4>
+          <span className="text-[10px] font-black uppercase text-slate-400">{unit}</span>
+       </div>
+    </div>
+  );
+}
 
-    return (
-        <div className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-border-dark dark:bg-surface-dark transition-all hover:border-primary/50">
-            <div className="flex justify-between items-start">
+function FacilityUsageCard({ name, id, usage, current, max, color, region, rpm }) {
+  const colors = {
+    rose: 'from-rose-500 to-pink-500 text-rose-500',
+    blue: 'from-blue-500 to-indigo-500 text-blue-500',
+    amber: 'from-amber-500 to-orange-500 text-amber-500',
+    emerald: 'from-emerald-500 to-teal-500 text-emerald-500',
+  };
+
+  return (
+    <Card className={`border-t-4 transition-all hover:scale-[1.02] ${usage > 90 ? 'border-t-rose-500' : 'border-t-blue-600'}`}>
+       <CardBody className="p-6 space-y-6">
+          <div className="flex justify-between items-start">
+             <div className="flex items-center gap-3">
+                <div className={`size-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center ${colors[color].split(' ')[2]}`}>
+                   <span className="material-symbols-outlined text-xl">hub</span>
+                </div>
                 <div>
-                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
-                    <div className="mt-2 flex items-baseline gap-2">
-                        <p className="text-2xl font-bold text-slate-900 dark:text-white">{val}</p>
-                        <span className={`text-xs font-medium ${trendColor} flex items-center`}>
-                             {trend.includes('new') || trend.includes('needed') ? '' : <span className="material-symbols-outlined text-[14px] mr-0.5">trending_up</span>} {trend}
-                        </span>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-1">{sub}</p>
+                   <h3 className="text-sm font-black text-slate-800 dark:text-gray-100 leading-none">{name}</h3>
+                   <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{region} Operational</span>
                 </div>
-                <div className={`rounded-lg p-2 ${bgMap[color].split(' ')[0]} ${bgMap[color].split(' ')[1]}`}>
-                    <span className="material-symbols-outlined">{icon}</span>
-                </div>
-            </div>
-            <div className={`absolute bottom-0 left-0 h-1 w-full ${bgMap[color].split(' ')[0]}`}>
-                <div className={`h-full ${barMap[color]} w-[65%]`}></div>
-            </div>
-        </div>
-    )
-}
-
-function FilterBtn({ icon, label }) {
-    return (
-        <button className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-border-dark dark:bg-surface-dark dark:text-slate-300 dark:hover:bg-slate-800">
-            <span className="material-symbols-outlined text-[18px]">{icon}</span>
-            {label}
-        </button>
-    )
-}
-
-function FacilityCard({ name, id, usage, current, max, status, color, cap, rpm }) {
-    const statusMap = {
-        red: "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-500/30",
-        emerald: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-slate-200",
-        orange: "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-slate-200"
-    };
-    const iconMap = {
-        red: "bg-red-500/10 text-red-500",
-        emerald: "bg-blue-500/10 text-primary",
-        orange: "bg-orange-500/10 text-orange-500"
-    };
-    const barMap = {
-        red: "bg-red-500",
-        emerald: "bg-primary",
-        orange: "bg-orange-500"
-    };
-
-    return (
-        <div className={`flex flex-col rounded-xl border ${color === 'red' ? 'border-red-500/30' : 'border-slate-200'} bg-white p-5 shadow-sm dark:bg-surface-dark dark:border-border-dark`}>
-            <div className="mb-4 flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${iconMap[color]}`}>
-                        <span className="material-symbols-outlined">local_hospital</span>
-                    </div>
-                    <div>
-                        <h3 className="font-bold text-slate-900 dark:text-white">{name}</h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">ID: {id}</p>
-                    </div>
-                </div>
-                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusMap[color]}`}>
-                    {status}
-                </span>
-            </div>
-            <div className="mb-6 flex items-center justify-center gap-8 py-2">
-                {/* Simple Circle Gauge Rep */}
-                 <div className="flex flex-col items-center justify-center rounded-full border-4 border-slate-200 dark:border-slate-700 size-32 relative">
-                    <div className="absolute top-0 left-0 w-full h-full rounded-full border-4 border-transparent border-t-primary" style={{transform:`rotate(${usage * 3.6}deg)`}}></div> 
-                    <span className="text-2xl font-bold text-slate-900 dark:text-white">{usage}%</span>
-                    <span className="text-[10px] text-slate-500">USAGE</span>
-                 </div>
-
-                 <div className="flex-1 space-y-4">
-                    <div>
-                        <div className="flex justify-between text-xs mb-1">
-                            <span className="text-slate-500">Current</span>
-                            <span className="text-slate-900 dark:text-white">{current}</span>
-                        </div>
-                         <div className="flex justify-between text-xs mb-1">
-                            <span className="text-slate-500">Max Cap</span>
-                            <span className="text-slate-900 dark:text-white">{max}</span>
-                        </div>
-                        <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                            <div className={`h-full ${barMap[color]} rounded-full`} style={{ width: `${usage}%` }}></div>
-                        </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-500">Burst Mode</span>
-                         <label className="relative inline-flex cursor-pointer items-center">
-                            <input defaultChecked={color === 'red'} className="peer sr-only" type="checkbox"/>
-                            <div className={`peer h-5 w-9 rounded-full bg-slate-200 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:${barMap[color]} peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:border-slate-600 dark:bg-slate-700`}></div>
-                        </label>
-                    </div>
-                 </div>
-            </div>
-             <div className="mt-auto grid grid-cols-2 gap-4 border-t border-slate-100 pt-4 dark:border-slate-700">
-                 <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-500">Monthly Cap</label>
-                    <input className="block w-full rounded-md border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white" type="number" defaultValue={cap}/>
-                 </div>
-                 <div>
-                    <label className="mb-1 flex justify-between text-xs font-medium text-slate-500">
-                        <span>Rate Limit</span>
-                        <span className={iconMap[color].split(' ')[1]}>{rpm} RPM</span>
-                    </label>
-                    <input className={`h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-200 dark:bg-slate-700 accent-${color === 'emerald' ? 'primary' : (color === 'orange' ? 'orange-500': 'red-500')}`} max="1000" min="100" type="range" defaultValue={rpm}/>
-                 </div>
              </div>
-        </div>
-    )
+             <span className={`text-[9px] font-black uppercase px-2 py-1 rounded bg-slate-900 text-white tracking-widest`}>{id}</span>
+          </div>
+
+          <div className="flex items-center gap-8 py-2">
+             <div className="relative size-28 rounded-full border-4 border-slate-100 dark:border-slate-800 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border-4 border-blue-600 border-t-transparent transition-all duration-1000" style={{ transform: `rotate(${usage * 3.6}deg)` }}></div>
+                <div className="text-center">
+                   <p className="text-xl font-black text-slate-900 dark:text-white leading-none">{usage}%</p>
+                   <p className="text-[8px] font-black uppercase text-slate-400 mt-1">Utilization</p>
+                </div>
+             </div>
+             <div className="flex-1 space-y-4">
+                <div className="space-y-1">
+                   <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
+                      <span>Live Payload</span>
+                      <span className="text-slate-900 dark:text-white">{current} / {max}</span>
+                   </div>
+                   <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner">
+                      <div className={`h-full bg-gradient-to-r ${colors[color].split(' ')[0]} ${colors[color].split(' ')[1]} transition-all duration-1000`} style={{ width: `${usage}%` }}></div>
+                   </div>
+                </div>
+                <div className="flex items-center justify-between">
+                   <span className="text-[10px] font-black uppercase text-slate-500">Autonomous Throttling</span>
+                   <div className="w-8 h-4 bg-blue-600 rounded-full relative">
+                      <div className="absolute right-1 top-1 size-2 bg-white rounded-full"></div>
+                   </div>
+                </div>
+             </div>
+          </div>
+
+          <div className="pt-6 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-4">
+             <div className="space-y-1.5">
+                <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Daily Cap</label>
+                <input className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs font-bold" type="text" defaultValue={max} />
+             </div>
+             <div className="space-y-1.5">
+                <div className="flex justify-between">
+                   <label className="text-[9px] font-black uppercase text-slate-400 ml-1">Rate Limit</label>
+                   <span className="text-[9px] font-black text-blue-600">{rpm} RPM</span>
+                </div>
+                <input type="range" className="w-full accent-blue-600 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full appearance-none" defaultValue={rpm} max="1000" />
+             </div>
+          </div>
+       </CardBody>
+    </Card>
+  );
 }
 
-function SliderRange({ label, val, color }) {
-    const accent = color === 'orange' ? 'accent-orange-500' : 'accent-red-500';
-    return (
-        <div className="mb-4">
-            <div className="flex justify-between text-sm text-slate-700 dark:text-slate-300 mb-1">
-                <span>{label}</span>
-                <span className="font-bold">{val}</span>
-            </div>
-            <input className={`h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-200 dark:bg-slate-700 ${accent}`} type="range" defaultValue={parseInt(val)}/>
-        </div>
-    )
+function ConfigRange({ label, val, color }) {
+  const colors = {
+    amber: 'accent-amber-500 text-amber-500',
+    rose: 'accent-rose-500 text-rose-500',
+  };
+  return (
+    <div className="space-y-3">
+       <div className="flex justify-between items-center">
+          <span className="text-xs font-bold text-slate-700 dark:text-gray-300">{label}</span>
+          <span className={`text-xs font-black ${colors[color].split(' ')[1]}`}>{val}</span>
+       </div>
+       <input type="range" className={`w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full appearance-none ${colors[color].split(' ')[0]}`} defaultValue={parseInt(val)} />
+    </div>
+  );
 }
 
-function CheckItem({ label, desc, checked }) {
-    return (
-        <div className="flex items-start gap-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
-            <input defaultChecked={checked} className="mt-1 rounded border-slate-300 text-primary focus:ring-primary dark:border-slate-600 dark:bg-slate-700" type="checkbox"/>
-            <div className="text-sm">
-                <p className="font-medium text-slate-900 dark:text-white">{label}</p>
-                <p className="text-xs text-slate-500">{desc}</p>
-            </div>
-        </div>
-    )
+function CheckToggle({ label, active }) {
+  return (
+    <div className="flex items-center justify-between p-3 rounded-2xl bg-white dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+       <span className="text-xs font-bold text-slate-600 dark:text-gray-300">{label}</span>
+       <div className={`w-10 h-5 rounded-full transition-colors relative cursor-pointer ${active ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-700'}`}>
+          <div className={`absolute top-1 size-3 bg-white rounded-full transition-all ${active ? 'right-1' : 'left-1'}`}></div>
+       </div>
+    </div>
+  );
 }

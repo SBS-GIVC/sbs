@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { nphiesService } from '../services/nphiesService';
 import { useToast } from '../components/Toast';
+import { Button } from '../components/ui/Button';
+import { Card, CardBody, CardHeader } from '../components/ui/Card';
+import { SectionHeader } from '../components/ui/SectionHeader';
 
 /**
- * Eligibility Verification Page
- * Real-time patient coverage verification with NPHIES
+ * Premium Eligibility Verification Page
+ * Optimized for GIVC-SBS Ultra-Premium Design System
  */
 export function EligibilityPage() {
   const [patientId, setPatientId] = useState('');
@@ -61,274 +64,233 @@ export function EligibilityPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background-light dark:bg-background-dark">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-emerald-700 via-teal-700 to-cyan-800 px-4 sm:px-6 lg:px-8 py-10 sm:py-12">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMtOS45NDEgMC0xOCA4LjA1OS0xOCAxOHM4LjA1OSAxOCAxOCAxOCAxOC04LjA1OSAxOC0xOC04LjA1OS0xOC0xOC0xOHoiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLW9wYWNpdHk9Ii4xIi8+PC9nPjwvc3ZnPg==')] opacity-30"></div>
+    <div className="flex-1 overflow-y-auto bg-grid scrollbar-hide">
+      <main className="max-w-[1200px] mx-auto p-6 sm:p-8 space-y-8 stagger-children">
         
-        <div className="relative max-w-4xl mx-auto">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
-            <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <span className="material-symbols-rounded text-3xl text-white">verified_user</span>
-            </div>
-            <div>
-              <h1 className="text-3xl sm:text-4xl font-bold text-white">Eligibility Verification</h1>
-              <p className="text-emerald-100">Validate coverage, benefits, and limits in real time.</p>
-            </div>
-          </div>
-
-          {/* Search Card */}
-          <div className="mt-6 sm:mt-8 bg-white/10 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-white/20">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-emerald-100 mb-2">Patient ID / National ID</label>
-                <input
-                  type="text"
-                  value={patientId}
-                  onChange={(e) => setPatientId(e.target.value)}
-                  placeholder="Enter patient ID..."
-                  className="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-emerald-100 mb-2">Insurance Provider (Optional)</label>
-                <select
-                  value={insurerId}
-                  onChange={(e) => setInsurerId(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-white/50"
-                >
-                  <option value="">Auto-detect</option>
-                  <option value="INS-BUPA">Bupa Arabia</option>
-                  <option value="INS-TAWUNIYA">Tawuniya</option>
-                  <option value="INS-MEDGULF">MedGulf</option>
-                  <option value="INS-AXA">AXA Cooperative</option>
-                  <option value="INS-MALATH">Malath Insurance</option>
-                </select>
-              </div>
-              <div className="flex items-end">
-                <button
-                  onClick={handleVerify}
-                  disabled={loading}
-                  className="w-full px-6 py-3 rounded-xl bg-white text-emerald-700 font-semibold hover:bg-emerald-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-medium hover:shadow-glow"
-                >
-                  {loading ? (
-                    <>
-                      <span className="material-symbols-rounded animate-spin text-xl">progress_activity</span>
-                      Verifying...
-                    </>
-                  ) : (
-                    <>
-                      <span className="material-symbols-rounded text-xl">search</span>
-                      Verify Eligibility
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Results Section */}
-      <div className="max-w-4xl mx-auto px-8 py-8">
-        {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-rounded text-red-500">error</span>
-              <p className="text-red-600 dark:text-red-400">{error}</p>
-            </div>
-          </div>
-        )}
-
-        {eligibility && (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            {/* Status Card */}
-            <div className={`rounded-2xl p-6 ${
-              eligibility.eligible 
-                ? 'bg-gradient-to-r from-emerald-500 to-teal-500' 
-                : 'bg-gradient-to-r from-red-500 to-orange-500'
-            }`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
-                    <span className="material-symbols-rounded text-4xl text-white">
-                      {eligibility.eligible ? 'check_circle' : 'cancel'}
-                    </span>
+        {/* Header Section */}
+        <section className="animate-premium-in">
+          <SectionHeader 
+            title="Eligibility Verification" 
+            subtitle="Validate patient coverage and benefit limits against national NPHIES databases in real-time."
+            badge="Live Verification"
+          />
+          
+          <Card className="mt-8 border-l-4 border-l-emerald-500">
+            <CardBody className="p-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Patient National ID / Iqama</label>
+                  <div className="relative group">
+                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors">fingerprint</span>
+                    <input
+                      type="text"
+                      value={patientId}
+                      onChange={(e) => setPatientId(e.target.value)}
+                      placeholder="e.g. 1029384756"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-blue-600/20 transition-all"
+                    />
                   </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-white">
-                      {eligibility.eligible ? 'Coverage Active' : 'Coverage Inactive'}
-                    </h2>
-                    <p className="text-white/80">
-                      Policy: {eligibility.policyNumber} | Class: {eligibility.className || 'Standard'}
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Insurance Provider</label>
+                  <div className="relative group">
+                    <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors">business</span>
+                    <select
+                      value={insurerId}
+                      onChange={(e) => setInsurerId(e.target.value)}
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white font-bold focus:outline-none focus:ring-2 focus:ring-blue-600/20 appearance-none transition-all"
+                    >
+                      <option value="">Auto-detect via NPHIES</option>
+                      <option value="INS-BUPA">Bupa Arabia</option>
+                      <option value="INS-TAWUNIYA">Tawuniya</option>
+                      <option value="INS-MEDGULF">MedGulf</option>
+                      <option value="INS-AXA">GIG (Formerly AXA)</option>
+                    </select>
+                    <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">expand_more</span>
+                  </div>
+                </div>
+
+                <Button 
+                  loading={loading}
+                  icon="verified" 
+                  onClick={handleVerify}
+                  className="w-full py-4 rounded-2xl"
+                  variant="success"
+                >
+                  Verify Coverage
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
+        </section>
+
+        {/* Results Area */}
+        <div className="min-h-[400px]">
+          {error && (
+            <div className="animate-premium-in p-6 rounded-3xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-4">
+              <div className="size-12 rounded-2xl bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-500/20">
+                <span className="material-symbols-outlined">report</span>
+              </div>
+              <div>
+                <h4 className="font-bold text-rose-600 dark:text-rose-400">Verification Failed</h4>
+                <p className="text-sm text-rose-500/80 font-medium">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {eligibility ? (
+            <div className="space-y-8 animate-premium-in">
+              {/* Main Status Card */}
+              <Card className={`overflow-hidden border-none shadow-2xl`}>
+                <div className={`p-8 flex flex-col sm:flex-row items-center justify-between gap-6 bg-gradient-to-r text-white ${
+                  eligibility.eligible 
+                    ? 'from-emerald-500 to-teal-600 shadow-emerald-500/20' 
+                    : 'from-rose-500 to-orange-600 shadow-rose-500/20'
+                }`}>
+                  <div className="flex items-center gap-6">
+                    <div className="size-20 rounded-[24px] bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-xl">
+                      <span className="material-symbols-outlined text-5xl">
+                        {eligibility.eligible ? 'check_circle' : 'cancel'}
+                      </span>
+                    </div>
+                    <div className="text-center sm:text-left">
+                      <h2 className="text-3xl font-extrabold tracking-tighter leading-tight">
+                        {eligibility.eligible ? 'Patient is Eligible' : 'Coverage Inactive'}
+                      </h2>
+                      <p className="text-white/80 font-bold tracking-tight mt-1 flex items-center gap-2 justify-center sm:justify-start">
+                        <span className="material-symbols-outlined text-sm">policy</span>
+                        Policy: {eligibility.policyNumber}
+                        <span className="mx-2 opacity-50">|</span>
+                        Class: {eligibility.className || 'Standard'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-center sm:text-right bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+                    <p className="text-xs font-bold uppercase tracking-widest text-white/70">Coverage Valid Until</p>
+                    <p className="text-2xl font-black">{eligibility.coverageEnd}</p>
+                  </div>
+                </div>
+                
+                <CardBody className="grid sm:grid-cols-3 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/50 dark:divide-slate-800/50 p-0">
+                  <div className="p-6 space-y-1">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Insurance Payer</p>
+                    <p className="text-lg font-extrabold text-slate-900 dark:text-white capitalize">{eligibility.payerName || 'Detecting...'}</p>
+                    <p className="text-xs font-mono text-slate-400">{eligibility.payerId}</p>
+                  </div>
+                  <div className="p-6 space-y-1">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Co-Payment / Deductible</p>
+                    <div className="flex items-center gap-2">
+                       <span className="text-lg font-extrabold text-slate-900 dark:text-white">{eligibility.coPayPercentage || 0}%</span>
+                       <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-600/10 text-blue-600 border border-blue-600/20">Patient Share</span>
+                    </div>
+                    <p className="text-xs font-bold text-slate-400">{formatCurrency(eligibility.deductible)} total deductible</p>
+                  </div>
+                  <div className="p-6 space-y-1">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Adjudication Mode</p>
+                    <p className="text-lg font-extrabold text-slate-900 dark:text-white">Real-time (NPHIES)</p>
+                    <p className="text-xs font-bold text-emerald-500 flex items-center gap-1">
+                      <span className="size-1.5 rounded-full bg-emerald-500"></span> 
+                      Secure Bridge Active
                     </p>
                   </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-white/70">Valid Until</p>
-                  <p className="text-xl font-bold text-white">{eligibility.coverageEnd}</p>
-                </div>
+                </CardBody>
+              </Card>
+
+              {/* Benefits breakdown */}
+              <Card>
+                <CardHeader 
+                  title="Coverage Benefits Detail" 
+                  subtitle="Detailed breakdown of active benefit categories and remaining limits."
+                />
+                <CardBody className="space-y-6">
+                  {Object.values(eligibility.benefits || {}).map((benefit, index) => (
+                    <BenefitBar
+                      key={index}
+                      benefit={benefit}
+                      formatCurrency={formatCurrency}
+                      percentage={getBenefitUsagePercentage(benefit)}
+                    />
+                  ))}
+                </CardBody>
+              </Card>
+
+              {/* Quick Actions */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <ActionCard icon="add_box" label="Create Claim" sub="Use current eligibility" onClick={() => window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: 'claim-builder' } }))} />
+                <ActionCard icon="approval" label="Request Auth" sub="Pre-approval portal" onClick={() => window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: 'prior-auth' } }))} />
+                <ActionCard icon="print" label="Print Summary" sub="Generate PDF export" onClick={() => window.print()} />
+                <ActionCard icon="history" label="Verify History" sub="Audit older sessions" onClick={() => {}} />
               </div>
             </div>
-
-            {/* Insurance Info */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <InfoCard
-                icon="business"
-                label="Insurance Provider"
-                value={eligibility.payerName || 'Unknown'}
-                sublabel={eligibility.payerId}
-              />
-              <InfoCard
-                icon="percent"
-                label="Co-Payment"
-                value={`${eligibility.coPayPercentage || 0}%`}
-                sublabel="Patient responsibility"
-              />
-              <InfoCard
-                icon="payments"
-                label="Deductible"
-                value={formatCurrency(eligibility.deductible)}
-                sublabel={eligibility.deductibleMet ? '✓ Met for this year' : 'Not yet met'}
-              />
-            </div>
-
-            {/* Benefits Breakdown */}
-            <div className="bg-white dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Benefits Summary</h3>
-                <p className="text-sm text-slate-500">Annual coverage limits and usage</p>
+          ) : !loading && (
+            <div className="flex flex-col items-center justify-center py-20 animate-premium-in">
+              <div className="size-24 rounded-[32px] bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center text-slate-300 dark:text-slate-600 mb-6">
+                <span className="material-symbols-outlined text-6xl">person_search</span>
               </div>
-              
-              <div className="p-6 space-y-6">
-                {Object.values(eligibility.benefits || {}).map((benefit, index) => (
-                  <BenefitRow
-                    key={index}
-                    benefit={benefit}
-                    formatCurrency={formatCurrency}
-                    usagePercentage={getBenefitUsagePercentage(benefit)}
-                  />
-                ))}
-              </div>
+              <h3 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">Ready for Verification</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1 max-w-xs text-center">
+                Enter a Patient National ID or Iqama number to begin the real-time eligibility check.
+              </p>
             </div>
-
-            {/* Quick Actions */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <QuickActionButton
-                icon="receipt_long"
-                label="Submit Claim"
-                onClick={() => window.location.hash = '#claims'}
-              />
-              <QuickActionButton
-                icon="approval"
-                label="Prior Authorization"
-                onClick={() => window.location.hash = '#prior-auth'}
-              />
-              <QuickActionButton
-                icon="print"
-                label="Print Summary"
-                onClick={() => window.print()}
-              />
-              <QuickActionButton
-                icon="history"
-                label="View History"
-                onClick={() => {}}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!eligibility && !loading && !error && (
-          <div className="text-center py-16">
-            <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-              <span className="material-symbols-rounded text-5xl text-slate-400">person_search</span>
-            </div>
-            <h3 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">
-              Enter Patient Details
-            </h3>
-            <p className="text-slate-500 max-w-md mx-auto">
-              Enter a patient ID above to verify their insurance eligibility and view coverage details in real-time.
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function InfoCard({ icon, label, value, sublabel }) {
-  return (
-    <div className="bg-white dark:bg-surface-dark rounded-xl p-5 border border-slate-200 dark:border-slate-800">
-      <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-          <span className="material-symbols-rounded text-primary">{icon}</span>
-        </div>
-        <div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
-          <p className="text-lg font-bold text-slate-900 dark:text-white">{value}</p>
-          <p className="text-xs text-slate-400">{sublabel}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function BenefitRow({ benefit, formatCurrency, usagePercentage }) {
-  const getBarColor = (percentage) => {
-    if (percentage >= 90) return 'bg-red-500';
-    if (percentage >= 70) return 'bg-amber-500';
-    return 'bg-emerald-500';
-  };
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-slate-900 dark:text-white capitalize">
-            {benefit.name || benefit.category}
-          </span>
-          {usagePercentage >= 80 && (
-            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-              Low Balance
-            </span>
           )}
         </div>
-        <div className="text-right">
-          <span className="text-sm font-bold text-slate-900 dark:text-white">
-            {formatCurrency(benefit.remaining)}
+      </main>
+    </div>
+  );
+}
+
+function BenefitBar({ benefit, formatCurrency, percentage }) {
+  const isHighUsage = percentage > 85;
+  return (
+    <div className="space-y-2 group">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`p-1.5 rounded-lg ${isHighUsage ? 'bg-rose-500/10 text-rose-600' : 'bg-blue-600/10 text-blue-600'}`}>
+            <span className="material-symbols-outlined text-[20px]">medical_services</span>
+          </div>
+          <span className="text-sm font-extrabold text-slate-700 dark:text-slate-200 capitalize group-hover:text-blue-600 transition-colors">
+            {benefit.name || benefit.category}
           </span>
-          <span className="text-xs text-slate-500"> remaining</span>
+        </div>
+        <div className="text-right">
+          <p className="text-sm font-black text-slate-900 dark:text-white">{formatCurrency(benefit.remaining)}</p>
+          <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Remaining Limit</p>
         </div>
       </div>
       
-      <div className="relative h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-        <div
-          className={`absolute inset-y-0 left-0 ${getBarColor(usagePercentage)} rounded-full transition-all duration-500`}
-          style={{ width: `${usagePercentage}%` }}
-        />
+      <div className="relative h-2.5 bg-slate-100 dark:bg-slate-800/50 rounded-full overflow-hidden shadow-inner font-bold">
+        <div 
+          className={`absolute inset-y-0 left-0 rounded-full transition-all duration-1000 cubic-bezier(0.16, 1, 0.3, 1) ${
+            isHighUsage ? 'bg-gradient-to-r from-rose-500 to-orange-500' : 'bg-gradient-to-r from-blue-600 to-indigo-600'
+          }`}
+          style={{ width: `${percentage}%` }}
+        >
+          <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+        </div>
       </div>
       
-      <div className="flex justify-between mt-1 text-xs text-slate-500">
-        <span>Used: {formatCurrency(benefit.used)}</span>
-        <span>Limit: {formatCurrency(benefit.allowed)}</span>
+      <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+        <span>Used: {formatCurrency(benefit.used)} ({percentage}%)</span>
+        <span>Annual Limit: {formatCurrency(benefit.allowed)}</span>
       </div>
     </div>
   );
 }
 
-function QuickActionButton({ icon, label, onClick }) {
+function ActionCard({ icon, label, sub, onClick }) {
   return (
-    <button
+    <button 
       onClick={onClick}
-      className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 hover:border-primary hover:shadow-lg transition-all group"
+      className="glass-card p-5 rounded-3xl border border-slate-200/50 dark:border-slate-800/50 hover:border-blue-600/50 transition-all duration-300 flex flex-col items-center gap-3 group text-center"
     >
-      <span className="material-symbols-rounded text-2xl text-slate-400 group-hover:text-primary transition-colors">
-        {icon}
-      </span>
-      <span className="text-sm font-medium text-slate-600 dark:text-slate-400 group-hover:text-primary">
-        {label}
-      </span>
+      <div className="size-12 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-400 group-hover:bg-blue-600 group-hover:text-white group-hover:scale-110 transition-all duration-300 flex items-center justify-center">
+        <span className="material-symbols-outlined text-2xl">{icon}</span>
+      </div>
+      <div>
+        <h4 className="text-sm font-extrabold text-slate-900 dark:text-white tracking-tight">{label}</h4>
+        <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">{sub}</p>
+      </div>
     </button>
   );
 }

@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
 import { normalizeCode } from '../utils/middleware';
+import { Card, CardBody, CardHeader } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
 
+/**
+ * Premium Developer Portal
+ * Optimized for GIVC-SBS Ultra-Premium Design System
+ */
 export function DeveloperPortal() {
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState(null);
   
-  // Default request body for the demo
   const [requestBody, setRequestBody] = useState(`{
     "facility_id": "HOSP-001",
     "internal_code": "99213",
@@ -23,7 +28,6 @@ export function DeveloperPortal() {
         const body = JSON.parse(requestBody);
         const result = await normalizeCode(body.internal_code, body.description);
         
-        // Simulate a full API response structure
         const apiResponse = {
             status: "success",
             request_id: `req_${Math.random().toString(36).substring(7)}`,
@@ -55,234 +59,179 @@ export function DeveloperPortal() {
   };
 
   return (
-    <div className="flex flex-1 overflow-hidden h-full bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-200">
-        {/* Left Sidebar (Navigation) */}
-        <aside className="w-64 bg-background-light dark:bg-[#111a22] border-r border-slate-200 dark:border-border-dark flex flex-col overflow-y-auto hidden lg:flex shrink-0">
-            <div className="p-4 space-y-8">
-                <NavSection title="Getting Started">
-                     <NavItem icon="home" label="Introduction" href="#" />
-                     <NavItem icon="vpn_key" label="Authentication" href="#" />
-                     <NavItem icon="speed" label="Rate Limits" href="#" />
-                </NavSection>
-                <NavSection title="Claims API">
-                     <NavItem icon="cloud_upload" label="Upload Claim" href="#" active />
-                     <NavItem icon="search_check" label="Check Status" href="#" />
-                     <NavItem icon="history" label="History Log" href="#" />
-                </NavSection>
-                <NavSection title="Schema Definitions">
-                     <NavItem icon="data_object" label="Claim Object" href="#" />
-                     <NavItem icon="person" label="Patient Object" href="#" />
-                </NavSection>
-            </div>
-             <div className="mt-auto p-4 border-t border-slate-200 dark:border-border-dark">
-                <div className="bg-slate-100 dark:bg-[#1e293b] p-3 rounded-lg">
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">API Status</p>
-                    <div className="flex items-center gap-2">
-                        <span className="size-2 rounded-full bg-green-500 animate-pulse"></span>
-                        <span className="text-sm font-medium text-slate-900 dark:text-white">All Systems Operational</span>
-                    </div>
-                </div>
-            </div>
+    <div className="flex-1 flex overflow-hidden bg-white dark:bg-slate-950">
+        {/* Left Nav */}
+        <aside className="w-72 bg-slate-50 dark:bg-slate-900/40 border-r border-slate-200/50 dark:border-slate-800/50 hidden lg:flex flex-col">
+           <div className="p-8 space-y-10">
+              <NavSection title="Orchestration">
+                 <NavItem icon="terminal" label="Introduction" active />
+                 <NavItem icon="key" label="Authentication" />
+                 <NavItem icon="compress" label="Rate Limits" />
+              </NavSection>
+              <NavSection title="Endpoints">
+                 <NavItem icon="upload_file" label="Submit Claims" />
+                 <NavItem icon="troubleshoot" label="Verify Status" />
+                 <NavItem icon="history" label="Event Log" />
+              </NavSection>
+           </div>
+           
+           <div className="mt-auto p-6">
+              <div className="p-4 rounded-3xl bg-blue-600/5 border border-blue-600/10 space-y-3">
+                 <div className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Registry Status</span>
+                 </div>
+                 <p className="text-xs font-bold text-slate-800 dark:text-gray-200">Production Nodes Active</p>
+              </div>
+           </div>
         </aside>
 
-        {/* Center Content (Documentation) */}
-        <main className="flex-1 overflow-y-auto bg-white dark:bg-[#101922] relative scroll-smooth p-8 pb-24">
-            <div className="max-w-4xl mx-auto">
-                 {/* Breadcrumbs */}
-                <nav className="flex mb-6 text-sm">
-                    <ol className="inline-flex items-center space-x-1 md:space-x-2">
-                        <li className="text-slate-500 dark:text-[#92adc9]">API Reference</li>
-                        <span className="material-symbols-outlined text-slate-400 text-sm">chevron_right</span>
-                        <li className="text-slate-500 dark:text-[#92adc9]">Claims</li>
-                        <span className="material-symbols-outlined text-slate-400 text-sm">chevron_right</span>
-                        <li className="font-medium text-slate-900 dark:text-white">Upload</li>
-                    </ol>
-                </nav>
+        {/* Main Doc */}
+        <main className="flex-1 overflow-y-auto scrollbar-hide p-8 sm:p-12">
+            <div className="max-w-4xl mx-auto space-y-12 animate-premium-in">
+               <nav className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Documentation</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">Normalization API</span>
+               </nav>
 
-                <div className="mb-10">
-                    <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-4">Upload Claim Data</h1>
-                    <p className="text-lg text-slate-600 dark:text-[#92adc9] leading-relaxed">
-                         Submit raw claim data for AI-driven normalization and coding. This endpoint processes unstructured clinical notes and returns standardized SBS, ICD-10, and CPT codes.
-                    </p>
-                </div>
+               <header className="space-y-6">
+                  <h1 className="text-5xl font-black tracking-tighter text-slate-900 dark:text-white">Relay Claim Payload</h1>
+                  <p className="text-lg font-bold text-slate-500 leading-relaxed">
+                     Submit unstructured clinical data for real-time SBS conversion and NPHIES relay. 
+                     Our neural engine identifies procedural markers and maps them to official billing schemas with cryptographic certainty.
+                  </p>
+               </header>
 
-                <div className="mb-10">
-                    <div className="flex items-center gap-4 p-4 rounded-lg bg-slate-100 dark:bg-[#1e293b] border border-slate-200 dark:border-border-dark font-mono text-sm overflow-x-auto">
-                        <span className="px-2.5 py-1 rounded text-xs font-bold bg-primary text-white uppercase tracking-wide">POST</span>
-                        <span className="text-slate-600 dark:text-slate-300">https://api.brainsait.cloud/v1/claims/upload</span>
-                        <button className="ml-auto text-slate-400 hover:text-white transition-colors">
-                            <span className="material-symbols-outlined text-[18px]">content_copy</span>
-                        </button>
-                    </div>
-                </div>
+               {/* Endpoint Card */}
+               <div className="glass-panel p-2 rounded-[24px] border border-blue-600/10 flex items-center gap-4 group">
+                  <div className="px-4 py-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-blue-600/20">POST</div>
+                  <code className="flex-1 font-mono text-sm font-bold text-slate-600 dark:text-slate-400">https://relay.brainsait.cloud/v1/normalize</code>
+                  <button className="p-3 text-slate-300 hover:text-blue-600 transition-colors">
+                     <span className="material-symbols-outlined text-lg font-black">content_copy</span>
+                  </button>
+               </div>
 
-                <div className="mb-12">
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Header Parameters</h2>
-                    <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-border-dark">
-                         <table className="min-w-full divide-y divide-slate-200 dark:divide-border-dark">
-                            <thead className="bg-slate-50 dark:bg-[#1e293b]">
-                                <tr>
-                                    <Th>Field</Th><Th>Type</Th><Th>Required</Th><Th>Description</Th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-border-dark bg-white dark:bg-[#111a22]">
-                                <ParamRow field="Authorization" type="string" required desc={<span>Your API Key in the format <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-xs">Bearer sk_live_...</code></span>} />
-                                <ParamRow field="Content-Type" type="string" required desc={<span>Must be <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-xs">application/json</code></span>} />
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+               {/* Parameters */}
+               <section className="space-y-6">
+                  <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">Body Parameters</h3>
+                  <div className="overflow-hidden rounded-[32px] border border-slate-200 dark:border-slate-800">
+                     <table className="w-full text-left">
+                        <thead className="bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-slate-800">
+                           <tr>
+                              <Th>Field</Th><Th>Type</Th><Th>Requirement</Th><Th>Context</Th>
+                           </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                           <ParamRow field="facility_id" type="string" required desc="Universal Facility Entity ID (NPHIES format)." />
+                           <ParamRow field="internal_code" type="string" required desc="Source EHR procedural or diagnostic code." />
+                           <ParamRow field="description" type="string" desc="Unstructured clinical narrative for neural analysis." />
+                           <ParamRow field="service_date" type="iso-date" required desc="Timestamp of clinical encounter (UTC)." />
+                        </tbody>
+                     </table>
+                  </div>
+               </section>
 
-                <div className="mb-12">
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">Body Parameters <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">application/json</span></h2>
-                     <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-border-dark">
-                         <table className="min-w-full divide-y divide-slate-200 dark:divide-border-dark">
-                            <thead className="bg-slate-50 dark:bg-[#1e293b]">
-                                <tr>
-                                    <Th>Field</Th><Th>Type</Th><Th>Required</Th><Th>Description</Th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-border-dark bg-white dark:bg-[#111a22]">
-                                <ParamRow field="facility_id" type="string" required desc="The unique identifier for the hospital or clinic facility originating the claim." subDesc='Example: "FAC-NY-001"' isPrim />
-                                <ParamRow field="internal_code" type="string" required desc="The specific internal CPT or billing code used by the facility's EHR system." isPrim />
-                                <ParamRow field="description" type="string" required={false} desc="Raw clinical notes, physician comments, or procedure descriptions for AI normalization. Maximum 5000 characters." isPrim />
-                                <ParamRow field="service_date" type="date (ISO 8601)" required desc="The date the service was performed." subDesc="Format: YYYY-MM-DD" isPrim />
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                
-                 <div className="bg-blue-50 dark:bg-[#0d1a29] border-l-4 border-primary p-4 rounded-r-lg">
-                    <div className="flex">
-                        <div className="flex-shrink-0"><span className="material-symbols-outlined text-primary">info</span></div>
-                        <div className="ml-3">
-                            <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">Handling PII Data</h3>
-                            <div className="mt-2 text-sm text-blue-700 dark:text-blue-400">
-                                <p>Ensure all patient identifiers in the `description` field are de-identified if not explicitly required for processing.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+               {/* Info Callout */}
+               <div className="p-8 rounded-[32px] bg-slate-900 text-white relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-8 text-blue-600 opacity-20 transform translate-x-4 -translate-y-4">
+                     <span className="material-symbols-outlined text-[120px] font-black">shield_lock</span>
+                  </div>
+                  <div className="relative space-y-2">
+                     <h4 className="text-lg font-black tracking-tight">Enterprise Security</h4>
+                     <p className="text-sm font-bold text-slate-400 max-w-md">All data relayer requests must be signed with your RSA-2048 private key. Unsigned payloads will be dropped by the gateway firewall.</p>
+                  </div>
+               </div>
             </div>
         </main>
 
-        {/* Right Sidebar (Code Sandbox) */}
-        <aside className="w-[450px] bg-[#0d1117] border-l border-slate-800 hidden xl:flex flex-col shrink-0">
-             <div className="flex items-center justify-between px-4 h-12 border-b border-slate-800 bg-[#161b22]">
-                <div className="flex gap-1">
-                    <button className="px-3 py-1.5 text-xs font-medium text-white bg-slate-700 rounded-md shadow-sm">cURL</button>
-                    <button className="px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors">Node.js</button>
-                    <button className="px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors">Python</button>
-                </div>
-            </div>
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
-                <div className="group relative">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Request Body</span>
-                    </div>
+        {/* Sandbox Side */}
+        <aside className="w-[500px] bg-slate-900 border-l border-white/5 hidden xl:flex flex-col">
+           <div className="h-16 border-b border-white/5 flex items-center px-8 justify-between">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Payload Sandbox</span>
+              <div className="flex gap-1">
+                 {['JSON', 'cURL', 'Node'].map(t => (
+                   <button key={t} className={`px-3 py-1 text-[9px] font-black uppercase rounded-lg ${t === 'JSON' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-white transition-colors'}`}>{t}</button>
+                 ))}
+              </div>
+           </div>
+
+           <div className="flex-1 overflow-y-auto p-8 space-y-10 scrollbar-hide">
+              <div className="space-y-4">
+                 <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Request Body</label>
+                    <span className="text-[9px] font-bold text-blue-500">Live Editor</span>
+                 </div>
+                 <div className="relative">
                     <textarea 
-                        className="w-full bg-[#161b22] text-slate-300 font-mono text-xs rounded-lg border border-slate-800 p-4 min-h-[150px] focus:outline-none focus:border-primary/50 resize-y"
-                        value={requestBody}
-                        onChange={(e) => setRequestBody(e.target.value)}
-                        spellCheck="false"
+                       className="w-full h-48 bg-slate-950 rounded-2xl p-6 font-mono text-xs text-blue-400 border border-white/5 focus:outline-none focus:border-blue-600/50 transition-colors"
+                       value={requestBody}
+                       onChange={(e) => setRequestBody(e.target.value)}
+                       spellCheck="false"
                     />
-                </div>
+                 </div>
+              </div>
 
-                <div className="group relative">
-                    <div className="flex items-center justify-between mb-2">
-                         <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Response</span>
-                         {response && !loading && <span className="text-xs font-bold text-green-400 bg-green-400/10 px-2 py-0.5 rounded">200 OK</span>}
-                    </div>
-                    <div className="bg-[#161b22] rounded-lg border border-slate-800 p-4 font-mono text-xs overflow-x-auto shadow-xl min-h-[100px] max-h-[400px]">
-                        {loading ? (
-                             <div className="flex items-center gap-2 text-slate-400">
-                                <span className="size-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
-                                Sending request...
-                             </div>
-                        ) : (
-                            <pre><code className="text-slate-300">{response || '// Click "Run Request" to test'}</code></pre>
-                        )}
-                    </div>
-                </div>
+              <div className="space-y-4">
+                 <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Neural Response</label>
+                    {response && <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500">200 OK</span>}
+                 </div>
+                 <div className="w-full bg-slate-950 rounded-2xl p-6 font-mono text-xs text-slate-300 border border-white/5 min-h-[120px] relative">
+                    {loading ? (
+                      <div className="flex items-center gap-2 text-blue-600 animate-pulse">
+                         <span className="material-symbols-outlined text-sm animate-spin">sync</span>
+                         Transmitting to Relay...
+                      </div>
+                    ) : (
+                      <pre className="whitespace-pre-wrap">{response || '// Execute request to view response payload'}</pre>
+                    )}
+                 </div>
+              </div>
+           </div>
 
-                <div className="bg-[#1e293b]/50 border border-[#2d3b4b] rounded-lg p-4 mt-8">
-                    <div className="flex items-start gap-3">
-                        <span className="material-symbols-outlined text-primary text-[20px] mt-0.5">lightbulb</span>
-                        <div>
-                            <h4 className="text-sm font-semibold text-gray-200">Test Mode</h4>
-                            <p className="text-xs text-slate-400 mt-1 leading-relaxed">Use test keys <code className="bg-[#2d3b4b] px-1 py-0.5 rounded text-slate-300">sk_test_...</code> to simulate responses.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div className="p-4 border-t border-slate-800 bg-[#161b22] sticky bottom-0">
-                <button 
-                    onClick={handleRunRequest}
-                    disabled={loading}
-                    className="w-full flex items-center justify-center gap-2 bg-primary hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                     <span className="material-symbols-outlined text-[20px]">play_arrow</span>
-                     {loading ? 'Running...' : 'Run Request'}
-                </button>
-            </div>
+           <div className="p-8 border-t border-white/5 backdrop-blur-md">
+              <Button loading={loading} icon="bolt" className="w-full py-4 rounded-2xl shadow-2xl shadow-blue-600/20" onClick={handleRunRequest}>Submit to Testing Registry</Button>
+           </div>
         </aside>
     </div>
   );
 }
 
 function NavSection({ title, children }) {
-    return (
-        <div>
-            <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 px-2">{title}</h3>
-            <ul className="space-y-1">{children}</ul>
-        </div>
-    )
+  return (
+    <div className="space-y-4">
+      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">{title}</h3>
+      <div className="space-y-1">{children}</div>
+    </div>
+  );
 }
 
-function NavItem({ icon, label, href, active }) {
-    const activeClass = active ? "bg-primary/10 text-primary border-l-2 border-primary" : "text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#1e293b] transition-colors group";
-    const iconClass = active ? "text-primary" : "text-slate-400 group-hover:text-primary";
-    
-    return (
-        <li>
-            <a className={`flex items-center gap-3 px-2 py-2 text-sm font-medium rounded-md ${activeClass}`} href={href}>
-                <span className={`material-symbols-outlined text-[20px] ${iconClass}`}>{icon}</span>
-                {label}
-            </a>
-        </li>
-    )
+function NavItem({ icon, label, active }) {
+  return (
+    <button className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all group ${active ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:bg-white dark:hover:bg-slate-800/50'}`}>
+       <span className={`material-symbols-outlined text-[20px] ${active ? 'text-white' : 'text-slate-400 group-hover:text-blue-600'}`}>{icon}</span>
+       <span className="text-sm font-bold">{label}</span>
+    </button>
+  );
 }
 
 function Th({ children }) {
-    return <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{children}</th>
+  return <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">{children}</th>
 }
 
-function ParamRow({ field, type, required, desc, subDesc, isPrim }) {
-    const typeClass = isPrim ? "text-primary" : "text-slate-500 dark:text-slate-400";
-    return (
-        <tr>
-            <td className="px-6 py-4 whitespace-nowrap align-top"><div className="text-sm font-mono font-bold text-slate-900 dark:text-white">{field}</div></td>
-            <td className={`px-6 py-4 whitespace-nowrap align-top text-sm ${typeClass}`}>{type}</td>
-            <td className={`px-6 py-4 whitespace-nowrap align-top text-sm ${required ? 'text-red-500 font-medium' : 'text-slate-500 font-medium'}`}>{required ? 'Yes' : 'Optional'}</td>
-            <td className="px-6 py-4 align-top text-sm text-slate-500 dark:text-slate-400">
-                {desc}
-                {subDesc && <div className="mt-1 text-xs text-slate-400">{subDesc}</div>}
-            </td>
-        </tr>
-    )
-}
-
-function CodeBlock({ title, code, badge }) {
-    return (
-        <div className="group relative">
-            <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{title}</span>
-                {badge && <span className="text-xs font-bold text-green-400 bg-green-400/10 px-2 py-0.5 rounded">{badge}</span>}
-                {!badge && <button className="text-xs text-primary hover:text-white flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><span className="material-symbols-outlined text-[14px]">content_copy</span> Copy</button>}
-            </div>
-            <div className="bg-[#161b22] rounded-lg border border-slate-800 p-4 font-mono text-xs overflow-x-auto shadow-xl">
-                <pre><code className="text-slate-300">{code}</code></pre>
-            </div>
-        </div>
-    )
+function ParamRow({ field, type, required, desc }) {
+  return (
+    <tr className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+       <td className="px-6 py-5"><code className="text-sm font-black text-blue-600">{field}</code></td>
+       <td className="px-6 py-5 text-xs font-bold text-slate-400">{type}</td>
+       <td className="px-6 py-5">
+          <span className={`text-[10px] font-black uppercase tracking-widest ${required ? 'text-rose-500' : 'text-slate-400'}`}>{required ? 'Required' : 'Optional'}</span>
+       </td>
+       <td className="px-6 py-5 text-sm font-bold text-slate-600 dark:text-gray-300">{desc}</td>
+    </tr>
+  );
 }

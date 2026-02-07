@@ -20,8 +20,8 @@ const ClaimBuilderPage = lazy(() => import('./pages/ClaimBuilderPage').then(m =>
 const SBSCodeBrowser = lazy(() => import('./pages/SBSCodeBrowser').then(m => ({ default: m.SBSCodeBrowser })));
 const UnifiedCodeBrowser = lazy(() => import('./pages/UnifiedCodeBrowser').then(m => ({ default: m.UnifiedCodeBrowser })));
 const AIHubPage = lazy(() => import('./pages/AIHubPage').then(m => ({ default: m.AIHubPage })));
-const PredictiveAnalyticsPage = lazy(() => import('./pages/PredictiveAnalyticsPage').then(m => ({ default: m.PredictiveAnalyticsDashboard })));
-const AIAnalyticsHub = lazy(() => import('./pages/AIAnalyticsHub').then(m => ({ default: m.default })));
+const PredictiveAnalyticsPage = lazy(() => import('./pages/PredictiveAnalyticsPage').then(m => ({ default: m.PredictiveAnalyticsPage })));
+const AIAnalyticsHub = lazy(() => import('./pages/AIAnalyticsHub').then(m => ({ default: m.AIAnalyticsHub })));
 const IoTDashboardPage = lazy(() => import('./pages/IoTDashboardPage').then(m => ({ default: m.IoTDashboardPage })));
 
 // Loading component for Suspense
@@ -187,7 +187,8 @@ export default function App() {
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
         {/* Helper function to determine if we show the standard TopHeader or if the page has its own headers */}
         {/* For now, we will use the standard TopHeader for most pages except DeveloperPortal which might look better full screen or handled differently */}
-        {['dashboard', 'mappings'].includes(currentView) && (
+        {/* Standard TopHeader for all main operational pages */}
+        {!['developer', 'iot-dashboard'].includes(currentView) && (
             <TopHeader 
               title={pageTitle} 
               subtitle={subtitle} 
@@ -195,12 +196,6 @@ export default function App() {
               onMenuClick={() => setSidebarOpen(true)}
             />
         )}
-        
-        {/* Some new pages like FacilityUsage have their own headers built-in, so we might want to hide TopHeader for them 
-            or refactor them to remove their header. 
-            The designs provided had headers in the HTML. 
-            I'll hide the TopHeader for the new pages that have their own headers inside the component.
-        */}
 
         <main className="flex-1 overflow-hidden relative flex flex-col">
           <Suspense fallback={<PageLoader />}>

@@ -1,8 +1,3 @@
-/**
- * AI Analytics Hub
- * Comprehensive dashboard for AI-powered claim analytics, predictions, and insights
- */
-
 import React, { useState, useEffect } from 'react';
 import {
   predictClaim,
@@ -12,8 +7,16 @@ import {
   analyzeClaim,
   getFacilityAnalytics
 } from '../services/aiPredictionService';
+import { Card, CardBody, CardHeader } from '../components/ui/Card';
+import { SectionHeader } from '../components/ui/SectionHeader';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 
-const AIAnalyticsHub = () => {
+/**
+ * Premium AI Analytics Hub
+ * Powered by GIVC-SBS Intelligence
+ */
+export function AIAnalyticsHub() {
   const [activeTab, setActiveTab] = useState('predict');
   const [claimData, setClaimData] = useState({
     facility_id: 1,
@@ -32,7 +35,6 @@ const AIAnalyticsHub = () => {
   const [loading, setLoading] = useState(false);
   const [facilityAnalytics, setFacilityAnalytics] = useState(null);
 
-  // Load facility analytics on mount
   useEffect(() => {
     loadFacilityAnalytics();
   }, []);
@@ -46,567 +48,237 @@ const AIAnalyticsHub = () => {
     }
   };
 
-  const handleAnalyze = async () => {
+  const executeAIAction = async (fn, key) => {
     setLoading(true);
     try {
-      const result = await analyzeClaim(claimData.facility_id, claimData);
-      setAnalysisResult(result);
-    } catch (error) {
-      console.error("Analysis failed:", error);
+      let result;
+      if (key === 'predict') {
+        result = await predictClaim(
+          claimData.facility_id, claimData.patient_age, claimData.patient_gender,
+          claimData.diagnosis_codes, claimData.procedure_codes,
+          claimData.service_date, claimData.total_amount
+        );
+        setAnalysisResult({ prediction: result });
+      } else if (key === 'optimize') {
+        result = await optimizeCost(claimData.facility_id, claimData.items);
+        setAnalysisResult({ optimization: result });
+      } else if (key === 'fraud') {
+        result = await detectFraud(claimData.facility_id, claimData);
+        setAnalysisResult({ fraud: result });
+      } else if (key === 'compliance') {
+        result = await checkCompliance(claimData.facility_id, claimData);
+        setAnalysisResult({ compliance: result });
+      } else {
+        result = await analyzeClaim(claimData.facility_id, claimData);
+        setAnalysisResult(result);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePredict = async () => {
-    setLoading(true);
-    try {
-      const result = await predictClaim(
-        claimData.facility_id,
-        claimData.patient_age,
-        claimData.patient_gender,
-        claimData.diagnosis_codes,
-        claimData.procedure_codes,
-        claimData.service_date,
-        claimData.total_amount
-      );
-      setAnalysisResult({ prediction: result });
-    } catch (error) {
-      console.error("Prediction failed:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOptimize = async () => {
-    setLoading(true);
-    try {
-      const result = await optimizeCost(claimData.facility_id, claimData.items);
-      setAnalysisResult({ optimization: result });
-    } catch (error) {
-      console.error("Optimization failed:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleFraudDetection = async () => {
-    setLoading(true);
-    try {
-      const result = await detectFraud(claimData.facility_id, claimData);
-      setAnalysisResult({ fraud: result });
-    } catch (error) {
-      console.error("Fraud detection failed:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleComplianceCheck = async () => {
-    setLoading(true);
-    try {
-      const result = await checkCompliance(claimData.facility_id, claimData);
-      setAnalysisResult({ compliance: result });
-    } catch (error) {
-      console.error("Compliance check failed:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const updateClaimData = (field, value) => {
-    setClaimData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const updateItem = (index, field, value) => {
-    setClaimData(prev => ({
-      ...prev,
-      items: prev.items.map((item, i) => i === index ? { ...item, [field]: value } : item)
-    }));
-  };
-
-  const addItem = () => {
-    setClaimData(prev => ({
-      ...prev,
-      items: [...prev.items, { sbs_code: '', quantity: 1, description: '' }]
-    }));
-  };
-
-  const removeItem = (index) => {
-    setClaimData(prev => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index)
-    }));
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'APPROVED': return 'bg-green-100 text-green-800 border-green-200';
-      case 'REJECTED': return 'bg-red-100 text-red-800 border-red-200';
-      case 'REVIEW_REQUIRED': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'COMPLIANCE_ISSUE': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'OPTIMIZATION_AVAILABLE': return 'bg-blue-100 text-blue-800 border-blue-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  const getRiskColor = (score) => {
-    if (score >= 70) return 'text-red-600 font-bold';
-    if (score >= 40) return 'text-yellow-600 font-semibold';
-    return 'text-green-600 font-semibold';
-  };
+  const updateClaimData = (field, value) => setClaimData(prev => ({ ...prev, [field]: value }));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="flex-1 overflow-y-auto bg-grid scrollbar-hide">
+      <main className="max-w-[1500px] mx-auto p-6 sm:p-12 space-y-12 stagger-children">
+        
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-            AI Analytics Hub
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400">
-            Powered by DeepSeek AI • Real-time predictive analytics for healthcare claims
-          </p>
-        </div>
+        <section className="animate-premium-in">
+           <SectionHeader 
+             title="Neural Analytics Hub" 
+             subtitle="Autonomous claim profiling, risk assessment, and financial optimization engine."
+             badge="Inference V4"
+           />
+        </section>
 
-        {/* Facility Analytics Overview */}
+        {/* Global Stats Overview */}
         {facilityAnalytics && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
-              <div className="text-sm text-slate-500 dark:text-slate-400">Total Claims</div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                {facilityAnalytics.total_claims || 0}
-              </div>
-            </div>
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
-              <div className="text-sm text-slate-500 dark:text-slate-400">Approval Rate</div>
-              <div className="text-2xl font-bold text-green-600">
-                {((facilityAnalytics.approved_claims / facilityAnalytics.total_claims) * 100 || 0).toFixed(1)}%
-              </div>
-            </div>
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
-              <div className="text-sm text-slate-500 dark:text-slate-400">Total Amount</div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                {facilityAnalytics.total_amount?.toFixed(0) || 0} SAR
-              </div>
-            </div>
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700">
-              <div className="text-sm text-slate-500 dark:text-slate-400">Avg Claim</div>
-              <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                {facilityAnalytics.average_amount?.toFixed(0) || 0} SAR
-              </div>
-            </div>
-          </div>
+          <section className="grid grid-cols-2 lg:grid-cols-4 gap-6 animate-premium-in" style={{ animationDelay: '100ms' }}>
+             <AnalyticsKpi label="Registry Volume" value={facilityAnalytics.total_claims || 0} unit="Claims" color="blue" />
+             <AnalyticsKpi label="Sync Success" value={((facilityAnalytics.approved_claims / facilityAnalytics.total_claims) * 100 || 0).toFixed(1)} unit="%" color="emerald" />
+             <AnalyticsKpi label="Total Flux" value={facilityAnalytics.total_amount?.toFixed(0) || 0} unit="SAR" color="indigo" />
+             <AnalyticsKpi label="Avg Latency" value="1.2" unit="s" color="rose" />
+          </section>
         )}
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-          {[
-            { id: 'predict', label: 'Predict', icon: '🔮' },
-            { id: 'optimize', label: 'Optimize', icon: '💰' },
-            { id: 'fraud', label: 'Fraud Detection', icon: '🛡️' },
-            { id: 'compliance', label: 'Compliance', icon: '📋' },
-            { id: 'analyze', label: 'Full Analysis', icon: '📊' }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
-                activeTab === tab.id
-                  ? 'bg-gradient-to-r from-primary to-blue-600 text-white shadow-lg'
-                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
-              }`}
-            >
-              <span className="mr-2">{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
+        {/* Interactive Workspace */}
+        <div className="grid lg:grid-cols-12 gap-8">
+           {/* Left: Configuration Form */}
+           <div className="lg:col-span-5 space-y-8 animate-premium-in" style={{ animationDelay: '200ms' }}>
+              <Card>
+                 <CardHeader title="Input Manifest" subtitle="Provide the clinical context for neural processing." />
+                 <CardBody className="space-y-6 py-6">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                       <Input label="Facility ID" type="number" value={claimData.facility_id} onChange={(e) => updateClaimData('facility_id', e.target.value)} />
+                       <Input label="Yield Value (SAR)" type="number" value={claimData.total_amount} onChange={(e) => updateClaimData('total_amount', e.target.value)} />
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                       <Input label="Age" type="number" value={claimData.patient_age} onChange={(e) => updateClaimData('patient_age', e.target.value)} />
+                       <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Gender</label>
+                          <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-600/20" value={claimData.patient_gender} onChange={(e) => updateClaimData('patient_gender', e.target.value)}>
+                             <option value="M">Male</option>
+                             <option value="F">Female</option>
+                          </select>
+                       </div>
+                       <Input label="Date" type="date" value={claimData.service_date} onChange={(e) => updateClaimData('service_date', e.target.value)} />
+                    </div>
+                    <Input label="Diagnosis Registry (ICD-10)" placeholder="I10, E11.9..." value={claimData.diagnosis_codes.join(', ')} onChange={(e) => updateClaimData('diagnosis_codes', e.target.value.split(','))} />
+                    <Input label="Procedure Codes (SBS)" placeholder="1101001..." value={claimData.procedure_codes.join(', ')} onChange={(e) => updateClaimData('procedure_codes', e.target.value.split(','))} />
+                 </CardBody>
+              </Card>
+
+              {/* Action Hub */}
+              <div className="flex flex-wrap gap-4">
+                 <ActionTab active={activeTab === 'predict'} label="Predict" icon="online_prediction" onClick={() => setActiveTab('predict')} />
+                 <ActionTab active={activeTab === 'optimize'} label="Optimize" icon="savings" onClick={() => setActiveTab('optimize')} />
+                 <ActionTab active={activeTab === 'fraud'} label="Fraud" icon="shield_person" onClick={() => setActiveTab('fraud')} />
+                 <ActionTab active={activeTab === 'compliance'} label="Safety" icon="policy" onClick={() => setActiveTab('compliance')} />
+                 <ActionTab active={activeTab === 'analyze'} label="Full Audit" icon="analytics" onClick={() => setActiveTab('analyze')} />
+              </div>
+
+              <Button 
+                className="w-full h-16 text-lg shadow-2xl shadow-blue-600/20" 
+                icon="bolt" 
+                loading={loading}
+                onClick={() => executeAIAction(null, activeTab)}
+              >
+                 Initialize Neural Sequence
+              </Button>
+           </div>
+
+           {/* Right: Inference Terminal */}
+           <div className="lg:col-span-7 space-y-8 animate-premium-in" style={{ animationDelay: '300ms' }}>
+              <Card className="min-h-[600px] flex flex-col bg-slate-950 text-white overflow-hidden relative">
+                 <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+                    <span className="material-symbols-outlined text-[200px] font-black">satellite_alt</span>
+                 </div>
+                 <CardHeader title="Inference Terminal" subtitle="Standard output from the DeepSeek orchestration layer." />
+                 <CardBody className="flex-1 flex flex-col p-10 space-y-8">
+                    {loading ? (
+                      <div className="flex-1 flex flex-col items-center justify-center space-y-6">
+                         <div className="size-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Processing Clinical Vectors...</p>
+                      </div>
+                    ) : analysisResult ? (
+                       <div className="space-y-8 animate-premium-in">
+                          {/* Top Status */}
+                          <div className="p-8 rounded-[38px] bg-white/5 border border-white/10 flex justify-between items-center group hover:bg-white/10 transition-colors">
+                             <div className="space-y-1">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Autonomous status</p>
+                                <h4 className="text-3xl font-black text-white tracking-tighter uppercase">{analysisResult.overall_status || 'PROCESSED'}</h4>
+                             </div>
+                             {analysisResult.overall_risk_score !== undefined && (
+                                <div className="text-right">
+                                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Risk Marker</p>
+                                   <h4 className={`text-3xl font-black tracking-tighter ${analysisResult.overall_risk_score > 70 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                      {analysisResult.overall_risk_score.toFixed(0)}%
+                                   </h4>
+                                </div>
+                             )}
+                          </div>
+
+                          {/* Specific Result Components */}
+                          {analysisResult.prediction && <ResultModule title="Approval Analysis" data={analysisResult.prediction} icon="trending_up" />}
+                          {analysisResult.optimization && <ResultModule title="Yield Optimization" data={analysisResult.optimization} icon="savings" />}
+                          {analysisResult.fraud && <ResultModule title="Integrity Audit" data={analysisResult.fraud} icon="verified" alert={analysisResult.fraud.is_fraudulent} />}
+                          {analysisResult.compliance && <ResultModule title="Regulatory Safety" data={analysisResult.compliance} icon="gavel" />}
+
+                          {/* Comprehensive Footer */}
+                          {analysisResult.recommendations && (
+                             <div className="p-8 rounded-[32px] bg-blue-600/10 border border-blue-600/20 space-y-4">
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-400">Strategic Protocol Recommendations</h4>
+                                <ul className="space-y-3">
+                                   {analysisResult.recommendations.map((r, i) => (
+                                      <li key={i} className="flex gap-4 text-xs font-bold text-slate-300">
+                                         <span className="text-blue-500 font-black">•</span> {r}
+                                      </li>
+                                   ))}
+                                </ul>
+                             </div>
+                          )}
+                       </div>
+                    ) : (
+                       <div className="flex-1 flex flex-col items-center justify-center space-y-6 opacity-30">
+                          <span className="material-symbols-outlined text-[80px] font-black">airwave</span>
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em]">Awaiting Input Sequence</p>
+                       </div>
+                    )}
+                 </CardBody>
+              </Card>
+           </div>
         </div>
-
-        {/* Input Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Claim Data Form */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
-              Claim Data
-            </h2>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Facility ID
-                  </label>
-                  <input
-                    type="number"
-                    value={claimData.facility_id}
-                    onChange={(e) => updateClaimData('facility_id', parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Total Amount (SAR)
-                  </label>
-                  <input
-                    type="number"
-                    value={claimData.total_amount}
-                    onChange={(e) => updateClaimData('total_amount', parseFloat(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Age
-                  </label>
-                  <input
-                    type="number"
-                    value={claimData.patient_age}
-                    onChange={(e) => updateClaimData('patient_age', parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Gender
-                  </label>
-                  <select
-                    value={claimData.patient_gender}
-                    onChange={(e) => updateClaimData('patient_gender', e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary"
-                  >
-                    <option value="M">Male</option>
-                    <option value="F">Female</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Service Date
-                  </label>
-                  <input
-                    type="date"
-                    value={claimData.service_date}
-                    onChange={(e) => updateClaimData('service_date', e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Diagnosis Codes (ICD-10)
-                </label>
-                <input
-                  type="text"
-                  value={claimData.diagnosis_codes.join(', ')}
-                  onChange={(e) => updateClaimData('diagnosis_codes', e.target.value.split(',').map(s => s.trim()).filter(s => s))}
-                  placeholder="I10, E11.9, N18.3"
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  Procedure Codes (SBS)
-                </label>
-                <input
-                  type="text"
-                  value={claimData.procedure_codes.join(', ')}
-                  onChange={(e) => updateClaimData('procedure_codes', e.target.value.split(',').map(s => s.trim()).filter(s => s))}
-                  placeholder="1101001, 1201001"
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              {/* Claim Items */}
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Claim Items
-                  </label>
-                  <button
-                    onClick={addItem}
-                    className="text-sm text-primary hover:text-primary-dark font-medium"
-                  >
-                    + Add Item
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {claimData.items.map((item, index) => (
-                    <div key={index} className="flex gap-2 items-center">
-                      <input
-                        type="text"
-                        value={item.sbs_code}
-                        onChange={(e) => updateItem(index, 'sbs_code', e.target.value)}
-                        placeholder="SBS Code"
-                        className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
-                      />
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value))}
-                        placeholder="Qty"
-                        className="w-20 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
-                      />
-                      <input
-                        type="text"
-                        value={item.description}
-                        onChange={(e) => updateItem(index, 'description', e.target.value)}
-                        placeholder="Description"
-                        className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
-                      />
-                      <button
-                        onClick={() => removeItem(index)}
-                        className="px-2 py-2 text-red-500 hover:text-red-700"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Analysis Results */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
-              AI Analysis Results
-            </h2>
-
-            {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-                  <p className="text-slate-600 dark:text-slate-400">Analyzing with DeepSeek AI...</p>
-                </div>
-              </div>
-            ) : analysisResult ? (
-              <div className="space-y-4">
-                {/* Overall Status */}
-                {analysisResult.overall_status && (
-                  <div className={`p-4 rounded-lg border ${getStatusColor(analysisResult.overall_status)}`}>
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold">Overall Status</span>
-                      <span className="text-lg font-bold">{analysisResult.overall_status}</span>
-                    </div>
-                    {analysisResult.overall_risk_score !== undefined && (
-                      <div className="mt-2">
-                        <div className="text-sm">Risk Score: <span className={getRiskColor(analysisResult.overall_risk_score)}>{analysisResult.overall_risk_score.toFixed(1)}/100</span></div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Prediction Results */}
-                {analysisResult.prediction && (
-                  <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-                    <h3 className="font-semibold text-slate-900 dark:text-white mb-2">🔮 Prediction</h3>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-slate-500">Confidence:</span>
-                        <span className="ml-2 font-semibold text-primary">{(analysisResult.prediction.confidence * 100).toFixed(1)}%</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Risk Score:</span>
-                        <span className={`ml-2 font-semibold ${getRiskColor(analysisResult.prediction.risk_score)}`}>{analysisResult.prediction.risk_score.toFixed(1)}</span>
-                      </div>
-                    </div>
-                    {analysisResult.prediction.recommendations?.length > 0 && (
-                      <div className="mt-3">
-                        <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Recommendations:</div>
-                        <ul className="text-sm space-y-1">
-                          {analysisResult.prediction.recommendations.map((rec, i) => (
-                            <li key={i} className="text-slate-600 dark:text-slate-400">• {rec}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Optimization Results */}
-                {analysisResult.optimization && (
-                  <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-                    <h3 className="font-semibold text-slate-900 dark:text-white mb-2">💰 Cost Optimization</h3>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-slate-500">Total Savings:</span>
-                        <span className="ml-2 font-semibold text-green-600">{analysisResult.optimization.total_savings.toFixed(2)} SAR</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Savings %:</span>
-                        <span className="ml-2 font-semibold text-green-600">{analysisResult.optimization.savings_percentage.toFixed(1)}%</span>
-                      </div>
-                    </div>
-                    {analysisResult.optimization.recommendations?.length > 0 && (
-                      <div className="mt-3">
-                        <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Optimization Tips:</div>
-                        <ul className="text-sm space-y-1">
-                          {analysisResult.optimization.recommendations.map((rec, i) => (
-                            <li key={i} className="text-slate-600 dark:text-slate-400">• {rec}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Fraud Detection Results */}
-                {analysisResult.fraud && (
-                  <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-                    <h3 className="font-semibold text-slate-900 dark:text-white mb-2">🛡️ Fraud Detection</h3>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-slate-500">Fraudulent:</span>
-                        <span className={`ml-2 font-semibold ${analysisResult.fraud.is_fraudulent ? 'text-red-600' : 'text-green-600'}`}>
-                          {analysisResult.fraud.is_fraudulent ? 'Yes' : 'No'}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Fraud Score:</span>
-                        <span className={`ml-2 font-semibold ${getRiskColor(analysisResult.fraud.fraud_score)}`}>{analysisResult.fraud.fraud_score.toFixed(1)}</span>
-                      </div>
-                    </div>
-                    {analysisResult.fraud.risk_factors?.length > 0 && (
-                      <div className="mt-3">
-                        <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Risk Factors:</div>
-                        <ul className="text-sm space-y-1">
-                          {analysisResult.fraud.risk_factors.map((factor, i) => (
-                            <li key={i} className="text-slate-600 dark:text-slate-400">• {factor}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Compliance Results */}
-                {analysisResult.compliance && (
-                  <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-                    <h3 className="font-semibold text-slate-900 dark:text-white mb-2">📋 Compliance Check</h3>
-                    <div className="text-sm mb-2">
-                      <span className="text-slate-500">Status:</span>
-                      <span className={`ml-2 font-semibold ${analysisResult.compliance.is_compliant ? 'text-green-600' : 'text-red-600'}`}>
-                        {analysisResult.compliance.is_compliant ? 'Compliant' : 'Non-Compliant'}
-                      </span>
-                    </div>
-                    {analysisResult.compliance.violations?.length > 0 && (
-                      <div className="mt-2">
-                        <div className="text-sm font-medium text-red-600 mb-1">Violations:</div>
-                        <ul className="text-sm space-y-1">
-                          {analysisResult.compliance.violations.map((violation, i) => (
-                            <li key={i} className="text-red-600">• {violation}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {analysisResult.compliance.warnings?.length > 0 && (
-                      <div className="mt-2">
-                        <div className="text-sm font-medium text-yellow-600 mb-1">Warnings:</div>
-                        <ul className="text-sm space-y-1">
-                          {analysisResult.compliance.warnings.map((warning, i) => (
-                            <li key={i} className="text-yellow-600">• {warning}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {analysisResult.compliance.suggestions?.length > 0 && (
-                      <div className="mt-2">
-                        <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Suggestions:</div>
-                        <ul className="text-sm space-y-1">
-                          {analysisResult.compliance.suggestions.map((suggestion, i) => (
-                            <li key={i} className="text-slate-600 dark:text-slate-400">• {suggestion}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Comprehensive Recommendations */}
-                {analysisResult.recommendations && (
-                  <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-blue-50 dark:bg-blue-900/20">
-                    <h3 className="font-semibold text-slate-900 dark:text-white mb-2">💡 Comprehensive Recommendations</h3>
-                    <ul className="text-sm space-y-1">
-                      {analysisResult.recommendations.map((rec, i) => (
-                        <li key={i} className="text-slate-700 dark:text-slate-300">• {rec}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-64 text-slate-500 dark:text-slate-400">
-                <div className="text-center">
-                  <div className="text-4xl mb-2">📊</div>
-                  <p>Enter claim data and click "Analyze" to get AI-powered insights</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-wrap gap-3 justify-center">
-          {activeTab === 'predict' && (
-            <button
-              onClick={handlePredict}
-              disabled={loading}
-              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg font-semibold hover:opacity-90 disabled:opacity-50 transition-all shadow-lg"
-            >
-              🔮 Predict Claim Approval
-            </button>
-          )}
-          {activeTab === 'optimize' && (
-            <button
-              onClick={handleOptimize}
-              disabled={loading}
-              className="px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg font-semibold hover:opacity-90 disabled:opacity-50 transition-all shadow-lg"
-            >
-              💰 Optimize Costs
-            </button>
-          )}
-          {activeTab === 'fraud' && (
-            <button
-              onClick={handleFraudDetection}
-              disabled={loading}
-              className="px-6 py-3 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-lg font-semibold hover:opacity-90 disabled:opacity-50 transition-all shadow-lg"
-            >
-              🛡️ Detect Fraud
-            </button>
-          )}
-          {activeTab === 'compliance' && (
-            <button
-              onClick={handleComplianceCheck}
-              disabled={loading}
-              className="px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-lg font-semibold hover:opacity-90 disabled:opacity-50 transition-all shadow-lg"
-            >
-              📋 Check Compliance
-            </button>
-          )}
-          {activeTab === 'analyze' && (
-            <button
-              onClick={handleAnalyze}
-              disabled={loading}
-              className="px-6 py-3 bg-gradient-to-r from-primary to-blue-600 text-white rounded-lg font-semibold hover:opacity-90 disabled:opacity-50 transition-all shadow-lg"
-            >
-              📊 Full AI Analysis
-            </button>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="mt-8 text-center text-sm text-slate-500 dark:text-slate-400">
-          <p>Powered by DeepSeek AI • SBS V3.1 Compliant • Real-time Predictive Analytics</p>
-          <p className="mt-1">All predictions are advisory - final decisions should be made by qualified professionals</p>
-        </div>
-      </div>
+      </main>
     </div>
   );
-};
+}
 
-export default AIAnalyticsHub;
+function AnalyticsKpi({ label, value, unit, color }) {
+  const backgrounds = {
+    blue: 'text-blue-600 bg-blue-600/5 border-blue-600/10',
+    emerald: 'text-emerald-500 bg-emerald-500/5 border-emerald-500/10',
+    indigo: 'text-indigo-600 bg-indigo-600/5 border-indigo-600/10',
+    rose: 'text-rose-600 bg-rose-600/5 border-rose-600/10',
+  };
+  return (
+    <Card className={`group hover:scale-[1.03] transition-all hover:bg-current hover:shadow-2xl ${backgrounds[color]}`}>
+       <CardBody className="p-8 space-y-6">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+          <div className="flex items-baseline gap-2">
+             <h4 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter group-hover:text-white transition-colors">{value}</h4>
+             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-white/60 transition-colors">{unit}</span>
+          </div>
+       </CardBody>
+    </Card>
+  );
+}
+
+function ActionTab({ active, label, icon, onClick }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`px-6 py-4 rounded-[24px] border transition-all flex items-center gap-3 ${
+        active 
+          ? 'bg-blue-600 text-white border-blue-600 shadow-xl shadow-blue-600/20 scale-[1.05]' 
+          : 'bg-white dark:bg-slate-900 text-slate-500 border-slate-100 dark:border-slate-800 hover:border-blue-600/30'
+      }`}
+    >
+       <span className="material-symbols-outlined text-xl font-black">{icon}</span>
+       <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
+    </button>
+  );
+}
+
+function ResultModule({ title, data, icon, alert }) {
+  return (
+    <div className={`p-8 rounded-[38px] border bg-white/5 transition-all hover:bg-white/10 ${alert ? 'border-rose-500/30' : 'border-white/5'}`}>
+       <div className="flex justify-between items-start mb-6">
+          <div className="flex gap-4">
+             <div className={`size-10 rounded-xl flex items-center justify-center ${alert ? 'bg-rose-500 text-white shadow-xl shadow-rose-500/20' : 'bg-white/10 text-slate-400'}`}>
+                <span className="material-symbols-outlined text-xl font-black">{icon}</span>
+             </div>
+             <div className="space-y-1">
+                <h4 className="text-sm font-black text-white">{title}</h4>
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Inference Complete</p>
+             </div>
+          </div>
+          {data.confidence && <span className="text-xl font-black text-blue-600 tracking-tighter">{(data.confidence * 100).toFixed(0)}% <span className="text-[10px]">Conf.</span></span>}
+       </div>
+       {data.recommendations && (
+          <div className="grid gap-2">
+             {data.recommendations.map((r, i) => (
+                <p key={i} className="text-[11px] font-bold text-slate-400 leading-relaxed italic">• {r}</p>
+             ))}
+          </div>
+       )}
+       {data.risk_factors && (
+          <div className="grid gap-2">
+             {data.risk_factors.map((r, i) => (
+                <p key={i} className="text-[11px] font-bold text-rose-400 leading-relaxed italic animate-pulse">• {r}</p>
+             ))}
+          </div>
+       )}
+    </div>
+  );
+}

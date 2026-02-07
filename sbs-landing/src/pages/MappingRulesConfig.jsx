@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
 import { normalizeCode } from '../utils/middleware';
+import { Card, CardBody, CardHeader } from '../components/ui/Card';
+import { SectionHeader } from '../components/ui/SectionHeader';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 
+/**
+ * Premium Mapping Rules Configuration
+ * Optimized for GIVC-SBS Ultra-Premium Design System
+ */
 export function MappingRulesConfig() {
   const [testInput, setTestInput] = useState("Appy removal w/ complications");
   const [testResult, setTestResult] = useState({
@@ -15,13 +23,13 @@ export function MappingRulesConfig() {
     try {
         const result = await normalizeCode("TEST_CODE", testInput);
         setTestResult({
-            code: `${result.sbs_code} - ${result.desc.substring(0, 20)}...`,
+            code: `${result.sbs_code} - ${result.desc.substring(0, 24)}...`,
             confidence: Math.round(result.confidence * 100),
             status: result.confidence > 0.85 ? "Auto-Accepted" : "Review Required"
         });
     } catch (e) {
         setTestResult({
-            code: "Error",
+            code: "Resolution Error",
             confidence: 0,
             status: "Failed"
         });
@@ -31,251 +39,183 @@ export function MappingRulesConfig() {
   };
 
   return (
-    <div className="flex-1 w-full max-w-[1440px] mx-auto px-6 py-8 overflow-y-auto">
-        {/* Page Heading */}
-        <div className="flex flex-wrap justify-between gap-6 mb-8 items-end">
-            <div className="flex flex-col gap-2">
-                <h1 className="text-slate-900 dark:text-white text-3xl font-black leading-tight tracking-tight">Mapping Rules Configuration</h1>
-                <p className="text-secondary-text text-base max-w-2xl">Manage AI normalization logic, confidence thresholds, and facility-specific override rules for claims processing.</p>
-            </div>
-            <div className="flex gap-3">
-                <button onClick={() => alert("Version History (Mock)")} className="flex items-center gap-2 px-4 py-2 bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-border-dark rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <span className="material-symbols-outlined text-[18px]">history</span>
-                    View Version History
-                </button>
-                <button onClick={() => alert("Defaults Reset.")} className="flex items-center gap-2 px-4 py-2 bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-border-dark rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-red-600">
-                    <span className="material-symbols-outlined text-[18px]">restart_alt</span>
-                    Reset Defaults
-                </button>
-            </div>
-        </div>
+    <div className="flex-1 overflow-y-auto bg-grid scrollbar-hide">
+      <main className="max-w-[1400px] mx-auto p-6 sm:p-8 space-y-8 stagger-children">
+        
+        {/* Header Section */}
+        <section className="animate-premium-in">
+           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <SectionHeader 
+                title="Orchestration Rules" 
+                subtitle="Configure neural confidence thresholds and behavioral overrides for the GIVC-SBS integration engine."
+                badge="Governance Engine"
+              />
+              <div className="flex gap-3">
+                 <Button variant="secondary" icon="history">Version History</Button>
+                 <Button icon="restore" onClick={() => alert("Restoring Defaults...")}>Node Reset</Button>
+              </div>
+           </div>
+        </section>
 
-        {/* Main Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Left Column: Global Thresholds & Logic */}
-            <div className="lg:col-span-5 flex flex-col gap-6">
-                {/* Global Thresholds Card */}
-                <div className="bg-surface-light dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-border-dark shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-slate-200 dark:border-border-dark flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/50">
-                        <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary">tune</span>
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Global Thresholds</h3>
-                        </div>
-                        <span className="text-xs font-semibold px-2 py-1 rounded bg-blue-100 dark:bg-blue-900 text-primary dark:text-blue-300 uppercase tracking-wide">Active</span>
+        <div className="grid lg:grid-cols-12 gap-8">
+           {/* Global Thresholds & Logic Settings */}
+           <div className="lg:col-span-5 space-y-8 animate-premium-in" style={{ animationDelay: '100ms' }}>
+              <Card>
+                 <CardHeader title="Global Logic Thresholds" subtitle="Confidence markers that dictate autonomous relay behavior." />
+                 <CardBody className="space-y-10 py-6">
+                    <ConfigSlider unit="%" label="Auto-Accept Marker" val={85} color="emerald" hint="Payloads exceeding this marker bypass manual triage." />
+                    <ConfigSlider unit="%" label="Review Trigger" val={50} color="amber" hint="Minimum marker required for AI-suggested candidates." />
+                    
+                    <div className="p-6 bg-blue-600/5 rounded-[28px] border border-blue-600/10 flex gap-4">
+                       <span className="material-symbols-outlined text-blue-600 font-black">info</span>
+                       <p className="text-xs font-bold text-slate-500 leading-relaxed">
+                          Claims falling between <span className="text-blue-600">50% and 84%</span> will be queued for expert verification. Payloads <span className="text-rose-500">below 50%</span> are automatically re-routed for provider correction.
+                       </p>
                     </div>
-                    <div className="p-6 flex flex-col gap-8">
-                        {/* Auto-Accept Slider */}
-                        <div className="flex flex-col gap-3">
-                            <div className="flex justify-between items-end">
-                                <label className="text-sm font-medium text-slate-900 dark:text-gray-200">
-                                    Auto-Accept Threshold
-                                    <span className="block text-xs font-normal text-secondary-text mt-0.5">Confidence required to bypass review</span>
-                                </label>
-                                <div className="px-3 py-1 rounded-md bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-bold font-mono">85%</div>
-                            </div>
-                            <div className="relative h-6 flex items-center">
-                                <input className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary focus:outline-none focus:ring-2 focus:ring-primary/50" max="100" min="0" type="range" defaultValue={85}/>
-                            </div>
-                        </div>
-                        {/* Review Required Slider */}
-                        <div className="flex flex-col gap-3">
-                            <div className="flex justify-between items-end">
-                                <label className="text-sm font-medium text-slate-900 dark:text-gray-200">
-                                    Review Required Threshold
-                                    <span className="block text-xs font-normal text-secondary-text mt-0.5">Minimum confidence for suggestion</span>
-                                </label>
-                                <div className="px-3 py-1 rounded-md bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 font-bold font-mono">50%</div>
-                            </div>
-                            <div className="relative h-6 flex items-center">
-                                <input className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50" max="100" min="0" type="range" defaultValue={50}/>
-                            </div>
-                        </div>
-                        {/* Visual Summary */}
-                        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-sm border border-slate-200 dark:border-border-dark flex gap-3">
-                            <span className="material-symbols-outlined text-secondary-text shrink-0">info</span>
-                            <p className="text-secondary-text leading-snug">
-                                Claims with <span className="font-bold text-slate-900 dark:text-white">50-84%</span> confidence will enter the <span className="font-medium text-orange-600 dark:text-orange-400">Human Review Queue</span>. Below 50% will be rejected automatically.
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                 </CardBody>
+              </Card>
 
-                 {/* Logic Customization Card */}
-                 <div className="bg-surface-light dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-border-dark shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-slate-200 dark:border-border-dark flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/50">
-                        <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary">rule</span>
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Logic Customization</h3>
-                        </div>
-                    </div>
-                    <div className="p-0">
-                         <ToggleItem label="Fuzzy Matching" subLabel="Enable approximate string matching for typos." defaultChecked={true} icon="help" />
-                         <ToggleItem label="Priority to SBS V3.0" subLabel="Prefer newer Standard Body System ontology." defaultChecked={true} />
-                         <ToggleItem label="Enforce ICD-10 Strict" subLabel="Require valid ICD-10 codes for surgical procedures." defaultChecked={false} />
-                    </div>
-                </div>
-            </div>
+              <Card>
+                 <CardHeader title="Operational Heuristics" />
+                 <CardBody className="p-0">
+                    <ToggleRule label="Fuzzy Normalization" sub="Enable semantic matching for unstructured clinical shorthand." active />
+                    <ToggleRule label="Universal SBS Priority" sub="Prefer Saudi-specific V3.1 code systems during conflicts." active />
+                    <ToggleRule label="Strict ICD-10 Enforcement" sub="Reject claims missing secondary diagnostic validation." />
+                 </CardBody>
+              </Card>
+           </div>
 
-            {/* Right Column: Facility Overrides & Test Rule */}
-            <div className="lg:col-span-7 flex flex-col gap-6">
-                 {/* Facility-Specific Overrides */}
-                 <div className="bg-surface-light dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-border-dark shadow-sm flex flex-col h-full min-h-[400px]">
-                    <div className="px-6 py-4 border-b border-slate-200 dark:border-border-dark flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/50">
-                        <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary">domain_add</span>
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Facility-Specific Overrides</h3>
-                        </div>
-                        <button className="flex items-center gap-1 text-sm font-bold text-primary hover:text-blue-600 transition-colors">
-                            <span className="material-symbols-outlined text-lg">add</span>
-                            Add Override
-                        </button>
+           {/* Facility Overrides & Simulator */}
+           <div className="lg:col-span-7 space-y-8 animate-premium-in" style={{ animationDelay: '200ms' }}>
+              <Card className="flex flex-col">
+                 <CardHeader 
+                   title="Entity Overrides" 
+                   subtitle="Region or facility-specific logic that bypasses global heuristics." 
+                   action={<Button variant="secondary" size="sm" icon="add">Add Override</Button>}
+                 />
+                 <CardBody className="p-0">
+                    <div className="overflow-x-auto">
+                       <table className="w-full text-left">
+                          <thead className="bg-slate-50 dark:bg-slate-900/40">
+                             <tr>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500">Facility ID</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500">Behavior</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500">Context</th>
+                                <th className="px-6 py-4"></th>
+                             </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                             <OverrideListItem name="City General Hospital" type="Acute" rule="Safety +5%" color="indigo" />
+                             <OverrideListItem name="North Surgical Center" type="High Risk" rule="Force ICD-10" color="rose" />
+                             <OverrideListItem name="Valley View Clinic" type="Outpatient" rule="Lax Syntax" color="emerald" />
+                          </tbody>
+                       </table>
                     </div>
-                    <div className="p-4 border-b border-slate-200 dark:border-border-dark bg-white dark:bg-surface-dark">
-                        <div className="relative w-full">
-                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-secondary-text">search</span>
-                            <input className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800 border border-slate-200 dark:border-border-dark rounded-lg text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all" placeholder="Search facilities by name or ID..." type="text"/>
-                        </div>
-                    </div>
-                    <div className="flex-1 overflow-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-10 text-secondary-text uppercase tracking-wider text-xs font-semibold">
-                                <tr>
-                                    <th className="px-6 py-3 font-medium">Facility</th>
-                                    <th className="px-6 py-3 font-medium">Type</th>
-                                    <th className="px-6 py-3 font-medium">Override Rule</th>
-                                    <th className="px-6 py-3 font-medium text-right">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200 dark:divide-border-dark">
-                                <OverrideRow name="City General Hospital" id="48291" type="Acute Care" ruleType="warning" ruleText="Threshold +5%" typeColor="purple" />
-                                <OverrideRow name="North Surgical Center" id="99210" type="High Risk" ruleType="lock" ruleText="Force ICD-10" typeColor="red" iconColor="blue" />
-                                <OverrideRow name="Valley View Clinic" id="11029" type="Outpatient" ruleType="do_not_disturb_on" ruleText="Ignore Typos" typeColor="green" iconColor="gray" />
-                            </tbody>
-                        </table>
-                    </div>
-                    <div className="px-6 py-3 border-t border-slate-200 dark:border-border-dark bg-gray-50 dark:bg-gray-900/30 text-xs text-secondary-text flex justify-center">
-                        Showing 3 of 12 active overrides
-                    </div>
+                 </CardBody>
+              </Card>
+
+              {/* Simulation Playground */}
+              <Card className="bg-slate-900 text-white overflow-hidden">
+                 <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                    <span className="material-symbols-outlined text-[100px] font-black">biotech</span>
                  </div>
+                 <CardHeader title="Neural Simulator" subtitle="Validate your governance rules against sample clinical narratives." />
+                 <CardBody className="space-y-8">
+                    <div className="flex gap-4 items-end">
+                       <div className="flex-1">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Test Narrative</label>
+                          <input 
+                             className="w-full bg-slate-950/50 border border-white/10 rounded-2xl px-6 py-3.5 text-sm font-bold text-white focus:outline-none focus:ring-2 focus:ring-blue-600/30"
+                             value={testInput}
+                             onChange={(e) => setTestInput(e.target.value)}
+                             placeholder="Describe a clinical service..."
+                          />
+                       </div>
+                       <Button loading={loading} icon="play_arrow" className="py-3.5 px-8" onClick={handleSimulate}>Simulate</Button>
+                    </div>
 
-                 {/* Test Playground */}
-                 <div className="bg-gradient-to-br from-white to-blue-50 dark:from-surface-dark dark:to-slate-800/50 rounded-xl border border-slate-200 dark:border-border-dark shadow-sm">
-                    <div className="px-6 py-4 border-b border-slate-200 dark:border-border-dark flex justify-between items-center">
-                         <div className="flex items-center gap-2">
-                            <span className="material-symbols-outlined text-primary">science</span>
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Test Rule Playground</h3>
-                        </div>
+                    <div className="glass-panel p-8 rounded-[32px] border border-white/5 relative overflow-hidden flex flex-col sm:flex-row gap-8">
+                       <div className={`absolute left-0 top-0 bottom-0 w-2 ${testResult.confidence >= 85 ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+                       <div className="flex-1 space-y-2">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Predicted Normalization</p>
+                          <h4 className={`text-2xl font-black tracking-tight ${loading ? 'animate-pulse opacity-50' : ''}`}>{testResult.code}</h4>
+                       </div>
+                       <div className="text-center sm:text-right space-y-2">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Confidence</p>
+                          <h4 className={`text-3xl font-black tracking-tighter ${testResult.confidence >= 85 ? 'text-emerald-500' : 'text-amber-500'}`}>{testResult.confidence}%</h4>
+                       </div>
                     </div>
-                    <div className="p-6 grid gap-6">
-                        <div className="flex flex-col gap-2">
-                             <label className="text-sm font-medium text-slate-900 dark:text-gray-200">Test Claim Description</label>
-                             <div className="flex gap-3">
-                                <input 
-                                    className="flex-1 px-4 py-2.5 bg-white dark:bg-gray-800 border border-slate-200 dark:border-border-dark rounded-lg text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all shadow-sm" 
-                                    placeholder="e.g. Appy removal w/ complications" 
-                                    type="text" 
-                                    value={testInput}
-                                    onChange={(e) => setTestInput(e.target.value)}
-                                />
-                                <button 
-                                    onClick={handleSimulate}
-                                    disabled={loading}
-                                    className="px-6 py-2 bg-primary hover:bg-blue-600 text-white font-semibold rounded-lg text-sm transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50"
-                                >
-                                     <span className="material-symbols-outlined text-lg">play_arrow</span>
-                                     {loading ? 'Simulating...' : 'Simulate'}
-                                </button>
-                             </div>
-                        </div>
-                        {/* Results Card */}
-                        <div className="bg-white dark:bg-gray-800 rounded-lg border border-slate-200 dark:border-border-dark p-5 shadow-sm relative overflow-hidden">
-                             <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${testResult.confidence > 85 ? 'bg-green-500' : 'bg-orange-500'}`}></div>
-                             <div className="flex justify-between items-start mb-4">
-                                <div>
-                                    <p className="text-xs font-semibold text-secondary-text uppercase tracking-wide mb-1">Predicted Code</p>
-                                    <p className="text-xl font-bold text-slate-900 dark:text-white animate-pulse-once">{testResult.code}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-xs font-semibold text-secondary-text uppercase tracking-wide mb-1">Confidence Score</p>
-                                    <p className={`text-xl font-black ${testResult.confidence > 85 ? 'text-green-600 dark:text-green-400' : 'text-orange-500'}`}>{testResult.confidence}%</p>
-                                </div>
-                             </div>
-                             <div className="flex items-center gap-2 pt-4 border-t border-slate-200 dark:border-border-dark">
-                                <span className={`flex size-6 items-center justify-center rounded-full ${testResult.confidence > 85 ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400' : 'bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-400'}`}>
-                                    <span className="material-symbols-outlined text-sm">{testResult.confidence > 85 ? 'check' : 'priority_high'}</span>
-                                </span>
-                                <p className="text-sm text-slate-900 dark:text-gray-200">
-                                    Status: <span className="font-bold">{testResult.status}</span> {testResult.confidence > 85 ? '(Above 85% threshold)' : '(Below 85%)'}
-                                </p>
-                             </div>
-                        </div>
+
+                    <div className="flex justify-center">
+                       <span className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-white/10 ${testResult.confidence >= 85 ? 'text-emerald-500 bg-emerald-500/5' : 'text-amber-500 bg-amber-500/5'}`}>
+                          Result: {testResult.status}
+                       </span>
                     </div>
-                 </div>
-            </div>
+                 </CardBody>
+              </Card>
+           </div>
         </div>
+      </main>
     </div>
   );
 }
 
-function ToggleItem({ label, subLabel, defaultChecked, icon }) {
-    return (
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-border-dark last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-            <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                    <span className="font-medium text-slate-900 dark:text-white">{label}</span>
-                    {icon && <span className="material-symbols-outlined text-base text-secondary-text cursor-help" title={label}>help</span>}
-                </div>
-                <span className="text-xs text-secondary-text">{subLabel}</span>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-                <input defaultChecked={defaultChecked} className="sr-only peer" type="checkbox"/>
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 dark:peer-focus:ring-primary/40 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
-            </label>
-        </div>
-    )
+function ConfigSlider({ label, val, color, unit, hint }) {
+  const themes = {
+    emerald: 'accent-emerald-500 text-emerald-600',
+    amber: 'accent-amber-500 text-amber-600',
+  };
+  return (
+    <div className="space-y-4">
+       <div className="flex justify-between items-end">
+          <div className="space-y-1">
+             <label className="text-sm font-black text-slate-800 dark:text-gray-100 leading-none">{label}</label>
+             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{hint}</p>
+          </div>
+          <span className={`text-xl font-black ${themes[color].split(' ')[1]}`}>{val}{unit}</span>
+       </div>
+       <input type="range" className={`w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full appearance-none transition-all ${themes[color].split(' ')[0]}`} defaultValue={val} />
+    </div>
+  );
 }
 
-function OverrideRow({ name, id, type, ruleType, ruleText, typeColor, iconColor }) {
-    const bgColors = {
-        purple: "bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300",
-        red: "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300",
-        green: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
-    };
+function ToggleRule({ label, sub, active }) {
+  return (
+    <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+       <div className="space-y-1">
+          <h4 className="text-sm font-bold text-slate-800 dark:text-gray-100">{label}</h4>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{sub}</p>
+       </div>
+       <div className={`w-10 h-5 rounded-full transition-colors relative cursor-pointer ${active ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-700'}`}>
+          <div className={`absolute top-1 size-3 bg-white rounded-full transition-all ${active ? 'right-1' : 'left-1'}`}></div>
+       </div>
+    </div>
+  );
+}
 
-    const iconColors = {
-        orange: "text-orange-500",
-        blue: "text-blue-500",
-        gray: "text-gray-500"
-    };
-
-    // simplified dynamic class access
-    const typeClass = bgColors[typeColor] || bgColors.purple;
-    const ruleIconClass = iconColor === 'blue' ? 'text-blue-500' : iconColor === 'gray' ? 'text-gray-500' : 'text-orange-500';
-
-    return (
-        <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-            <td className="px-6 py-4 whitespace-nowrap">
-                <div className="flex flex-col">
-                    <span className="font-medium text-slate-900 dark:text-white">{name}</span>
-                    <span className="text-xs text-secondary-text">ID: {id}</span>
-                </div>
-            </td>
-            <td className="px-6 py-4 whitespace-nowrap">
-                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${typeClass}`}>
-                    {type}
-                </span>
-            </td>
-            <td className="px-6 py-4">
-                <div className="flex items-center gap-2">
-                    <span className={`material-symbols-outlined ${ruleIconClass} text-sm`}>{ruleType}</span>
-                    <span className="text-slate-900 dark:text-gray-200">{ruleText}</span>
-                </div>
-            </td>
-            <td className="px-6 py-4 text-right">
-                <button className="text-secondary-text hover:text-primary transition-colors">
-                    <span className="material-symbols-outlined text-lg">edit</span>
-                </button>
-            </td>
-        </tr>
-    )
+function OverrideListItem({ name, type, rule, color }) {
+  const backgrounds = {
+    indigo: 'text-indigo-600 bg-indigo-600/10',
+    rose: 'text-rose-600 bg-rose-600/10',
+    emerald: 'text-emerald-600 bg-emerald-600/10',
+  };
+  return (
+    <tr className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all duration-300">
+       <td className="px-6 py-5">
+          <p className="text-sm font-bold text-slate-800 dark:text-white leading-none">{name}</p>
+       </td>
+       <td className="px-6 py-5">
+          <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${backgrounds[color] || backgrounds.indigo}`}>{type}</span>
+       </td>
+       <td className="px-6 py-5">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+             <span className="material-symbols-outlined text-sm font-black">verified</span>
+             {rule}
+          </div>
+       </td>
+       <td className="px-6 py-5 text-right">
+          <button className="text-slate-300 hover:text-blue-600 transition-colors"><span className="material-symbols-outlined text-lg">edit</span></button>
+       </td>
+    </tr>
+  );
 }

@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
+import { Card, CardBody, CardHeader } from '../components/ui/Card';
+import { SectionHeader } from '../components/ui/SectionHeader';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 
+/**
+ * Premium Settings Page
+ * Optimized for GIVC-SBS Ultra-Premium Design System
+ */
 export function SettingsPage() {
   const [darkMode, setDarkMode] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -7,149 +15,134 @@ export function SettingsPage() {
   const [confidenceThreshold, setConfidenceThreshold] = useState(85);
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 bg-background-light dark:bg-background-dark">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Settings</h1>
-          <p className="text-slate-500 dark:text-slate-400">Manage your application preferences and configurations</p>
-        </div>
+    <div className="flex-1 overflow-y-auto bg-grid scrollbar-hide">
+      <main className="max-w-[1000px] mx-auto p-6 sm:p-12 space-y-12 stagger-children">
+        
+        {/* Header Section */}
+        <section className="animate-premium-in">
+           <SectionHeader 
+             title="System Configuration" 
+             subtitle="Fine-tune your GIVC-SBS environment, security parameters, and autonomous relay logic."
+             badge="Security Gate"
+           />
+        </section>
 
-        {/* Appearance Section */}
-        <div className="bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm mb-6">
-          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">palette</span>
-              Appearance
-            </h2>
-          </div>
-          <div className="p-6 space-y-6">
-            <SettingToggle
-              label="Dark Mode"
-              description="Use dark theme throughout the application"
-              enabled={darkMode}
-              onToggle={() => setDarkMode(!darkMode)}
-            />
-          </div>
-        </div>
-
-        {/* Notifications Section */}
-        <div className="bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm mb-6">
-          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">notifications</span>
-              Notifications
-            </h2>
-          </div>
-          <div className="p-6 space-y-6">
-            <SettingToggle
-              label="Email Notifications"
-              description="Receive email alerts for claim status updates"
-              enabled={emailNotifications}
-              onToggle={() => setEmailNotifications(!emailNotifications)}
-            />
-          </div>
-        </div>
-
-        {/* AI Configuration Section */}
-        <div className="bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm mb-6">
-          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">smart_toy</span>
-              AI Configuration
-            </h2>
-          </div>
-          <div className="p-6 space-y-6">
-            <SettingToggle
-              label="Automatic Mapping"
-              description="Automatically map codes above the confidence threshold"
-              enabled={autoMapping}
-              onToggle={() => setAutoMapping(!autoMapping)}
-            />
-            
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-900 dark:text-white">Confidence Threshold</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Minimum confidence for auto-mapping ({confidenceThreshold}%)</p>
-              </div>
-              <div className="w-48">
-                <input
-                  type="range"
-                  min="50"
-                  max="100"
-                  value={confidenceThreshold}
-                  onChange={(e) => setConfidenceThreshold(parseInt(e.target.value))}
-                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* API Configuration Section */}
-        <div className="bg-white dark:bg-surface-dark rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm mb-6">
-          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">api</span>
-              API Configuration
-            </h2>
-          </div>
-          <div className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-900 dark:text-white mb-1">
-                n8n Webhook URL
-              </label>
-              <input
-                type="text"
-                placeholder="https://n8n.example.com/webhook/..."
-                className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#182430] border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50"
+        <div className="space-y-8">
+           {/* Governance Settings */}
+           <Card className="animate-premium-in shadow-2xl shadow-slate-900/5 group" style={{ animationDelay: '100ms' }}>
+              <CardHeader 
+                title="Operational Logic" 
+                subtitle="Manage how the relay handles autonomous decision making." 
+                icon="settings_suggest"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-900 dark:text-white mb-1">
-                NPHIES Environment
-              </label>
-              <select className="w-full px-4 py-2.5 bg-slate-50 dark:bg-[#182430] border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50">
-                <option value="sandbox">Sandbox (Testing)</option>
-                <option value="production">Production</option>
-              </select>
-            </div>
-          </div>
-        </div>
+              <CardBody className="p-0">
+                 <SettingItem 
+                    label="Autonomous Mapping" 
+                    desc="Automatically synchronize claims that exceed the neural confidence threshold."
+                    active={autoMapping}
+                    onToggle={() => setAutoMapping(!autoMapping)}
+                 />
+                 <div className="px-10 py-8 space-y-4">
+                    <div className="flex justify-between items-end">
+                       <div className="space-y-1">
+                          <p className="text-sm font-black text-slate-800 dark:text-gray-100">Confidence Threshold</p>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Minimum marker for auto-triage</p>
+                       </div>
+                       <span className="text-xl font-black text-blue-600">{confidenceThreshold}%</span>
+                    </div>
+                    <input 
+                       type="range" 
+                       className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full appearance-none accent-blue-600 cursor-pointer"
+                       value={confidenceThreshold}
+                       max="100"
+                       min="50"
+                       onChange={(e) => setConfidenceThreshold(e.target.value)}
+                    />
+                 </div>
+              </CardBody>
+           </Card>
 
-        {/* Save Button */}
-        <div className="flex justify-end gap-3">
-          <button className="px-6 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-medium transition-colors">
-            Reset to Defaults
-          </button>
-          <button className="px-6 py-2.5 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-medium shadow-lg shadow-blue-500/20 transition-colors flex items-center gap-2">
-            <span className="material-symbols-outlined text-lg">save</span>
-            Save Changes
-          </button>
+           {/* Security & API */}
+           <Card className="animate-premium-in" style={{ animationDelay: '200ms' }}>
+              <CardHeader title="Gateway Connectivity" subtitle="Manage your production endpoints and security keys." icon="key" />
+              <CardBody className="p-10 space-y-8">
+                 <div className="grid sm:grid-cols-2 gap-8">
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">n8n Relay Webhook</label>
+                       <Input icon="link" placeholder="https://n8n.brainsait.cloud/..." />
+                    </div>
+                    <div className="space-y-1.5">
+                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">NPHIES Environment</label>
+                       <select className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-600/20 appearance-none">
+                          <option>Production Node</option>
+                          <option>Developer Sandbox</option>
+                          <option>UAT Staging</option>
+                       </select>
+                    </div>
+                 </div>
+                 <div className="p-6 rounded-[28px] bg-amber-500/5 border border-amber-500/10 flex gap-4">
+                    <span className="material-symbols-outlined text-amber-500 font-black">shield</span>
+                    <p className="text-xs font-bold text-slate-500 leading-relaxed italic">
+                       Changing the NPHIES environment will invalidate current session tokens and requires a full security re-handshake.
+                    </p>
+                 </div>
+              </CardBody>
+           </Card>
+
+           {/* Personalization */}
+           <Card className="animate-premium-in" style={{ animationDelay: '300ms' }}>
+              <CardHeader title="Interface Preferences" icon="palette" />
+              <CardBody className="p-0">
+                 <SettingItem 
+                    label="Luminance Profile" 
+                    desc="Switch between specialized high-contrast dark mode and clinical light mode."
+                    active={darkMode}
+                    onToggle={() => setDarkMode(!darkMode)}
+                    icon="dark_mode"
+                 />
+                 <SettingItem 
+                    label="Dispatch Notifications" 
+                    desc="Receive real-time relay failure alerts via encrypted email channels."
+                    active={emailNotifications}
+                    onToggle={() => setEmailNotifications(!emailNotifications)}
+                    icon="mail"
+                 />
+              </CardBody>
+           </Card>
+
+           <div className="flex justify-between items-center py-6">
+              <button className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-rose-500 transition-colors">Factory Reset Configuration</button>
+              <div className="flex gap-4">
+                 <Button variant="secondary" className="px-8">Discard</Button>
+                 <Button className="px-10 shadow-2xl shadow-blue-600/20" icon="save">Commit Changes</Button>
+              </div>
+           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
 
-function SettingToggle({ label, description, enabled, onToggle }) {
+function SettingItem({ label, desc, active, onToggle, icon }) {
   return (
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium text-slate-900 dark:text-white">{label}</p>
-        <p className="text-xs text-slate-500 dark:text-slate-400">{description}</p>
-      </div>
-      <button
-        onClick={onToggle}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-          enabled ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-600'
-        }`}
-      >
-        <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-            enabled ? 'translate-x-6' : 'translate-x-1'
-          }`}
-        />
-      </button>
+    <div className="flex items-center justify-between px-10 py-8 border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+       <div className="flex gap-4">
+          {icon && (
+            <div className="size-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+               <span className="material-symbols-outlined text-xl">{icon}</span>
+            </div>
+          )}
+          <div className="space-y-1">
+             <h4 className="text-sm font-black text-slate-800 dark:text-white leading-none">{label}</h4>
+             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest max-w-sm">{desc}</p>
+          </div>
+       </div>
+       <div 
+         onClick={onToggle}
+         className={`w-12 h-6 rounded-full transition-all relative cursor-pointer ${active ? 'bg-blue-600 shadow-lg shadow-blue-600/20' : 'bg-slate-200 dark:bg-slate-700'}`}
+       >
+          <div className={`absolute top-1 size-4 bg-white rounded-full transition-all shadow-sm ${active ? 'right-1' : 'left-1'}`}></div>
+       </div>
     </div>
   );
 }

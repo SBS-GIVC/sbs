@@ -568,6 +568,7 @@ app.post('/api/gemini/generate', async (req, res) => {
     }
 
     const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     
     // Smart mock response generator for when API is unavailable
     const generateMockResponse = (prompt) => {
@@ -652,57 +653,86 @@ Please provide the claim details or paste the claim data for analysis.`;
 How can I assist you today?`;
     };
     
-    if (!DEEPSEEK_API_KEY) {
-      console.warn('⚠️ DEEPSEEK_API_KEY not configured, returning mock response');
-      return res.json({
-        success: true,
-        text: generateMockResponse(prompt),
-        isMock: true
-      });
-    }
-
-    try {
-      // Call DeepSeek API (OpenAI-compatible format)
-      const deepseekResponse = await axios.post(
-        'https://api.deepseek.com/chat/completions',
-        {
-          model: 'deepseek-chat',
-          messages: [
-            ...(systemInstruction ? [{ role: 'system', content: systemInstruction }] : [
-              { role: 'system', content: 'You are an expert Saudi healthcare AI assistant. You help with SBS (Saudi Billing System) codes, NPHIES compliance, claim validation, and healthcare billing optimization. Be concise and professional.' }
-            ]),
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.3,
-          max_tokens: 1024,
-          stream: false
-        },
-        {
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+    // Priority 1: Use Gemini if key is provided (since endpoint is named gemini/generate)
+    if (GEMINI_API_KEY) {
+      try {
+        const geminiResponse = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: `${systemInstruction}\n\nUser Query: ${prompt}` }]
+              }
+            ],
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 1024,
+            }
           },
-          timeout: 30000
-        }
-      );
+          {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 30000
+          }
+        );
 
-      const text = deepseekResponse.data?.choices?.[0]?.message?.content || '';
-      
-      res.json({
-        success: true,
-        text: text,
-        model: 'deepseek-chat'
-      });
-    } catch (apiError) {
-      // If DeepSeek API fails, provide mock response instead of error
-      console.warn('⚠️ DeepSeek API unavailable, using mock response:', apiError.message);
-      return res.json({
-        success: true,
-        text: generateMockResponse(prompt),
-        isMock: true,
-        fallbackReason: 'AI service temporarily unavailable'
-      });
+        const text = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        return res.json({
+          success: true,
+          text: text,
+          model: 'gemini-1.5-flash'
+        });
+      } catch (geminiError) {
+        console.warn('⚠️ Gemini API error, falling back to DeepSeek or Mock:', geminiError.message);
+      }
     }
+
+    // Priority 2: Use DeepSeek if key is provided
+    if (DEEPSEEK_API_KEY) {
+      try {
+        const deepseekResponse = await axios.post(
+          'https://api.deepseek.com/chat/completions',
+          {
+            model: 'deepseek-chat',
+            messages: [
+              ...(systemInstruction ? [{ role: 'system', content: systemInstruction }] : [
+                { role: 'system', content: 'You are an expert Saudi healthcare AI assistant. You help with SBS (Saudi Billing System) codes, NPHIES compliance, claim validation, and healthcare billing optimization. Be concise and professional.' }
+              ]),
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.3,
+            max_tokens: 1024,
+            stream: false
+          },
+          {
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+            },
+            timeout: 30000
+          }
+        );
+
+        const text = deepseekResponse.data?.choices?.[0]?.message?.content || '';
+        
+        return res.json({
+          success: true,
+          text: text,
+          model: 'deepseek-chat'
+        });
+      } catch (apiError) {
+        console.warn('⚠️ DeepSeek API unavailable, using mock response:', apiError.message);
+      }
+    }
+
+    // Priority 3: Mock Response
+    console.warn('⚠️ No AI keys configured or APIs failed, returning mock response');
+    return res.json({
+      success: true,
+      text: generateMockResponse(prompt),
+      isMock: true,
+      fallbackReason: (!GEMINI_API_KEY && !DEEPSEEK_API_KEY) ? 'No AI keys configured' : 'AI services temporarily unavailable'
+    });
 
   } catch (error) {
     console.error('❌ DeepSeek API error:', error.message);

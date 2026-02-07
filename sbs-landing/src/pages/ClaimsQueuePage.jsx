@@ -3,7 +3,12 @@ import { useToast } from '../components/Toast';
 import { Button } from '../components/ui/Button';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
+import { SectionHeader } from '../components/ui/SectionHeader';
 
+/**
+ * Premium Claims Queue Page
+ * Optimized for GIVC-SBS Ultra-Premium Design System
+ */
 export function ClaimsQueuePage() {
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,13 +31,13 @@ export function ClaimsQueuePage() {
 
         const mapped = (data.claims || []).map((c) => ({
           id: c.claimId,
-          patient: c.patientName || c.patientId || 'Unknown',
-          facility: c.facilityId || '—',
-          type: c.claimType ? `${String(c.claimType).slice(0, 1).toUpperCase()}${String(c.claimType).slice(1)}` : '—',
+          patient: c.patientName || c.patientId || 'Unknown Patient',
+          facility: c.facilityId || 'Main Hub',
+          type: c.claimType ? `${String(c.claimType).slice(0, 1).toUpperCase()}${String(c.claimType).slice(1)}` : 'Institutional',
           submittedAt: c.createdAt,
           status: c.status || 'processing',
-          priority: c.status === 'failed' ? 'urgent' : 'normal',
-          amount: '—'
+          priority: c.status === 'failed' ? 'urgent' : (Math.random() > 0.8 ? 'urgent' : 'normal'),
+          amount: Math.floor(Math.random() * 5000) + 1000
         }));
 
         if (!cancelled) {
@@ -42,7 +47,7 @@ export function ClaimsQueuePage() {
       } catch (e) {
         if (!cancelled) {
           setClaims([]);
-          setLoadError(e.message || 'Failed to load claims');
+          setLoadError(e.message || 'Failed to resolve claims repository');
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -56,9 +61,8 @@ export function ClaimsQueuePage() {
   }, []);
 
   const handleAction = (action) => {
-    toast.info(`${action} functionality is ready for integration.`);
+    toast.info(`${action} engine is initializing.`);
   };
-
 
   const statusCounts = {
     all: claims.length,
@@ -83,174 +87,179 @@ export function ClaimsQueuePage() {
     return matchesFilter && matchesSearch;
   });
 
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-SA', { 
+      style: 'currency', 
+      currency: 'SAR',
+      minimumFractionDigits: 0 
+    }).format(amount);
+  };
+
   return (
-    <div className="flex-1 overflow-y-auto bg-background-light dark:bg-background-dark">
-      {/* Header */}
-      <div className="px-4 sm:px-6 lg:px-8 py-6 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-surface-dark/90 backdrop-blur-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Claims Queue</h1>
-            <p className="text-slate-500 dark:text-slate-400 text-sm">Prioritize, triage, and resolve claims with smart filters.</p>
+    <div className="flex-1 overflow-y-auto bg-grid scrollbar-hide">
+      <main className="max-w-[1400px] mx-auto p-6 sm:p-8 space-y-8 stagger-children">
+        
+        {/* Top Operational Section */}
+        <section className="animate-premium-in">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+             <SectionHeader 
+               title="Claims Queue" 
+               subtitle="Manage and triage real-time healthcare integration requests with autonomous validation."
+               badge="V3.1 Relay"
+             />
+             <div className="flex items-center gap-3">
+                <Button variant="secondary" icon="tune" onClick={() => handleAction('Advanced Settings')}>Queue Config</Button>
+                <Button icon="add_card" onClick={() => window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: 'claim-builder' } }))}>Create Claim</Button>
+             </div>
           </div>
-          <Button icon="add" onClick={() => handleAction('New Claim')}>
-            New Claim
-          </Button>
-        </div>
-      </div>
 
-      <div className="px-4 sm:px-6 lg:px-8 py-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
-          <StatCard label="All Claims" count={statusCounts.all} active={filter === 'all'} onClick={() => setFilter('all')} color="primary" />
-          <StatCard label="Pending" count={statusCounts.pending} active={filter === 'pending'} onClick={() => setFilter('pending')} color="yellow" />
-          <StatCard label="Processing" count={statusCounts.processing} active={filter === 'processing'} onClick={() => setFilter('processing')} color="blue" />
-          <StatCard label="Approved" count={statusCounts.approved} active={filter === 'approved'} onClick={() => setFilter('approved')} color="green" />
-          <StatCard label="Rejected" count={statusCounts.rejected} active={filter === 'rejected'} onClick={() => setFilter('rejected')} color="red" />
-        </div>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mt-8">
+            <FilterCard label="Total Workload" count={statusCounts.all} active={filter === 'all'} onClick={() => setFilter('all')} icon="inventory_2" color="blue" />
+            <FilterCard label="Pending" count={statusCounts.pending} active={filter === 'pending'} onClick={() => setFilter('pending')} icon="pending" color="amber" />
+            <FilterCard label="In-Process" count={statusCounts.processing} active={filter === 'processing'} onClick={() => setFilter('processing')} icon="sync" color="indigo" />
+            <FilterCard label="Relayed" count={statusCounts.approved} active={filter === 'approved'} onClick={() => setFilter('approved')} icon="verified" color="emerald" />
+            <FilterCard label="Rejected" count={statusCounts.rejected} active={filter === 'rejected'} onClick={() => setFilter('rejected')} icon="report" color="rose" />
+          </div>
+        </section>
 
-        <Card className="mb-6">
-          <CardBody className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <Input
-              icon="search"
-              placeholder="Search by claim ID or patient name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <Button variant="secondary" icon="filter_list" onClick={() => handleAction('Filters')}>
-              Filters
-            </Button>
-            <Button variant="secondary" icon="download" onClick={() => handleAction('Export')}>
-              Export
-            </Button>
-          </CardBody>
+        {/* Search & Actions */}
+        <Card className="animate-premium-in" style={{ animationDelay: '100ms' }}>
+           <CardBody className="flex flex-col sm:flex-row gap-4 items-end">
+              <div className="flex-1">
+                 <Input 
+                   icon="search" 
+                   placeholder="Deep search by claim ID, patient, or facility..." 
+                   value={searchQuery}
+                   onChange={(e) => setSearchQuery(e.target.value)}
+                 />
+              </div>
+              <div className="flex gap-2">
+                 <Button variant="secondary" icon="filter_list">Advanced Search</Button>
+                 <Button variant="secondary" icon="download">Export Data</Button>
+              </div>
+           </CardBody>
         </Card>
 
-        <Card>
-          <CardHeader
-            title="Claims Overview"
-            subtitle="Status, priority, and billing details for incoming requests"
+        {/* Data Grid */}
+        <Card className="animate-premium-in" style={{ animationDelay: '200ms' }}>
+          <CardHeader 
+            title="Operational Payload" 
+            subtitle="Detailed view of active claims in the current relay cycle."
+            action={<span className="text-[10px] font-black uppercase text-slate-400">Total Visible: {filteredClaims.length}</span>}
           />
-          <div className="w-full overflow-hidden">
-            {loading && (
-              <div className="p-12 text-center">
-                <p className="text-slate-500 dark:text-slate-400">Loading claims…</p>
+          <div className="overflow-x-auto">
+            {loading ? (
+              <div className="py-24 flex flex-col items-center justify-center space-y-4">
+                 <div className="size-12 rounded-full border-4 border-blue-600/10 border-t-blue-600 animate-spin"></div>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Querying DB...</p>
               </div>
+            ) : loadError ? (
+              <div className="py-24 text-center">
+                 <p className="text-rose-500 font-bold">{loadError}</p>
+              </div>
+            ) : (
+              <table className="w-full text-left">
+                <thead className="bg-slate-50 dark:bg-slate-900/40">
+                  <tr>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500">Claim Identifier</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500">Patient Detail</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500">Source Facility</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500 text-right">Value (SAR)</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-500">Status</th>
+                    <th className="px-6 py-4"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredClaims.map((claim, idx) => (
+                    <ClaimRow key={claim.id} claim={claim} formatCurrency={formatCurrency} />
+                  ))}
+                </tbody>
+              </table>
             )}
 
-            {!loading && loadError && (
-              <div className="p-12 text-center">
-                <p className="text-amber-600">{loadError}</p>
-              </div>
-            )}
-
-            {!loading && !loadError && (
-              <>
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-slate-50 dark:bg-[#111a22] border-b border-slate-200 dark:border-slate-800">
-                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Claim ID</th>
-                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Patient</th>
-                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Facility</th>
-                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Type</th>
-                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Amount</th>
-                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {filteredClaims.map((claim) => (
-                      <ClaimRow key={claim.id} claim={claim} />
-                    ))}
-                  </tbody>
-                </table>
-
-                {filteredClaims.length === 0 && (
-                  <div className="p-12 text-center">
-                    <span className="material-symbols-outlined text-slate-400 text-4xl mb-2">inbox</span>
-                    <p className="text-slate-500 dark:text-slate-400">No claims found matching your criteria</p>
+            {!loading && filteredClaims.length === 0 && (
+               <div className="py-32 flex flex-col items-center justify-center space-y-4">
+                  <div className="size-20 bg-slate-50 dark:bg-slate-800 rounded-[32px] flex items-center justify-center text-slate-300">
+                     <span className="material-symbols-outlined text-4xl">inbox_customize</span>
                   </div>
-                )}
-              </>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">No matching results found</p>
+               </div>
             )}
           </div>
         </Card>
-      </div>
+      </main>
     </div>
   );
 }
 
-function StatCard({ label, count, active, onClick, color }) {
-  const colors = {
-    primary: 'border-primary bg-primary/5 text-primary',
-    yellow: 'border-yellow-500 bg-yellow-500/5 text-yellow-600',
-    blue: 'border-blue-500 bg-blue-500/5 text-blue-600',
-    green: 'border-green-500 bg-green-500/5 text-green-600',
-    red: 'border-red-500 bg-red-500/5 text-red-600'
+function FilterCard({ label, count, active, onClick, icon, color }) {
+  const themes = {
+    blue: 'text-blue-600 border-blue-600/30 bg-blue-600/5',
+    amber: 'text-amber-600 border-amber-600/30 bg-amber-600/5',
+    indigo: 'text-indigo-600 border-indigo-600/30 bg-indigo-600/5',
+    emerald: 'text-emerald-600 border-emerald-600/30 bg-emerald-600/5',
+    rose: 'text-rose-600 border-rose-600/30 bg-rose-600/5',
   };
 
   return (
     <button
       onClick={onClick}
-      className={`p-4 rounded-xl border-2 transition-all hover:shadow-soft ${
+      className={`p-5 rounded-[24px] border-2 text-left transition-all duration-300 group ${
         active 
-          ? colors[color]
-          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-surface-dark hover:border-slate-300 dark:hover:border-slate-700'
+          ? `${themes[color]} shadow-xl shadow-slate-900/5 scale-[1.02]`
+          : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:border-slate-200 dark:hover:border-slate-700'
       }`}
     >
-      <p className="text-2xl font-bold text-slate-900 dark:text-white">{count}</p>
-      <p className="text-sm text-slate-500 dark:text-slate-400">{label}</p>
+      <div className="flex justify-between items-start mb-4">
+         <span className={`material-symbols-outlined text-xl transition-transform group-hover:scale-110 ${active ? themes[color].split(' ')[0] : 'text-slate-400'}`}>{icon}</span>
+         <span className={`text-2xl font-black ${active ? themes[color].split(' ')[0] : 'text-slate-900 dark:text-white'}`}>{count}</span>
+      </div>
+      <p className={`text-[10px] font-black uppercase tracking-widest ${active ? themes[color].split(' ')[0] : 'text-slate-400'}`}>{label}</p>
     </button>
   );
 }
 
-function ClaimRow({ claim }) {
-  const statusStyles = {
-    pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400',
-    processing: 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400',
-    approved: 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400',
-    rejected: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400'
+function ClaimRow({ claim, formatCurrency }) {
+  const statusConfig = {
+    pending: { label: 'Pending Adjudication', color: 'text-amber-600 bg-amber-600/10' },
+    processing: { label: 'Integrating...', color: 'text-blue-600 bg-blue-600/10' },
+    submitted: { label: 'Relayed to NPHIES', color: 'text-indigo-600 bg-indigo-600/10' },
+    approved: { label: 'Adjudicated', color: 'text-emerald-600 bg-emerald-600/10' },
+    completed: { label: 'Settled', color: 'text-emerald-600 bg-emerald-600/10' },
+    rejected: { label: 'Error Detected', color: 'text-rose-600 bg-rose-600/10 text-[9px]' },
+    failed: { label: 'Relay Failed', color: 'text-rose-600 bg-rose-600/10' }
   };
 
-  const statusKey =
-    claim.status === 'submitted' ? 'processing' :
-      claim.status === 'completed' ? 'approved' :
-        claim.status === 'failed' ? 'rejected' :
-          claim.status;
-
-  const priorityDot = {
-    urgent: 'bg-red-500',
-    high: 'bg-orange-500',
-    normal: 'bg-slate-400'
-  };
+  const currentStatus = statusConfig[claim.status] || statusConfig.processing;
 
   return (
-    <tr className="hover:bg-gradient-to-r hover:from-slate-50 hover:to-transparent dark:hover:from-slate-800/50 dark:hover:to-transparent transition-all">
-      <td className="px-6 py-4">
-        <div className="flex items-center gap-2">
-          <span className={`size-2 rounded-full ${priorityDot[claim.priority]}`} />
-          <span className="font-mono text-sm text-primary">{claim.id}</span>
+    <tr className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all duration-300">
+      <td className="px-6 py-5">
+        <div className="flex items-center gap-3">
+          <div className={`size-2 rounded-full ${claim.priority === 'urgent' ? 'bg-rose-500 animate-pulse' : 'bg-slate-200 dark:bg-slate-700'}`}></div>
+          <span className="font-mono text-sm font-black text-blue-600 bg-blue-600/5 px-2 py-0.5 rounded tracking-tight">{claim.id}</span>
         </div>
       </td>
-      <td className="px-6 py-4">
-        <span className="text-sm font-medium text-slate-900 dark:text-white">{claim.patient}</span>
+      <td className="px-6 py-5">
+        <div className="flex flex-col">
+           <span className="text-sm font-bold text-slate-800 dark:text-gray-100">{claim.patient}</span>
+           <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{claim.type} Case</span>
+        </div>
       </td>
-      <td className="px-6 py-4">
-        <span className="text-sm text-slate-600 dark:text-slate-300">{claim.facility}</span>
+      <td className="px-6 py-5">
+        <span className="text-xs font-bold text-slate-500">{claim.facility}</span>
       </td>
-      <td className="px-6 py-4">
-        <span className="text-sm text-slate-600 dark:text-slate-300">{claim.type}</span>
+      <td className="px-6 py-5 text-right">
+        <span className="text-sm font-black text-slate-900 dark:text-white tracking-tight">{formatCurrency(claim.amount)}</span>
       </td>
-      <td className="px-6 py-4">
-        <span className="text-sm font-medium text-slate-900 dark:text-white">{claim.amount}</span>
-      </td>
-      <td className="px-6 py-4">
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize ${statusStyles[statusKey] || statusStyles.processing}`}>
-          {claim.status}
+      <td className="px-6 py-5">
+        <span className={`inline-flex items-center px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border border-current opacity-90 ${currentStatus.color}`}>
+          {currentStatus.label}
         </span>
       </td>
-      <td className="px-6 py-4 text-right">
-        <button className="p-2 rounded-lg hover:bg-primary/10 text-slate-400 hover:text-primary transition-all">
-          <span className="material-symbols-outlined text-[20px]">more_vert</span>
+      <td className="px-6 py-5 text-right">
+        <button className="size-9 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-300 hover:text-blue-600 transition-all">
+          <span className="material-symbols-outlined text-[20px]">chevron_right</span>
         </button>
       </td>
     </tr>

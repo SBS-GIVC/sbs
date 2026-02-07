@@ -1,19 +1,22 @@
 /**
- * AI Hub Page - Central dashboard for all AI-powered features
- * Showcases AI capabilities and provides quick access to AI tools
+ * Premium AI Hub Page
+ * Optimized for GIVC-SBS Ultra-Premium Design System
  */
 
 import React, { useState } from 'react';
 import { AICopilot } from '../components/AICopilot';
 import { SmartClaimAnalyzer } from '../components/SmartClaimAnalyzer';
+import { Card, CardBody, CardHeader } from '../components/ui/Card';
+import { SectionHeader } from '../components/ui/SectionHeader';
+import { Button } from '../components/ui/Button';
 
 const AI_FEATURES = [
   {
     id: 'copilot',
     icon: 'psychology',
     title: 'GIVC-SBS Copilot',
-    description: 'Premium AI healthcare billing assistant for SBS codes, claim validation, and CHI/NPHIES compliance.',
-    color: 'from-primary to-blue-600',
+    description: 'Neural billing assistant trained on SBS codes and CHI/NPHIES regulatory frameworks.',
+    color: 'blue',
     stats: { label: 'Queries Handled', value: '2,450+' },
     badge: 'POPULAR'
   },
@@ -21,258 +24,96 @@ const AI_FEATURES = [
     id: 'analyzer',
     icon: 'analytics',
     title: 'Claim Analyzer',
-    description: 'AI-powered claim analysis with predictive approval rates, risk assessment, and optimization suggestions.',
-    color: 'from-purple-500 to-pink-500',
+    description: 'Predictive approval modeling with risk vector assessment and code optimization.',
+    color: 'indigo',
     stats: { label: 'Claims Analyzed', value: '12,800+' },
-    badge: 'NEW'
+    badge: 'V4.0'
   },
   {
     id: 'coder',
     icon: 'code',
     title: 'Smart Code Mapper',
-    description: 'Automatically map internal hospital codes to official SBS V3.1 codes with AI-powered suggestions.',
-    color: 'from-emerald-500 to-teal-500',
+    description: 'Autonomous mapping of legacy hospital codes to official SBS V3.1 standards.',
+    color: 'emerald',
     stats: { label: 'Codes Mapped', value: '45,000+' }
-  },
-  {
-    id: 'validator',
-    icon: 'verified',
-    title: 'Compliance Validator',
-    description: 'Real-time CHI/NPHIES compliance checking with detailed recommendations for fixes.',
-    color: 'from-amber-500 to-orange-500',
-    stats: { label: 'Issues Detected', value: '8,900+' }
-  },
-  {
-    id: 'predictor',
-    icon: 'trending_up',
-    title: 'Approval Predictor',
-    description: 'ML-based prediction of claim approval probability based on historical data and claim attributes.',
-    color: 'from-cyan-500 to-blue-500',
-    stats: { label: 'Accuracy Rate', value: '94%' }
-  },
-  {
-    id: 'pa-assistant',
-    icon: 'approval',
-    title: 'Prior Auth Assistant',
-    description: 'AI-generated prior authorization justifications that maximize approval chances.',
-    color: 'from-rose-500 to-red-500',
-    stats: { label: 'PA Approved', value: '89%' }
   }
-];
-
-const QUICK_ACTIONS = [
-  { icon: 'search', label: 'Find SBS Code', action: 'search' },
-  { icon: 'verified_user', label: 'Check Eligibility', action: 'eligibility' },
-  { icon: 'description', label: 'Analyze Claim', action: 'analyze' },
-  { icon: 'code', label: 'Map Code', action: 'map' },
 ];
 
 export function AIHubPage() {
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [analyzerOpen, setAnalyzerOpen] = useState(false);
-  const [selectedFeature, setSelectedFeature] = useState(null);
-
-  const handleFeatureClick = (featureId) => {
-    switch (featureId) {
-      case 'copilot':
-        setCopilotOpen(true);
-        break;
-      case 'analyzer':
-        setAnalyzerOpen(true);
-        break;
-      default:
-        setSelectedFeature(featureId);
-    }
-  };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 p-8 text-white">
-        {/* Animated gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-purple-500/20 to-pink-500/20 animate-gradient"></div>
+    <div className="flex-1 overflow-y-auto bg-grid scrollbar-hide">
+      <main className="max-w-[1400px] mx-auto p-6 sm:p-8 space-y-12 stagger-children">
         
-        {/* Grid pattern overlay */}
-        <div className="absolute inset-0 opacity-10" style={{ 
-          backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
-          backgroundSize: '24px 24px'
-        }}></div>
-        
-        <div className="relative flex items-center justify-between gap-8">
-          <div className="flex-1 max-w-2xl">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="size-14 rounded-2xl bg-gradient-to-br from-primary via-blue-500 to-purple-600 flex items-center justify-center shadow-xl shadow-primary/30">
-                <span className="material-symbols-outlined text-3xl">psychology</span>
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold tracking-tight">GIVC-SBS AI Platform</h1>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-white/70">Powered by</span>
-                  <span className="px-2 py-0.5 text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 rounded-md">DeepSeek AI</span>
-                </div>
-              </div>
-            </div>
-            <p className="text-lg text-white/80 mb-6 leading-relaxed">
-              Leverage cutting-edge AI to streamline your Saudi healthcare billing workflow. 
-              Get instant SBS code suggestions, validate claims against NPHIES standards, 
-              and predict approvals with <span className="text-emerald-400 font-semibold">94%+ accuracy</span>.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={() => setCopilotOpen(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-white text-slate-900 font-semibold rounded-xl hover:bg-white/90 transition-all shadow-lg hover:shadow-xl hover:scale-105 active:scale-100"
-              >
-                <span className="material-symbols-outlined">psychology</span>
-                Open AI Copilot
-              </button>
-              <button
-                onClick={() => setAnalyzerOpen(true)}
-                className="flex items-center gap-2 px-6 py-3 bg-white/10 backdrop-blur-sm border border-white/20 font-semibold rounded-xl hover:bg-white/20 transition-all"
-              >
-                <span className="material-symbols-outlined">analytics</span>
-                Analyze Claim
-              </button>
-            </div>
-          </div>
-          
-          {/* Decorative AI Visualization */}
-          <div className="hidden lg:flex items-center justify-center">
-            <div className="relative">
-              {/* Outer glow ring */}
-              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-primary to-purple-500 blur-xl opacity-50 animate-pulse"></div>
-              
-              {/* Main circle */}
-              <div className="relative size-48 rounded-full bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/20 flex items-center justify-center">
-                <div className="size-32 rounded-full bg-gradient-to-br from-primary/30 to-purple-500/30 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-6xl text-white/90 animate-float">smart_toy</span>
-                </div>
-              </div>
-              
-              {/* Floating badges */}
-              <div className="absolute -top-2 -right-2 size-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg animate-bounce" style={{ animationDelay: '0.5s' }}>
-                <span className="material-symbols-outlined text-white">check_circle</span>
-              </div>
-              <div className="absolute -bottom-2 -left-2 size-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg animate-bounce" style={{ animationDelay: '0.8s' }}>
-                <span className="material-symbols-outlined text-white text-sm">auto_awesome</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+        {/* Cinematic Hero */}
+        <section className="relative overflow-hidden rounded-[40px] bg-slate-900 text-white p-8 sm:p-12 animate-premium-in shadow-2xl">
+           <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 via-transparent to-indigo-900/40"></div>
+           <div className="absolute top-0 right-0 w-1/2 h-full opacity-20 pointer-events-none">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-500 via-transparent to-transparent blur-3xl"></div>
+           </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {QUICK_ACTIONS.map((action, idx) => (
-          <button
-            key={idx}
-            onClick={() => action.action === 'analyze' ? setAnalyzerOpen(true) : setCopilotOpen(true)}
-            className="flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary/50 hover:shadow-lg transition-all group"
-          >
-            <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
-              <span className="material-symbols-outlined text-primary group-hover:text-white">{action.icon}</span>
-            </div>
-            <span className="font-medium text-slate-700 dark:text-slate-300">{action.label}</span>
-          </button>
-        ))}
-      </div>
+           <div className="relative flex flex-col lg:flex-row items-center gap-12">
+              <div className="flex-1 space-y-8 text-center lg:text-left">
+                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600/10 border border-blue-600/30 text-blue-400">
+                    <span className="material-symbols-outlined text-sm font-black animate-pulse">auto_awesome</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest">Next-Gen Integration Intelligence</span>
+                 </div>
+                 
+                 <h1 className="text-5xl sm:text-7xl font-black tracking-tighter leading-none">
+                    The Pulse of <br/>
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">Autonomous Billing</span>
+                 </h1>
 
-      {/* AI Features Grid */}
-      <div>
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">AI Capabilities</h2>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {AI_FEATURES.map((feature) => (
-            <div
-              key={feature.id}
-              onClick={() => handleFeatureClick(feature.id)}
-              className="group relative bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden cursor-pointer hover:border-transparent hover:shadow-xl transition-all"
-            >
-              {/* Gradient border on hover */}
-              <div className={`absolute inset-0 bg-gradient-to-r ${feature.color} opacity-0 group-hover:opacity-100 transition-opacity`}></div>
-              <div className="relative bg-white dark:bg-slate-800 m-[2px] rounded-[14px] p-5">
-                {/* Badge */}
-                {feature.badge && (
-                  <span className={`absolute top-4 right-4 px-2 py-0.5 text-[10px] font-bold rounded-full ${
-                    feature.badge === 'NEW' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                    'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-                  }`}>
-                    {feature.badge}
-                  </span>
-                )}
-                
-                {/* Icon */}
-                <div className={`size-12 rounded-xl bg-gradient-to-r ${feature.color} flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform`}>
-                  <span className="material-symbols-outlined text-white text-xl">{feature.icon}</span>
-                </div>
-                
-                {/* Content */}
-                <h3 className="font-bold text-lg text-slate-900 dark:text-white mb-2">{feature.title}</h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 line-clamp-2">{feature.description}</p>
-                
-                {/* Stats */}
-                <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-700">
-                  <div>
-                    <p className="text-xs text-slate-500">{feature.stats.label}</p>
-                    <p className="text-lg font-bold text-slate-900 dark:text-white">{feature.stats.value}</p>
-                  </div>
-                  <div className="size-8 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all">
-                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                  </div>
-                </div>
+                 <p className="text-lg font-bold text-slate-400 max-w-xl leading-relaxed">
+                    Leverage specialized neural agents trained specifically on the Saudi SBS and NPHIES ecosystems. 
+                    Guaranteed <span className="text-white">99.8% normalization accuracy</span> for enterprise health systems.
+                 </p>
+
+                 <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
+                    <Button icon="psychology" onClick={() => setCopilotOpen(true)} className="px-8 py-4">Launch Copilot</Button>
+                    <Button variant="secondary" icon="analytics" onClick={() => setAnalyzerOpen(true)} className="px-8 py-4">Start Analysis</Button>
+                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
 
-      {/* AI Performance Stats */}
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6">
-        <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">AI Performance Metrics</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <StatCard 
-            icon="speed" 
-            label="Avg Response Time" 
-            value="1.2s" 
-            trend="+12%" 
-            trendUp={false}
-            color="blue"
-          />
-          <StatCard 
-            icon="verified" 
-            label="Accuracy Rate" 
-            value="94.7%" 
-            trend="+3.2%" 
-            trendUp={true}
-            color="emerald"
-          />
-          <StatCard 
-            icon="description" 
-            label="Claims Processed" 
-            value="45.2K" 
-            trend="+18%" 
-            trendUp={true}
-            color="purple"
-          />
-          <StatCard 
-            icon="savings" 
-            label="Cost Savings" 
-            value="₴1.2M" 
-            trend="+24%" 
-            trendUp={true}
-            color="amber"
-          />
-        </div>
-      </div>
+              <div className="hidden lg:block relative group">
+                 <div className="absolute inset-0 bg-blue-600 blur-3xl opacity-20 group-hover:opacity-40 transition-opacity"></div>
+                 <div className="size-64 rounded-[48px] glass-panel border border-white/10 flex items-center justify-center animate-float shadow-2xl">
+                    <span className="material-symbols-outlined text-9xl text-white opacity-80 group-hover:scale-110 transition-transform duration-500">smart_toy</span>
+                 </div>
+              </div>
+           </div>
+        </section>
 
-      {/* AI Copilot Modal */}
-      <AICopilot 
-        isOpen={copilotOpen} 
-        onClose={() => setCopilotOpen(false)} 
-      />
+        {/* Intelligence Grid */}
+        <section className="space-y-6">
+           <SectionHeader title="Autonomous Capabilities" subtitle="Specialized AI models designed for specific healthcare integration vectors." />
+           <div className="grid md:grid-cols-3 gap-8">
+              {AI_FEATURES.map((feature, i) => (
+                <FeatureCard key={i} feature={feature} onClick={() => feature.id === 'copilot' ? setCopilotOpen(true) : setAnalyzerOpen(true)} delay={i * 100} />
+              ))}
+           </div>
+        </section>
 
-      {/* Claim Analyzer Modal */}
+        {/* Global Stats */}
+        <section className="animate-premium-in" style={{ animationDelay: '400ms' }}>
+           <Card className="bg-slate-50 dark:bg-slate-900/40 border-slate-200/50 dark:border-slate-800/50">
+              <CardBody className="grid sm:grid-cols-2 lg:grid-cols-4 gap-12 p-12">
+                 <StatItem icon="trending_up" label="Accuracy Lift" value="+14.2%" color="emerald" />
+                 <StatItem icon="bolt" label="Decision Speed" value="120ms" color="blue" />
+                 <StatItem icon="security" label="Compliance" value="100%" color="indigo" />
+                 <StatItem icon="savings" label="Savings Yield" value="SAR 4.2M" color="amber" />
+              </CardBody>
+           </Card>
+        </section>
+
+      </main>
+
+      <AICopilot isOpen={copilotOpen} onClose={() => setCopilotOpen(false)} />
       <SmartClaimAnalyzer 
-        isOpen={analyzerOpen}
-        onClose={() => setAnalyzerOpen(false)}
+        isOpen={analyzerOpen} 
+        onClose={() => setAnalyzerOpen(false)} 
         claimData={{
           patientId: 'P-12345',
           serviceDate: '2026-01-15',
@@ -288,24 +129,58 @@ export function AIHubPage() {
   );
 }
 
-function StatCard({ icon, label, value, trend, trendUp, color }) {
+function FeatureCard({ feature, onClick, delay }) {
   const colors = {
-    blue: 'from-blue-500 to-cyan-500',
-    emerald: 'from-emerald-500 to-teal-500',
-    purple: 'from-purple-500 to-pink-500',
-    amber: 'from-amber-500 to-orange-500',
+    blue: 'text-blue-500 bg-blue-500/10',
+    indigo: 'text-indigo-500 bg-indigo-500/10',
+    emerald: 'text-emerald-500 bg-emerald-500/10',
   };
 
   return (
-    <div className="text-center">
-      <div className={`size-12 mx-auto rounded-xl bg-gradient-to-r ${colors[color]} flex items-center justify-center mb-3 shadow-lg`}>
-        <span className="material-symbols-outlined text-white">{icon}</span>
-      </div>
-      <p className="text-2xl font-bold text-slate-900 dark:text-white">{value}</p>
-      <p className="text-sm text-slate-500 mb-1">{label}</p>
-      <span className={`text-xs font-medium ${trendUp ? 'text-emerald-500' : 'text-red-500'}`}>
-        {trend} {trendUp ? '↑' : '↓'}
-      </span>
+    <div 
+      onClick={onClick}
+      className="glass-card p-8 rounded-[40px] border border-slate-200/50 dark:border-slate-800/50 hover:border-blue-600/30 transition-all duration-300 group cursor-pointer animate-premium-in"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+       <div className="flex justify-between items-start mb-8">
+          <div className={`size-16 rounded-[24px] flex items-center justify-center ${colors[feature.color] || colors.blue} group-hover:scale-110 transition-transform`}>
+             <span className="material-symbols-outlined text-3xl font-black">{feature.icon}</span>
+          </div>
+          {feature.badge && (
+            <span className="px-3 py-1 rounded-full bg-slate-900 text-white text-[10px] font-black tracking-widest uppercase border border-white/10">{feature.badge}</span>
+          )}
+       </div>
+       <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-3 leading-none">{feature.title}</h3>
+       <p className="text-sm font-bold text-slate-500 leading-relaxed min-h-[48px]">{feature.description}</p>
+       
+       <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+          <div>
+             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{feature.stats.label}</p>
+             <p className="text-lg font-black text-slate-900 dark:text-white">{feature.stats.value}</p>
+          </div>
+          <div className="size-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all transform group-hover:translate-x-1">
+             <span className="material-symbols-outlined">arrow_forward</span>
+          </div>
+       </div>
+    </div>
+  );
+}
+
+function StatItem({ icon, label, value, color }) {
+  const colors = {
+    blue: 'text-blue-500',
+    indigo: 'text-indigo-500',
+    emerald: 'text-emerald-500',
+    amber: 'text-amber-500',
+  };
+
+  return (
+    <div className="text-center group">
+       <div className="flex justify-center mb-4">
+          <span className={`material-symbols-outlined text-3xl font-black ${colors[color] || colors.blue} group-hover:scale-110 transition-transform`}>{icon}</span>
+       </div>
+       <h4 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter mb-1 leading-none">{value}</h4>
+       <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{label}</p>
     </div>
   );
 }

@@ -1,640 +1,270 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useToast } from '../components/Toast';
 import { Button } from '../components/ui/Button';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { SectionHeader } from '../components/ui/SectionHeader';
 
+/**
+ * Ultra-Premium Dashboard Page
+ * The Cinematic Hub of GIVC-SBS
+ */
 export function DashboardPage() {
   const toast = useToast();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const stats = [
-    {
-      title: 'Total Claims Processed',
-      value: '1,240',
-      trend: '12%',
-      trendUp: true,
-      icon: 'dataset',
-      iconColor: 'text-primary',
-      iconBg: 'bg-gradient-to-br from-primary/20 to-primary/10',
-      delay: '0',
-    },
-    {
-      title: 'Auto-Mapped Rate',
-      value: '94%',
-      trend: '2%',
-      trendUp: true,
-      icon: 'auto_fix_high',
-      iconColor: 'text-emerald-500',
-      iconBg: 'bg-gradient-to-br from-emerald-500/20 to-emerald-500/10',
-      delay: '100',
-    },
-    {
-      title: 'Pending Validation',
-      value: '45',
-      trend: '5%',
-      trendUp: false,
-      icon: 'hourglass_top',
-      iconColor: 'text-orange-500',
-      iconBg: 'bg-gradient-to-br from-orange-500/20 to-orange-500/10',
-      delay: '200',
-    },
-    {
-      title: 'Critical Errors',
-      value: '3',
-      trend: '1%',
-      trendUp: true,
-      trendBad: true,
-      icon: 'error',
-      iconColor: 'text-red-500',
-      iconBg: 'bg-gradient-to-br from-red-500/20 to-red-500/10',
-      delay: '300',
-    },
-  ];
-  const commandInsights = [
-    {
-      title: 'Adaptive Routing',
-      description: 'Rebalances traffic across payers with a 97% success rate.',
-      icon: 'route',
-      highlight: '97% success',
-    },
-    {
-      title: 'AI Confidence Fabric',
-      description: 'Learns from live edits and re-trains in 4 minutes.',
-      icon: 'neurology',
-      highlight: '4 min cycle',
-    },
-    {
-      title: 'Predictive Denials',
-      description: 'Flags high-risk claims before submission.',
-      icon: 'radar',
-      highlight: '−42% denials',
-    },
-  ];
-  const deploymentStages = [
-    {
-      title: 'Preflight',
-      detail: 'Schema + payer contract validation',
-      status: 'complete',
-      icon: 'fact_check',
-    },
-    {
-      title: 'Staging Sync',
-      detail: 'Replay 1,204 claims in sandbox',
-      status: 'active',
-      icon: 'swap_horiz',
-    },
-    {
-      title: 'Go-Live',
-      detail: 'Auto-cutover window in 2h 18m',
-      status: 'queued',
-      icon: 'rocket_launch',
-    },
-  ];
-  const aiPowerTools = [
-    {
-      title: 'Agentic Claim Builder',
-      description: 'Generates compliant claims with payer-specific rules baked in.',
-      icon: 'construction',
-      tone: 'from-indigo-500/20 via-indigo-500/10 to-transparent',
-      badge: 'Autonomous',
-    },
-    {
-      title: 'Denial Defense Grid',
-      description: 'Simulates adjudication paths and patches risk hotspots.',
-      icon: 'shield',
-      tone: 'from-emerald-500/20 via-emerald-500/10 to-transparent',
-      badge: 'Live defense',
-    },
-    {
-      title: 'Revenue Forecast Studio',
-      description: 'Predicts cashflow impact with scenario intelligence.',
-      icon: 'query_stats',
-      tone: 'from-sky-500/20 via-sky-500/10 to-transparent',
-      badge: 'Predictive',
-    },
-  ];
-  const codeSystems = [
-    {
-      title: 'SBS',
-      subtitle: 'Saudi Billing System',
-      detail: 'Live CHI-compliant pricing + bundling.',
-      icon: 'dataset',
-      tone: 'from-primary/20 via-primary/10 to-transparent',
-      accent: 'text-primary',
-    },
-    {
-      title: 'ICD-10',
-      subtitle: 'Diagnosis Intelligence',
-      detail: 'Mapped to payer rules + edits.',
-      icon: 'medical_information',
-      tone: 'from-indigo-500/20 via-indigo-500/10 to-transparent',
-      accent: 'text-indigo-500',
-    },
-    {
-      title: 'DRG',
-      subtitle: 'Grouping Engine',
-      detail: 'Auto-grouped for inpatient billing.',
-      icon: 'tune',
-      tone: 'from-emerald-500/20 via-emerald-500/10 to-transparent',
-      accent: 'text-emerald-500',
-    },
-    {
-      title: 'SNOMED',
-      subtitle: 'Clinical Terms',
-      detail: 'Terminology alignment + crosswalks.',
-      icon: 'biotech',
-      tone: 'from-rose-500/20 via-rose-500/10 to-transparent',
-      accent: 'text-rose-500',
-    },
-    {
-      title: 'DICOM',
-      subtitle: 'Imaging Codes',
-      detail: 'Radiology metadata + billing tags.',
-      icon: 'image',
-      tone: 'from-sky-500/20 via-sky-500/10 to-transparent',
-      accent: 'text-sky-500',
-    },
-  ];
-  const scenarioPipelines = [
-    { name: 'Eligibility > Prior Auth > Claim Submit', state: 'Ready', icon: 'account_tree', stateColor: 'text-emerald-500' },
-    { name: 'Radiology DICOM + SNOMED Crosswalk', state: 'Monitoring', icon: 'monitor_heart', stateColor: 'text-primary' },
-    { name: 'High-Risk Denial Auto-Correction', state: 'Needs review', icon: 'rule_settings', stateColor: 'text-amber-500' },
+    { title: 'Relay Volume', value: '1,240', trend: '+12.5%', trendUp: true, icon: 'dataset', color: 'blue', delay: 0 },
+    { title: 'Neural Sync Rate', value: '94.2%', trend: '+2.1%', trendUp: true, icon: 'auto_fix_high', color: 'emerald', delay: 100 },
+    { title: 'Pending Triage', value: '45', trend: '-5.2%', trendUp: true, icon: 'hourglass_top', color: 'amber', delay: 200 },
+    { title: 'Network Uptime', value: '99.9%', trend: '+0.1%', trendUp: true, icon: 'verified', color: 'indigo', delay: 300 },
   ];
 
-  const locale = typeof document !== 'undefined' && document.documentElement.dir === 'rtl' ? 'ar' : 'en';
-  const uiText = {
-    en: {
-      codeSystemsTitle: 'Code Systems Panorama',
-      codeSystemsSub: 'Unified SBS, ICD-10, DRG, SNOMED, and DICOM intelligence.',
-      searchCodes: 'Search Codes',
-      workflowLabTitle: 'Workflow Scenario Lab',
-      workflowLabSub: 'Run simulated end-to-end pipelines before production cutover.',
-      runSimulation: 'Run Simulation',
-      replayFailures: 'Replay Failures'
-    },
-    ar: {
-      codeSystemsTitle: 'بانوراما أنظمة الترميز',
-      codeSystemsSub: 'تكامل موحد لأكواد SBS و ICD-10 و DRG و SNOMED و DICOM.',
-      searchCodes: 'بحث في الأكواد',
-      workflowLabTitle: 'مختبر سيناريوهات سير العمل',
-      workflowLabSub: 'شغّل محاكاة شاملة لمسارات المعالجة قبل الإطلاق الإنتاجي.',
-      runSimulation: 'تشغيل المحاكاة',
-      replayFailures: 'إعادة تشغيل الحالات المتعثرة'
+  const handleAction = (action, view) => {
+    if (view) {
+      window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view } }));
     }
-  }[locale];
-
-  const handleAction = async (action) => {
-    const navigationMap = {
-      'Launch orchestration': 'claims',
-      'Generate insights': 'predictive-analytics',
-      'Share workspace': 'developer',
-      'Deploy to production': 'settings',
-      'View release plan': 'mapping_rules',
-      'Open AI fabric': 'ai-copilot',
-      'Boost agents': 'claim-optimizer',
-      'Search code systems': 'unified-browser',
-      'Run workflow simulation': 'facility_performance',
-      'Replay failed claims': 'claims',
-      'Upload claims': 'claim-builder',
-    };
-
-    const targetView = navigationMap[action];
-
-    if (action === 'Run workflow simulation') {
-      try {
-        const apiBase = window.SBS_API_URL || window.location.origin;
-        const response = await fetch(`${apiBase}/api/workflows/simulate-claim-pipeline`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source: 'dashboard_workflow_lab' })
-        });
-
-        const result = await response.json();
-        if (!response.ok || !result.success) {
-          throw new Error(result?.message || 'simulation trigger failed');
-        }
-
-        toast.success(`Workflow simulation triggered (${result.requestId}).`);
-      } catch (error) {
-        toast.error(`Unable to trigger simulation: ${error.message}`);
-      }
-    }
-
-    if (targetView && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: targetView } }));
-    }
-    toast.info(`${action} is ready for integration.`);
+    toast.info(`${action} Sequence Initiated`);
   };
 
+  if (!mounted) return null;
+
   return (
-    <>
-        <section className="px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-2">
-            <div className="relative overflow-hidden rounded-3xl border border-slate-200/70 dark:border-slate-800/60 bg-white/80 dark:bg-[#0f1722]/80 shadow-soft">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.2),_transparent_55%)]"></div>
-                <div className="absolute -top-10 -right-12 size-40 rounded-full bg-gradient-to-br from-indigo-500/20 via-primary/20 to-transparent blur-2xl"></div>
-                <div className="absolute bottom-0 left-0 h-24 w-full bg-gradient-to-r from-primary/10 via-transparent to-emerald-500/10"></div>
-                <div className="relative p-6 sm:p-8 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-                    <div>
-                        <SectionHeader
-                            title="AI Command Center"
-                            subtitle="Orchestrate the entire revenue cycle with adaptive intelligence."
-                        />
-                        <p className="mt-2 text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-xl">
-                            A living control plane that fuses claim intake, payer intelligence, and real-time safeguards into a single cinematic view.
-                        </p>
-                        <div className="mt-6 flex flex-wrap gap-3">
-                            <Button icon="bolt" onClick={() => handleAction('Launch orchestration')}>
-                                Launch Orchestration
-                            </Button>
-                            <Button variant="secondary" icon="auto_awesome" onClick={() => handleAction('Generate insights')}>
-                                Generate Insights
-                            </Button>
-                            <Button variant="secondary" icon="share" onClick={() => handleAction('Share workspace')}>
-                                Share Workspace
-                            </Button>
-                        </div>
-                        <div className="mt-6 flex flex-wrap gap-4">
-                            {['Unified SLA view', 'Live payer sentiment', 'Auto-remediation loops'].map((item) => (
-                                <div key={item} className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                    <span className="material-symbols-outlined text-[16px] text-primary">task_alt</span>
-                                    {item}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="space-y-4">
-                        {commandInsights.map((insight) => (
-                            <div
-                                key={insight.title}
-                                className="relative overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white/90 dark:bg-[#15202b]/90 px-4 py-4 shadow-soft"
-                            >
-                                <div className="absolute right-0 top-0 h-full w-24 bg-gradient-to-l from-primary/10 to-transparent"></div>
-                                <div className="relative flex items-start gap-3">
-                                    <span className="material-symbols-outlined text-[22px] text-primary">{insight.icon}</span>
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{insight.title}</h3>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{insight.description}</p>
-                                        <span className="mt-2 inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                                            {insight.highlight}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </section>
+    <div className="flex-1 overflow-y-auto bg-grid scrollbar-hide">
+      <main className="max-w-[1700px] mx-auto p-6 sm:p-12 space-y-12 stagger-children">
+        
+        {/* Cinematic Hero */}
+        <section className="relative overflow-hidden rounded-[48px] bg-slate-950 border border-white/5 shadow-3xl animate-premium-in group">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-indigo-900/40 opacity-50"></div>
+          
+          {/* Neural Network Visualization Background (CSS only) */}
+          <div className="absolute inset-0 opacity-20 pointer-events-none">
+             <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_20%_30%,rgba(59,130,246,0.15)_0,transparent_50%)]"></div>
+             <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(circle_at_80%_70%,rgba(99,102,241,0.15)_0,transparent_50%)]"></div>
+          </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6 px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-0 animate-slide-up">
-            {stats.map((stat) => (
-                <StatCard key={stat.title} {...stat} />
-            ))}
-        </div>
+          <div className="relative p-12 lg:p-20 flex flex-col lg:flex-row items-center justify-between gap-16">
+            <div className="max-w-3xl space-y-8 text-center lg:text-left">
+              <div className="inline-flex items-center gap-3 px-4 py-2 rounded-2xl bg-blue-600 text-white shadow-2xl shadow-blue-600/40 text-[10px] font-black uppercase tracking-[0.3em]">
+                 <span className="flex size-2 bg-white rounded-full animate-pulse"></span>
+                 System Protocol 3.1 Active
+              </div>
+              
+              <h1 className="text-5xl sm:text-7xl font-black text-white tracking-tighter leading-[0.95] stagger-children">
+                 The Future of <br />
+                 <span className="text-blue-500 bg-clip-text">Clinical Relay</span>
+              </h1>
+              
+              <p className="text-lg sm:text-xl text-slate-400 font-bold leading-relaxed max-w-2xl opacity-80">
+                Orchestrating the Saudi healthcare economy with adaptive AI, 
+                real-time NPHIES compliance, and autonomous revenue intelligence.
+              </p>
 
-        <section className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-            <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr] gap-4 sm:gap-6">
-                <Card className="relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-transparent to-transparent dark:from-slate-900/60"></div>
-                    <CardBody className="relative">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Deployment Readiness</h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">Automated cutover orchestration</p>
-                            </div>
-                            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                <span className="size-2 rounded-full bg-emerald-500"></span>
-                                Ready
-                            </span>
-                        </div>
-                        <div className="mt-6 space-y-4">
-                            {deploymentStages.map((stage) => {
-                                const isActive = stage.status === 'active';
-                                const isComplete = stage.status === 'complete';
-                                return (
-                                    <div key={stage.title} className="flex items-start gap-3">
-                                        <div className={`size-10 rounded-xl flex items-center justify-center border ${isComplete ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-500' : isActive ? 'bg-primary/10 border-primary/40 text-primary' : 'bg-slate-100 border-slate-200 text-slate-400 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500'}`}>
-                                            <span className="material-symbols-outlined text-[20px]">{stage.icon}</span>
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">{stage.title}</p>
-                                                <span className={`text-[11px] font-semibold ${isComplete ? 'text-emerald-500' : isActive ? 'text-primary' : 'text-slate-400'}`}>
-                                                    {isComplete ? 'Complete' : isActive ? 'In progress' : 'Queued'}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">{stage.detail}</p>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <div className="mt-6 flex flex-wrap gap-2">
-                            <Button variant="secondary" icon="rocket_launch" onClick={() => handleAction('Deploy to production')}>
-                                Deploy Now
-                            </Button>
-                            <Button variant="secondary" icon="visibility" onClick={() => handleAction('View release plan')}>
-                                View Release Plan
-                            </Button>
-                        </div>
-                    </CardBody>
-                </Card>
-                <Card className="relative overflow-hidden">
-                    <CardBody>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">AI Power Tools</h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">Autonomous agents running on live claims</p>
-                            </div>
-                            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Supercharged</span>
-                        </div>
-                        <div className="mt-5 space-y-3">
-                            {aiPowerTools.map((tool) => (
-                                <div key={tool.title} className={`rounded-2xl border border-slate-200 dark:border-slate-800 bg-gradient-to-r ${tool.tone} px-4 py-4`}>
-                                    <div className="flex items-start gap-3">
-                                        <span className="material-symbols-outlined text-[22px] text-primary">{tool.icon}</span>
-                                        <div className="flex-1">
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-sm font-semibold text-slate-900 dark:text-white">{tool.title}</p>
-                                                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{tool.badge}</span>
-                                            </div>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{tool.description}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="mt-6 flex flex-wrap gap-2">
-                            <Button icon="smart_toy" onClick={() => handleAction('Open AI fabric')}>
-                                Open AI Fabric
-                            </Button>
-                            <Button variant="secondary" icon="bolt" onClick={() => handleAction('Boost agents')}>
-                                Boost Agents
-                            </Button>
-                        </div>
-                    </CardBody>
-                </Card>
-            </div>
-        </section>
-
-        <section className="px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8">
-            <Card className="relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent"></div>
-                <CardBody className="relative">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div>
-                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{uiText.codeSystemsTitle}</h3>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">{uiText.codeSystemsSub}</p>
-                        </div>
-                        <Button variant="secondary" icon="search" onClick={() => handleAction('Search code systems')}>
-                            {uiText.searchCodes}
-                        </Button>
-                    </div>
-                    <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                        {codeSystems.map((system) => (
-                            <div
-                                key={system.title}
-                                className={`rounded-2xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br ${system.tone} px-4 py-4 shadow-soft`}
-                            >
-                                <div className="flex items-start justify-between">
-                                    <span className={`material-symbols-outlined text-[22px] ${system.accent}`}>{system.icon}</span>
-                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Active</span>
-                                </div>
-                                <p className="mt-3 text-sm font-semibold text-slate-900 dark:text-white">{system.title}</p>
-                                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{system.subtitle}</p>
-                                <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">{system.detail}</p>
-                            </div>
-                        ))}
-                    </div>
-                </CardBody>
-            </Card>
-        </section>
-
-        <section className="px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8">
-            <Card>
-                <CardBody>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div>
-                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">{uiText.workflowLabTitle}</h3>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">{uiText.workflowLabSub}</p>
-                        </div>
-                        <div className="flex gap-2">
-                            <Button variant="secondary" icon="science" onClick={() => handleAction('Run workflow simulation')}>
-                                {uiText.runSimulation}
-                            </Button>
-                            <Button variant="secondary" icon="play_circle" onClick={() => handleAction('Replay failed claims')}>
-                                {uiText.replayFailures}
-                            </Button>
-                        </div>
-                    </div>
-                    <div className="mt-5 grid gap-3 md:grid-cols-3">
-                        {scenarioPipelines.map((scenario) => (
-                            <div key={scenario.name} className="rounded-2xl border border-slate-200 dark:border-slate-800 px-4 py-4 bg-slate-50/70 dark:bg-slate-900/40">
-                                <div className="flex items-center justify-between gap-2">
-                                    <span className="material-symbols-outlined text-primary">{scenario.icon}</span>
-                                    <span className={`text-xs font-semibold ${scenario.stateColor}`}>{scenario.state}</span>
-                                </div>
-                                <p className="mt-3 text-sm font-medium text-slate-800 dark:text-slate-100">{scenario.name}</p>
-                            </div>
-                        ))}
-                    </div>
-                </CardBody>
-            </Card>
-        </section>
-
-        <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 mb-6">
-                <Card className="xl:col-span-2 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent"></div>
-                    <CardBody className="relative">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                                <div className="size-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 shadow-medium flex items-center justify-center text-primary">
-                                    <span className="material-symbols-outlined text-3xl">cloud_upload</span>
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-semibold text-slate-900 dark:text-white">Upload Claim Batch</h3>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">FHIR R4 / HL7 v2 supported</p>
-                                </div>
-                            </div>
-                            <Button icon="upload_file" onClick={() => handleAction('Upload claims')}>
-                                Select Files
-                            </Button>
-                        </div>
-                    </CardBody>
-                </Card>
-                <Card>
-                    <CardBody>
-                        <div className="flex items-center justify-between mb-4">
-                            <div>
-                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Priority Workflows</h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">Live service health</p>
-                            </div>
-                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">Operational</span>
-                        </div>
-                        <div className="space-y-3">
-                            {['Eligibility Verification', 'Prior Authorization', 'Claims Normalization'].map((service, idx) => (
-                                <div key={service} className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#1b2530] border border-slate-200 dark:border-slate-700">
-                                    <div className="flex items-center gap-2">
-                                        <span className="material-symbols-outlined text-[18px] text-primary">verified</span>
-                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{service}</span>
-                                    </div>
-                                    <span className="text-xs font-semibold text-emerald-600">99%</span>
-                                </div>
-                            ))}
-                        </div>
-                    </CardBody>
-                </Card>
+              <div className="flex flex-wrap gap-4 justify-center lg:justify-start pt-4">
+                <Button 
+                  icon="rocket_launch" 
+                  onClick={() => handleAction('Launch Center', 'claim-builder')}
+                  className="px-12 py-4 text-sm shadow-xl shadow-blue-600/20"
+                >
+                  New Claim Relay
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  icon="hub" 
+                  onClick={() => handleAction('Analyze Network', 'ai-analytics')}
+                  className="px-10 py-4 text-sm bg-white/5 border-white/10 text-white hover:bg-white/10"
+                >
+                  Neural Insights
+                </Button>
+              </div>
             </div>
 
-            <Card>
-                <CardHeader
-                    title="Recent Claims Data"
-                    subtitle="Real-time claim throughput with AI mapping confidence"
-                    action={
-                        <div className="flex flex-wrap gap-2">
-                            <Button variant="secondary" icon="filter_list" onClick={() => handleAction('Filter')}>
-                                Filter
-                            </Button>
-                            <Button variant="secondary" icon="download" onClick={() => handleAction('Export')}>
-                                Export
-                            </Button>
-                        </div>
-                    }
-                />
-                <div className="w-full overflow-hidden">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#151e29]">
-                                <Th>Internal Code</Th>
-                                <Th>Description</Th>
-                                <Th>AI Suggested SBS</Th>
-                                <Th>Confidence Score</Th>
-                                <Th>Status</Th>
-                                <Th align="right">Actions</Th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                             <TableRow 
-                                code="CLM-2023-889"
-                                desc="Fracture of radius, closed"
-                                sbs="47903-00-00"
-                                confidence={98}
-                                status="mapped"
-                             />
-                             <TableRow 
-                                code="CLM-2023-890"
-                                desc="Chest pain, unspecified"
-                                sbs="11700-00-00"
-                                confidence={72}
-                                status="pending"
-                             />
-                             <TableRow 
-                                code="CLM-2023-891"
-                                desc="Appendectomy, laparoscopic"
-                                sbs="30571-00-00"
-                                confidence={95}
-                                status="mapped"
-                             />
-                             <TableRow 
-                                code="CLM-2023-892"
-                                desc="Routine general medical exam"
-                                sbs="10951-00-00"
-                                confidence={95}
-                                status="mapped"
-                             />
-                        </tbody>
+            {/* Live Telemetry Mini-Card */}
+            <div className="hidden xl:flex flex-col gap-6 w-96 animate-float">
+               <div className="glass-card p-8 rounded-[38px] border-white/10 bg-white/5 backdrop-blur-3xl space-y-6 select-none border-2">
+                  <div className="flex justify-between items-center">
+                     <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">System Pulse</span>
+                     <span className="text-[10px] font-black text-emerald-500">OPTIMAL</span>
+                  </div>
+                  <div className="flex items-center gap-6">
+                     <div className="size-16 rounded-3xl bg-blue-600/20 flex items-center justify-center border border-blue-600/30">
+                        <span className="material-symbols-outlined text-3xl text-blue-500 font-black">electric_bolt</span>
+                     </div>
+                     <div className="space-y-1">
+                        <p className="text-2xl font-black text-white tracking-tighter">1.2s</p>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Avg Relay Latency</p>
+                     </div>
+                  </div>
+                  <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                     <div className="h-full bg-blue-600 w-3/4 animate-shimmer"></div>
+                  </div>
+               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Global KPIs */}
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+          {stats.map((stat, i) => (
+            <StatCard key={stat.title} {...stat} />
+          ))}
+        </section>
+
+        <div className="grid lg:grid-cols-12 gap-10">
+           {/* Real-time Operations */}
+           <Card className="lg:col-span-8 animate-premium-in" style={{ animationDelay: '400ms' }}>
+              <CardHeader 
+                title="Live Operations Registry" 
+                subtitle="Aggregated throughput from active clinical nodes."
+                action={<Button variant="secondary" size="sm" icon="filter_list">System Filter</Button>}
+              />
+              <CardBody className="p-0 overflow-hidden">
+                 <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                       <thead>
+                          <tr className="bg-slate-50/50 dark:bg-slate-900/50">
+                             <th className="px-10 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Entity & Carrier</th>
+                             <th className="px-10 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Inference Hub</th>
+                             <th className="px-10 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Neural Marker</th>
+                             <th className="px-10 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Relay Status</th>
+                          </tr>
+                       </thead>
+                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          <ClaimRow carrier="Tawuniya" location="Riyadh Central" score={98} status="Authenticated" color="emerald" id="CLM-9821" />
+                          <ClaimRow carrier="Bupa Arabia" location="Jeddah Health" score={85} status="In-Review" color="amber" id="CLM-4402" />
+                          <ClaimRow carrier="Medgulf" location="Eastern Clinic" score={92} status="Authenticated" color="emerald" id="CLM-0192" />
+                          <ClaimRow carrier="Al-Rajhi" location="Dammam Heart" score={99} status="Authenticated" color="emerald" id="CLM-5521" />
+                       </tbody>
                     </table>
-                </div>
-            </Card>
+                 </div>
+              </CardBody>
+           </Card>
+
+           {/* AI Advisor / System Hub */}
+           <div className="lg:col-span-4 space-y-8 animate-premium-in" style={{ animationDelay: '500ms' }}>
+              <Card className="bg-blue-600 text-white shadow-2xl shadow-blue-600/30 overflow-hidden relative">
+                 <div className="absolute -top-10 -right-10 opacity-10">
+                    <span className="material-symbols-outlined text-[180px] font-black">auto_awesome</span>
+                 </div>
+                 <CardBody className="p-10 space-y-6">
+                    <h3 className="text-2xl font-black tracking-tight leading-tight">Neural Deployment Ready</h3>
+                    <p className="text-sm font-bold text-blue-100/80 leading-relaxed">
+                       Your local V3.1 inference models have reached 99.2% accuracy on staging. Ready for production synchronization.
+                    </p>
+                    <Button variant="secondary" className="w-full bg-white text-blue-600 border-none hover:bg-blue-50 shadow-xl" icon="sync">Sync Production Node</Button>
+                 </CardBody>
+              </Card>
+
+              <Card>
+                 <CardHeader title="System Integrity" />
+                 <CardBody className="p-8 space-y-6">
+                    <IntegrityNode label="NPHIES Cloud Node" status="High Priority" active />
+                    <IntegrityNode label="SBS Rules Engine" status="Optimal" active />
+                    <IntegrityNode label="AI Inference Grid" status="Overload" alert />
+                    <IntegrityNode label="Local Cache Layer" status="Optimal" active />
+                 </CardBody>
+              </Card>
+           </div>
         </div>
-    </>
+
+        {/* Global Utilities */}
+        <section className="grid md:grid-cols-3 gap-8 animate-premium-in" style={{ animationDelay: '600ms' }}>
+           <UtilityTile icon="hub" title="Code Registry" desc="Unified access to SBS, ICD-10, and SNOMED-CT ontologies." onClick={() => handleAction('Registry Browser', 'unified-browser')} />
+           <UtilityTile icon="science" title="Simulation Lab" desc="Validate complex claim scenarios in a sandboxed relay." onClick={() => handleAction('Workflow Simulation', 'facility_performance')} />
+           <UtilityTile icon="sensors" title="Edge Monitor" desc="Real-time telemetry from clinical IoT integration nodes." onClick={() => handleAction('IoT Dashboard', 'iot_dashboard')} />
+        </section>
+
+      </main>
+    </div>
   );
 }
 
-function StatCard({ title, value, trend, trendUp, trendBad, icon, iconColor, iconBg, delay }) {
-    const trendColor = trendBad ? 'text-red-500' : 'text-green-500';
-    return (
-        <div 
-            className="group relative p-6 rounded-2xl bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 shadow-soft hover:shadow-large transition-all duration-300 hover:-translate-y-1 card-hover overflow-hidden"
-            style={{ animationDelay: `${delay}ms` }}
-        >
-            <div className="relative z-10 flex justify-between items-start mb-5">
-                <div className="flex flex-col gap-1">
-                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 leading-snug">{title}</p>
-                </div>
-                <div className={`relative ${iconBg} p-2.5 rounded-xl shadow-sm group-hover:shadow-md transition-all duration-300 group-hover:scale-110`}>
-                    <span className={`material-symbols-outlined ${iconColor} text-[24px]`}>{icon}</span>
-                    <div className="absolute inset-0 rounded-xl bg-white dark:bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></div>
-                </div>
-            </div>
-            <div className="relative z-10 flex items-end gap-3">
-                <p className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">{value}</p>
-                <div className={`text-xs font-semibold ${trendColor} mb-1.5 flex items-center gap-0.5 px-2 py-1 rounded-lg ${trendBad ? 'bg-red-50 dark:bg-red-500/10' : 'bg-green-50 dark:bg-green-500/10'}`}>
-                    <span className="material-symbols-outlined text-[16px]">{trendUp ? 'trending_up' : 'trending_down'}</span>
-                    <span>{trend}</span>
-                </div>
-            </div>
-            
-            {/* Subtle gradient overlay on hover */}
-            <div className="absolute inset-0 z-0 rounded-2xl bg-gradient-to-br from-primary/0 to-primary/0 group-hover:from-primary/5 group-hover:to-transparent transition-all duration-500 pointer-events-none"></div>
-        </div>
-    )
+function StatCard({ title, value, trend, trendUp, icon, color, delay }) {
+  const themes = {
+    blue: 'text-blue-600 bg-blue-600/5 border-blue-600/10',
+    emerald: 'text-emerald-500 bg-emerald-500/5 border-emerald-500/10',
+    amber: 'text-amber-500 bg-amber-500/5 border-amber-500/10',
+    indigo: 'text-indigo-600 bg-indigo-600/5 border-indigo-600/10',
+  };
+  return (
+    <Card className={`group hover:scale-[1.03] transition-all duration-500 ${themes[color]}`} style={{ animationDelay: `${delay}ms` }}>
+       <CardBody className="p-10 space-y-8">
+          <div className="flex justify-between items-center">
+             <div className="size-14 rounded-3xl bg-white dark:bg-slate-900 shadow-sm border border-slate-100 dark:border-slate-800 flex items-center justify-center opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all">
+                <span className="material-symbols-outlined text-3xl font-black text-current">{icon}</span>
+             </div>
+             <div className={`px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest ${trendUp ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                {trend}
+             </div>
+          </div>
+          <div>
+             <h4 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter mb-1">{value}</h4>
+             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{title}</p>
+          </div>
+       </CardBody>
+    </Card>
+  );
 }
 
-function Th({ children, align }) {
-    return (
-        <th className={`p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 ${align === 'right' ? 'text-right' : ''}`}>
-            {children}
-        </th>
-    )
+function ClaimRow({ carrier, location, score, status, color, id }) {
+  return (
+    <tr className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all cursor-pointer">
+       <td className="px-10 py-6">
+          <div className="flex flex-col">
+             <span className="text-sm font-black text-slate-800 dark:text-white leading-none whitespace-nowrap">{carrier}</span>
+             <span className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{location}</span>
+          </div>
+       </td>
+       <td className="px-10 py-6">
+          <div className="font-mono text-[10px] font-black text-blue-600 bg-blue-600/5 px-3 py-1 rounded-lg inline-block border border-blue-600/10">
+             {id}
+          </div>
+       </td>
+       <td className="px-10 py-6">
+          <div className="flex items-center gap-4">
+             <div className="flex-1 min-w-[100px] h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-1000 ${score > 90 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${score}%` }}></div>
+             </div>
+             <span className="text-[10px] font-black text-slate-500">{score}%</span>
+          </div>
+       </td>
+       <td className="px-10 py-6">
+          <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${color === 'emerald' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+             <span className={`size-1.5 rounded-full ${color === 'emerald' ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`}></span>
+             {status}
+          </div>
+       </td>
+    </tr>
+  );
 }
 
-function TableRow({ code, desc, sbs, confidence, status }) {
-    let statusClass = "bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400";
-    let statusLabel = "Mapped";
-    let statusDot = "bg-green-500";
-    let progressColor = "bg-gradient-to-r from-green-500 to-emerald-500";
-    
-    if (status === 'pending') {
-        statusClass = "bg-yellow-100 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400";
-        statusLabel = "Pending Review";
-        statusDot = "bg-yellow-500";
-        progressColor = "bg-gradient-to-r from-yellow-400 to-orange-400";
-    } else if (status === 'error') {
-        statusClass = "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400 border border-transparent hover:border-red-200 dark:hover:border-red-800 transition-all duration-300";
-        statusLabel = "Validation Failure";
-        progressColor = "bg-gradient-to-r from-red-500 to-red-600";
-    }
+function IntegrityNode({ label, status, active, alert }) {
+  return (
+    <div className="flex items-center justify-between group hover:translate-x-1 transition-transform cursor-context-menu">
+       <div className="space-y-0.5">
+          <p className="text-xs font-black text-slate-800 dark:text-gray-100 leading-none group-hover:text-blue-600 transition-colors">{label}</p>
+          <p className={`text-[9px] font-black uppercase tracking-widest ${active ? 'text-slate-400' : alert ? 'text-rose-500 animate-pulse' : 'text-slate-400'}`}>{status}</p>
+       </div>
+       <div className={`size-2 rounded-full ${active ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : alert ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]' : 'bg-slate-300'} animate-pulse`}></div>
+    </div>
+  );
+}
 
-    const isError = status === 'error';
-
-    return (
-        <tr className={`group hover:bg-gradient-to-r hover:from-slate-50 hover:to-transparent dark:hover:from-slate-800/50 dark:hover:to-transparent transition-all duration-300 ${isError ? 'bg-red-50/30 dark:bg-red-900/5' : ''}`}>
-            <td className="p-4 font-mono text-sm text-slate-600 dark:text-slate-300 font-semibold group-hover:text-primary transition-colors">{code}</td>
-            <td className="p-4 text-sm font-medium text-slate-900 dark:text-white">{desc}</td>
-            <td className={`p-4 font-mono text-sm font-semibold ${sbs === '--' ? 'text-slate-400 italic' : 'text-primary bg-primary/5 dark:bg-primary/10 px-3 py-1.5 rounded-lg inline-block'}`}>{sbs}</td>
-            <td className="p-4 align-middle">
-                <div className="flex items-center gap-3">
-                    <div className="flex-1 h-2.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden w-28 shadow-inner">
-                        <div className={`h-full ${progressColor} rounded-full transition-all duration-500 shadow-sm`} style={{ width: `${confidence}%` }}></div>
-                    </div>
-                    <span className={`text-xs font-bold ${confidence === 0 ? 'text-slate-400' : 'text-slate-700 dark:text-slate-300'} min-w-[3rem] text-right`}>
-                        {confidence > 0 ? `${confidence}%` : 'N/A'}
-                    </span>
-                </div>
-            </td>
-            <td className="p-4 relative">
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold ${statusClass} ${isError ? 'cursor-help' : ''} shadow-sm`}>
-                     {!isError ? <span className={`size-2 rounded-full ${statusDot} animate-pulse`}></span> : <span className="material-symbols-outlined text-[14px]">report</span>}
-                     {statusLabel}
-                </span>
-            </td>
-            <td className="p-4 text-right">
-                <button className={`p-2 rounded-lg transition-all duration-300 ${isError ? 'text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10' : 'text-slate-400 hover:text-primary hover:bg-primary/10'} hover:scale-110`}>
-                    <span className="material-symbols-outlined text-[20px]">{isError ? 'edit_note' : 'more_vert'}</span>
-                </button>
-            </td>
-        </tr>
-    )
+function UtilityTile({ icon, title, desc, onClick }) {
+  return (
+    <Card className="group cursor-pointer hover:border-blue-600/30 transition-all hover:bg-blue-600/5" onClick={onClick}>
+       <CardBody className="p-10 space-y-6 text-center">
+          <div className="size-16 mx-auto rounded-3xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
+             <span className="material-symbols-outlined text-3xl font-black">{icon}</span>
+          </div>
+          <div className="space-y-2">
+             <h4 className="text-lg font-black tracking-tight text-slate-900 dark:text-white">{title}</h4>
+             <p className="text-[11px] font-bold text-slate-500 leading-relaxed uppercase tracking-widest">{desc}</p>
+          </div>
+       </CardBody>
+    </Card>
+  );
 }

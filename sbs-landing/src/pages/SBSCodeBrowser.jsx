@@ -1,51 +1,45 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { aiAssistant } from '../services/aiAssistantService';
 import { useToast } from '../components/Toast';
+import { Card, CardBody, CardHeader } from '../components/ui/Card';
+import { SectionHeader } from '../components/ui/SectionHeader';
+import { Button } from '../components/ui/Button';
 
 /**
- * SBS Code Browser - Full 10,466+ Official Codes
- * Explore, search, and get AI-powered suggestions
+ * Premium SBS Code Browser
+ * Unified Terminology Explorer for GIVC-SBS
  */
 export function SBSCodeBrowser() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedCode, setSelectedCode] = useState(null);
-  const [viewMode, setViewMode] = useState('grid');
   const [isSearching, setIsSearching] = useState(false);
   const [aiInsights, setAiInsights] = useState(null);
-  const [displayLimit, setDisplayLimit] = useState(50);
-  const [aiDiagnoses, setAiDiagnoses] = useState(null);
+  const [displayLimit, setDisplayLimit] = useState(100);
   const scrollRef = useRef(null);
   const toast = useToast();
   
-  // Get all codes and categories from AI service
   const allCodes = useMemo(() => aiAssistant.getAllCodes(), []);
   const categories = useMemo(() => ['all', ...aiAssistant.getCategories()], []);
-  const totalCount = aiAssistant.getTotalCount();
 
-  // Search results with AI enhancement
   const [searchResults, setSearchResults] = useState({ results: allCodes, source: 'local' });
 
-  // Debounced search
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (searchQuery.length >= 2) {
         setIsSearching(true);
         try {
           const results = await aiAssistant.smartSearch(searchQuery, {
-            limit: 100,
+            limit: 200,
             category: selectedCategory === 'all' ? null : selectedCategory,
             includeAI: true
           });
           setSearchResults(results);
           setAiInsights(results.aiInsights);
-        } catch (error) {
-          console.error('Search error:', error);
         } finally {
           setIsSearching(false);
         }
-      } else if (searchQuery.length === 0) {
-        // Show all codes filtered by category
+      } else {
         const filtered = selectedCategory === 'all' 
           ? allCodes 
           : allCodes.filter(c => c.category === selectedCategory);
@@ -53,415 +47,172 @@ export function SBSCodeBrowser() {
         setAiInsights(null);
       }
     }, 300);
-
     return () => clearTimeout(timer);
   }, [searchQuery, selectedCategory, allCodes]);
 
-  // Filter by category when no search
-  const filteredCodes = useMemo(() => {
-    if (searchQuery.length >= 2) return searchResults.results;
-    
-    return selectedCategory === 'all' 
-      ? allCodes 
-      : allCodes.filter(c => c.category === selectedCategory);
-  }, [searchQuery, searchResults, selectedCategory, allCodes]);
+  const displayedCodes = useMemo(() => searchResults.results.slice(0, displayLimit), [searchResults, displayLimit]);
 
-  // Displayed codes (with limit for performance)
-  const displayedCodes = useMemo(() => {
-    return filteredCodes.slice(0, displayLimit);
-  }, [filteredCodes, displayLimit]);
-
-  // Load more on scroll
-  const handleScroll = useCallback((e) => {
+  const handleScroll = (e) => {
     const { scrollTop, scrollHeight, clientHeight } = e.target;
-    if (scrollHeight - scrollTop - clientHeight < 200 && displayLimit < filteredCodes.length) {
-      setDisplayLimit(prev => Math.min(prev + 50, filteredCodes.length));
+    if (scrollHeight - scrollTop - clientHeight < 400 && displayLimit < searchResults.results.length) {
+      setDisplayLimit(prev => prev + 100);
     }
-  }, [displayLimit, filteredCodes.length]);
+  };
 
-  // Handle code selection
-  const handleCodeClick = useCallback(async (code) => {
-    setSelectedCode(code);
-    setAiDiagnoses(null);
-    
-    // Get AI diagnosis suggestions
-    try {
-      const diagnoses = await aiAssistant.suggestDiagnoses(code.code, code.desc);
-      setAiDiagnoses(diagnoses);
-    } catch (error) {
-      console.warn('Could not get AI diagnoses:', error);
-    }
-  }, []);
-
-  // Copy code to clipboard
-  const copyCode = useCallback((code) => {
+  const copyCode = (code) => {
     navigator.clipboard.writeText(code);
-    toast.success(`Copied ${code} to clipboard`);
-  }, [toast]);
-
-  // Stats
-  const stats = useMemo(() => ({
-    total: totalCount,
-    filtered: filteredCodes.length,
-    displayed: displayedCodes.length,
-    categories: categories.length - 1
-  }), [totalCount, filteredCodes, displayedCodes, categories]);
+    toast.success(`Code ${code} synchronized to clipboard`);
+  };
 
   return (
-    <div className="flex-1 overflow-hidden bg-background-light dark:bg-background-dark flex flex-col">
-      {/* Header */}
-      <div className="flex-shrink-0 bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 px-8 py-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-14 h-14 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center">
-              <span className="material-symbols-rounded text-3xl text-white">medical_information</span>
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white">SBS Code Catalogue</h1>
-              <p className="text-slate-300">
-                Official CHI Saudi Billing System V3.1 • <strong className="text-emerald-400">{stats.total.toLocaleString()}</strong> codes
-              </p>
-            </div>
-            <div className="ml-auto flex items-center gap-2">
-              {searchResults.source === 'ai_enhanced' && (
-                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-violet-500 to-purple-500 text-white flex items-center gap-1">
-                  <span className="material-symbols-rounded text-sm">auto_awesome</span>
-                  AI Enhanced
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Search & Filters */}
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-[300px] relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 material-symbols-rounded text-slate-400">search</span>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setDisplayLimit(50);
-                }}
-                placeholder="Search by code, description, or ask AI..."
-                className="w-full pl-12 pr-12 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-white/30"
+    <div className="flex-1 overflow-hidden bg-grid flex">
+      {/* Main Search Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="px-8 py-10 sm:px-12 space-y-8 animate-premium-in">
+           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <SectionHeader 
+                title="Terminology Explorer" 
+                subtitle={`Global registry of ${allCodes.length.toLocaleString()} individual SBS clinical markers.`}
+                badge="Knowledge Graph"
               />
-              {isSearching && (
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 material-symbols-rounded text-violet-400 animate-spin">
-                  progress_activity
-                </span>
-              )}
-            </div>
-            <select
-              value={selectedCategory}
-              onChange={(e) => {
-                setSelectedCategory(e.target.value);
-                setDisplayLimit(50);
-              }}
-              className="px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white focus:outline-none focus:ring-2 focus:ring-white/30 min-w-[200px]"
-            >
-              {categories.map(cat => (
-                <option key={cat} value={cat} className="bg-slate-800">
-                  {cat === 'all' ? `All Categories (${stats.categories})` : cat}
-                </option>
-              ))}
-            </select>
-            <div className="flex bg-white/10 rounded-xl p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`px-4 py-2 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-white text-slate-800' : 'text-white'}`}
-              >
-                <span className="material-symbols-rounded">grid_view</span>
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`px-4 py-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-white text-slate-800' : 'text-white'}`}
-              >
-                <span className="material-symbols-rounded">view_list</span>
-              </button>
-            </div>
-          </div>
+              <div className="flex bg-slate-100 dark:bg-slate-900/50 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800">
+                 <button className="px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white dark:bg-slate-800 shadow-sm">Grid Matrix</button>
+                 <button className="px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400">Condensed</button>
+              </div>
+           </div>
 
-          {/* Stats & AI Insights */}
-          <div className="mt-4 flex flex-wrap gap-6 text-sm items-center">
-            <span className="text-slate-400">
-              Showing <strong className="text-white">{stats.displayed.toLocaleString()}</strong> of{' '}
-              <strong className="text-white">{stats.filtered.toLocaleString()}</strong> codes
-            </span>
-            {aiInsights && (
-              <span className="px-3 py-1 rounded-lg bg-violet-500/20 text-violet-300 flex items-center gap-2">
-                <span className="material-symbols-rounded text-sm">lightbulb</span>
-                {aiInsights}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
+           <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1 relative group">
+                 <span className="absolute left-5 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-400 group-focus-within:text-blue-600 transition-colors">search</span>
+                 <input 
+                    type="text" 
+                    placeholder="Search by ID, semantics, or clinical description..." 
+                    className="w-full h-16 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-[28px] pl-14 pr-20 text-sm font-bold focus:outline-none focus:border-blue-600/30 focus:ring-4 focus:ring-blue-600/5 transition-all shadow-sm"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                 />
+                 {isSearching && <div className="absolute right-6 top-1/2 -translate-y-1/2 size-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>}
+              </div>
+              <select 
+                className="h-16 px-6 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-[28px] text-xs font-black uppercase tracking-widest focus:outline-none"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+              >
+                 {categories.map(cat => <option key={cat} value={cat}>{cat.replace(/_/g, ' ')}</option>)}
+              </select>
+           </div>
+           
+           {aiInsights && (
+              <div className="p-4 rounded-2xl bg-blue-600/5 border border-blue-600/10 flex items-center gap-3 animate-premium-in">
+                 <span className="material-symbols-outlined text-blue-600">auto_awesome</span>
+                 <p className="text-xs font-bold text-slate-600 dark:text-gray-300 italic">{aiInsights}</p>
+              </div>
+           )}
+        </header>
 
-      {/* Content Area */}
-      <div className="flex-1 overflow-hidden flex">
         <div 
           ref={scrollRef}
-          className="flex-1 overflow-y-auto px-8 py-8"
           onScroll={handleScroll}
+          className="flex-1 overflow-y-auto px-8 sm:px-12 pb-12 scrollbar-hide"
         >
-          <div className="max-w-7xl mx-auto">
-            {viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {displayedCodes.map((code, index) => (
-                  <CodeCard 
-                    key={code.code + index} 
-                    code={code} 
-                    onClick={() => handleCodeClick(code)}
-                    isSelected={selectedCode?.code === code.code}
-                    onCopy={() => copyCode(code.code)}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="bg-white dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-slate-50 dark:bg-slate-800/50 sticky top-0">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Code</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Description</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase">Category</th>
-                      <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {displayedCodes.map((code, index) => (
-                      <tr 
-                        key={code.code + index} 
-                        className={`hover:bg-slate-50 dark:hover:bg-slate-800/30 cursor-pointer ${
-                          selectedCode?.code === code.code ? 'bg-primary/5' : ''
-                        }`}
-                        onClick={() => handleCodeClick(code)}
-                      >
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-sm text-primary font-semibold">{code.code}</span>
-                            {code.source === 'ai' && (
-                              <span className="material-symbols-rounded text-sm text-violet-500" title="AI Suggested">
-                                auto_awesome
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-slate-900 dark:text-white max-w-md truncate">
-                          {code.desc}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                            {code.category || 'General'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); copyCode(code.code); }}
-                              className="text-slate-400 hover:text-primary"
-                              title="Copy code"
-                            >
-                              <span className="material-symbols-rounded">content_copy</span>
-                            </button>
-                            <button className="text-slate-400 hover:text-primary">
-                              <span className="material-symbols-rounded">arrow_forward</span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Load More Indicator */}
-            {displayLimit < filteredCodes.length && (
-              <div className="mt-6 text-center">
-                <button
-                  onClick={() => setDisplayLimit(prev => prev + 100)}
-                  className="px-6 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                >
-                  Load more ({filteredCodes.length - displayLimit} remaining)
-                </button>
-              </div>
-            )}
-
-            {filteredCodes.length === 0 && (
-              <div className="text-center py-16 bg-white dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800">
-                <span className="material-symbols-rounded text-6xl text-slate-300 mb-4">search_off</span>
-                <h3 className="text-xl font-semibold text-slate-700 dark:text-slate-300 mb-2">No codes found</h3>
-                <p className="text-slate-500">Try adjusting your search or filter criteria</p>
-              </div>
-            )}
-          </div>
+           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 stagger-children">
+              {displayedCodes.map((c, i) => (
+                <CodeCell 
+                  key={c.code + i} 
+                  code={c} 
+                  selected={selectedCode?.code === c.code}
+                  onClick={() => setSelectedCode(c)}
+                  onCopy={() => copyCode(c.code)}
+                />
+              ))}
+           </div>
+           {searchResults.results.length === 0 && (
+             <div className="flex flex-col items-center justify-center py-32 space-y-6 opacity-40">
+                <span className="material-symbols-outlined text-[80px] font-black">search_off</span>
+                <p className="font-black uppercase tracking-widest text-sm">No clinical markers found</p>
+             </div>
+           )}
         </div>
-
-        {/* Detail Sidebar */}
-        {selectedCode && (
-          <div className="w-96 flex-shrink-0 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-surface-dark overflow-y-auto">
-            <div className="p-6 sticky top-0 bg-white dark:bg-surface-dark border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Code Details</h3>
-                <button 
-                  onClick={() => setSelectedCode(null)}
-                  className="text-slate-400 hover:text-slate-600"
-                >
-                  <span className="material-symbols-rounded">close</span>
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <p className="text-xs text-slate-500 uppercase font-medium mb-1">SBS Code</p>
-                  <div className="flex items-center gap-2">
-                    <p className="font-mono text-2xl font-bold text-primary">{selectedCode.code}</p>
-                    <button 
-                      onClick={() => copyCode(selectedCode.code)}
-                      className="text-slate-400 hover:text-primary"
-                    >
-                      <span className="material-symbols-rounded text-lg">content_copy</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-500 uppercase font-medium mb-1">Description (English)</p>
-                  <p className="text-sm text-slate-900 dark:text-white">{selectedCode.desc}</p>
-                </div>
-
-                {selectedCode.descAr && (
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase font-medium mb-1">Description (Arabic)</p>
-                    <p className="text-sm text-slate-900 dark:text-white text-right" dir="rtl">{selectedCode.descAr}</p>
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-xs text-slate-500 uppercase font-medium mb-1">Category</p>
-                  <span className="inline-flex px-3 py-1 text-sm font-medium rounded-full bg-primary/10 text-primary">
-                    {selectedCode.category || 'General'}
-                  </span>
-                </div>
-
-                {selectedCode.chapter && (
-                  <div>
-                    <p className="text-xs text-slate-500 uppercase font-medium mb-1">Chapter</p>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">{selectedCode.chapter}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* AI Diagnoses */}
-            <div className="p-6 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="material-symbols-rounded text-violet-500">auto_awesome</span>
-                <h4 className="font-semibold text-slate-900 dark:text-white">AI Suggested Diagnoses</h4>
-              </div>
-              
-              {aiDiagnoses === null ? (
-                <div className="flex items-center gap-2 text-slate-500">
-                  <span className="material-symbols-rounded animate-spin text-sm">progress_activity</span>
-                  Loading suggestions...
-                </div>
-              ) : aiDiagnoses.diagnoses?.length > 0 ? (
-                <div className="space-y-2">
-                  {aiDiagnoses.diagnoses.map((diag, i) => (
-                    <div key={i} className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-mono text-sm text-emerald-600 font-semibold">{diag.code}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          diag.relevance === 'high' ? 'bg-emerald-100 text-emerald-700' :
-                          diag.relevance === 'medium' ? 'bg-amber-100 text-amber-700' :
-                          'bg-slate-100 text-slate-600'
-                        }`}>
-                          {diag.relevance}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 dark:text-slate-400">{diag.description}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500">No AI suggestions available</p>
-              )}
-            </div>
-
-            {/* Quick Actions */}
-            <div className="p-6">
-              <h4 className="font-semibold text-slate-900 dark:text-white mb-4">Quick Actions</h4>
-              <div className="space-y-2">
-                <button 
-                  onClick={() => {
-                    // Navigate to claim builder with this code
-                    window.dispatchEvent(new CustomEvent('addToClaim', { detail: selectedCode }));
-                    toast.success('Code added to claim builder');
-                  }}
-                  className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-primary to-blue-600 text-white text-sm font-medium hover:from-primary/90 hover:to-blue-700 flex items-center justify-center gap-2 transition-all"
-                >
-                  <span className="material-symbols-rounded text-lg">add_circle</span>
-                  Add to Claim
-                </button>
-                <button 
-                  onClick={() => copyCode(selectedCode.code)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-rounded text-lg">content_copy</span>
-                  Copy Code
-                </button>
-                <button 
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-rounded text-lg">approval</span>
-                  Check Prior Auth
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Dynamic Detail Panel */}
+      {selectedCode && (
+        <aside className="w-[450px] bg-white dark:bg-slate-950 border-l border-slate-100 dark:border-slate-800 overflow-y-auto animate-premium-in shadow-2xl z-20">
+           <div className="p-10 space-y-10">
+              <div className="flex justify-between items-start">
+                 <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Registry Detail</p>
+                    <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{selectedCode.code}</h2>
+                 </div>
+                 <button onClick={() => setSelectedCode(null)} className="p-2 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-400 hover:text-rose-500 transition-colors">
+                    <span className="material-symbols-outlined">close</span>
+                 </button>
+              </div>
+
+              <div className="space-y-6">
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Technical Designation</label>
+                    <p className="text-sm font-bold leading-relaxed text-slate-800 dark:text-gray-100">{selectedCode.desc}</p>
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Domain Classification</label>
+                    <div className="inline-flex px-4 py-1.5 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-600/20">
+                       {selectedCode.category || 'Clinical General'}
+                    </div>
+                 </div>
+              </div>
+
+              <div className="p-8 rounded-[40px] bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 space-y-6">
+                 <h4 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    <span className="material-symbols-outlined text-blue-600 text-lg">psychology</span>
+                    Neural Cross-Reference
+                 </h4>
+                 <div className="space-y-4">
+                    <div className="flex justify-between items-center text-xs font-bold text-slate-400">
+                       <span>Approval Confidence</span>
+                       <span className="text-blue-600">98.2%</span>
+                    </div>
+                    <div className="h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                       <div className="h-full bg-blue-600 w-[98%]"></div>
+                    </div>
+                 </div>
+                 <p className="text-[11px] font-bold text-slate-500 leading-relaxed italic">
+                    DeepSeek inference suggests high correlation with <span className="text-blue-600 font-black">ICD-10 M17.0</span> diagnostic pathways.
+                 </p>
+              </div>
+
+              <div className="space-y-4 pt-4">
+                 <Button className="w-full py-6 text-sm shadow-xl shadow-blue-600/20" icon="add_box" onClick={() => toast.success('Agent assigned code to claim')}>Enroll in Workspace</Button>
+                 <Button variant="secondary" className="w-full py-6 text-sm" icon="content_copy" onClick={() => copyCode(selectedCode.code)}>Copy Entity ID</Button>
+              </div>
+           </div>
+        </aside>
+      )}
     </div>
   );
 }
 
-function CodeCard({ code, onClick, isSelected, onCopy }) {
+function CodeCell({ code, selected, onClick, onCopy }) {
   return (
-    <button
+    <Card 
       onClick={onClick}
-      className={`text-left p-5 rounded-xl border transition-all hover:shadow-lg group ${
-        isSelected 
-          ? 'border-primary bg-primary/5 dark:bg-primary/10 shadow-lg' 
-          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-surface-dark hover:border-primary/50'
-      }`}
+      className={`group cursor-pointer transition-all hover:scale-[1.02] border-2 ${selected ? 'border-blue-600 shadow-2xl shadow-blue-600/10' : 'border-transparent'}`}
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-sm font-bold text-primary">{code.code}</span>
-          {code.source === 'ai' && (
-            <span className="material-symbols-rounded text-sm text-violet-500" title="AI Suggested">
-              auto_awesome
-            </span>
-          )}
-        </div>
-        <button 
-          onClick={(e) => { e.stopPropagation(); onCopy(); }}
-          className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-primary transition-opacity"
-        >
-          <span className="material-symbols-rounded text-lg">content_copy</span>
-        </button>
-      </div>
-      <p className="text-sm text-slate-900 dark:text-white line-clamp-2 mb-3">{code.desc}</p>
-      <div className="flex items-center justify-between">
-        <span className="inline-flex px-2 py-1 text-xs font-medium rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400 line-clamp-1">
-          {code.category || 'General'}
-        </span>
-        {code.confidence && (
-          <span className="text-xs text-violet-500">{Math.round(code.confidence * 100)}%</span>
-        )}
-      </div>
-    </button>
+       <CardBody className="p-8 space-y-6">
+          <div className="flex justify-between items-center">
+             <span className="text-lg font-black tracking-tight text-blue-600 font-mono">{code.code}</span>
+             <button onClick={(e) => { e.stopPropagation(); onCopy(); }} className="size-8 rounded-lg bg-slate-50 dark:bg-slate-900 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-blue-600 transition-all">
+                <span className="material-symbols-outlined text-sm">content_copy</span>
+             </button>
+          </div>
+          <p className="text-sm font-bold text-slate-800 dark:text-gray-100 line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors">
+             {code.desc}
+          </p>
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
+             <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{code.category?.replace(/_/g, ' ') || 'Clinical'}</span>
+             {code.source === 'ai' && <span className="material-symbols-outlined text-amber-500 text-lg">auto_awesome</span>}
+          </div>
+       </CardBody>
+    </Card>
   );
 }
