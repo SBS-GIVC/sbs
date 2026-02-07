@@ -78,13 +78,13 @@ provider = get_ai_provider()
    # AWS example
    aws secretsmanager update-secret \
      --secret-id sbs/normalizer/deepseek-api-key \
-     --secret-string "sk-new-key"
+    --secret-string "<NEW_DEEPSEEK_API_KEY>"
    
    # Azure example
    az keyvault secret set \
      --vault-name sbs-vault \
      --name deepseek-api-key \
-     --value "sk-new-key"
+    --value "<NEW_DEEPSEEK_API_KEY>"
    ```
 3. **Trigger rolling deployment** to pick up new secret
 4. **Verify** health endpoints return healthy
@@ -155,7 +155,7 @@ env:
 To set the secret:
 ```bash
 # Using GitHub CLI
-gh secret set DEEPSEEK_API_KEY --body "sk-your-key"
+gh secret set DEEPSEEK_API_KEY --body "<YOUR_DEEPSEEK_API_KEY>"
 
 # Or via GitHub UI:
 # Repo > Settings > Secrets and variables > Actions > New repository secret
@@ -167,7 +167,7 @@ Never hardcode secrets in `docker-compose.yml`:
 ```yaml
 # WRONG - never do this
 environment:
-  DEEPSEEK_API_KEY: sk-hardcoded-key
+  DEEPSEEK_API_KEY: <YOUR_DEEPSEEK_API_KEY>
 
 # CORRECT - use env_file or external secrets
 env_file:
@@ -183,7 +183,7 @@ Use Kubernetes Secrets:
 ```bash
 # Create secret
 kubectl create secret generic normalizer-secrets \
-  --from-literal=deepseek-api-key=sk-your-key \
+  --from-literal=deepseek-api-key=<YOUR_DEEPSEEK_API_KEY> \
   --namespace=sbs
 
 # Reference in deployment
@@ -291,7 +291,7 @@ To switch from DeepSeek to Gemini:
 export ENABLE_DEEPSEEK=false
 # OR
 export AI_PROVIDER=gemini
-export GEMINI_API_KEY=sk-gemini-key
+export GEMINI_API_KEY=<YOUR_GEMINI_API_KEY>
 
 # Restart service
 docker-compose restart normalizer

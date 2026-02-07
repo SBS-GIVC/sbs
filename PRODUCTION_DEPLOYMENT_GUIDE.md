@@ -498,10 +498,10 @@ normalizer:
 # Via GitHub UI:
 # Repository > Settings > Secrets and variables > Actions > New repository secret
 # Name: DEEPSEEK_API_KEY
-# Value: sk-your-deepseek-api-key
+# Value: <YOUR_DEEPSEEK_API_KEY>
 
 # Or via API:
-gh secret set DEEPSEEK_API_KEY -b "sk-your-deepseek-api-key" -R SBS-GIVC/sbs
+gh secret set DEEPSEEK_API_KEY -b "<YOUR_DEEPSEEK_API_KEY>" -R SBS-GIVC/sbs
 ```
 
 #### 2. Production Runtime Secret
@@ -512,7 +512,7 @@ Use your organization's secrets manager:
 ```bash
 aws secretsmanager create-secret \
   --name sbs/normalizer/deepseek-api-key \
-  --secret-string "sk-your-deepseek-api-key" \
+  --secret-string "<YOUR_DEEPSEEK_API_KEY>" \
   --description "DeepSeek API key for SBS normalizer service"
 ```
 
@@ -521,13 +521,13 @@ aws secretsmanager create-secret \
 az keyvault secret set \
   --vault-name sbs-production-vault \
   --name deepseek-api-key \
-  --value "sk-your-deepseek-api-key"
+  --value "<YOUR_DEEPSEEK_API_KEY>"
 ```
 
 **HashiCorp Vault:**
 ```bash
 vault kv put secret/sbs/normalizer \
-  deepseek_api_key="sk-your-deepseek-api-key"
+  deepseek_api_key="<YOUR_DEEPSEEK_API_KEY>"
 ```
 
 ### Verification Procedures
@@ -652,7 +652,7 @@ If the DeepSeek API key is compromised:
 # 2. Generate new key and update secrets
 aws secretsmanager update-secret \
   --secret-id sbs/normalizer/deepseek-api-key \
-  --secret-string "sk-new-key"
+  --secret-string "<NEW_DEEPSEEK_API_KEY>"
 
 # 3. Force service restart to pick up new key
 docker-compose pull normalizer

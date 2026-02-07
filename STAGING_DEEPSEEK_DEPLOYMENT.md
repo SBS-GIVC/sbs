@@ -60,7 +60,7 @@ The `DEEPSEEK_API_KEY` secret must be set in the repository. This secret is used
 2. Click "New repository secret"
 3. Set:
    - **Name:** `DEEPSEEK_API_KEY`
-   - **Value:** `sk-your-deepseek-api-key` (obtain from https://platform.deepseek.com/)
+  - **Value:** `<YOUR_DEEPSEEK_API_KEY>` (obtain from https://platform.deepseek.com/)
 4. Click "Add secret"
 
 #### Option B: Via GitHub CLI (if `gh` is installed)
@@ -75,7 +75,7 @@ sudo apt install gh  # Linux
 gh auth login
 
 # Set the secret
-gh secret set DEEPSEEK_API_KEY -R SBS-GIVC/sbs -b "sk-your-deepseek-api-key"
+gh secret set DEEPSEEK_API_KEY -R SBS-GIVC/sbs -b "<YOUR_DEEPSEEK_API_KEY>"
 ```
 
 #### Option C: Via API
@@ -135,7 +135,7 @@ Create a secret and update the deployment:
 ```bash
 # Create secret
 kubectl create secret generic deepseek-api-key \
-  --from-literal=key=sk-your-staging-key \
+  --from-literal=key=<YOUR_DEEPSEEK_API_KEY> \
   --namespace=sbs-staging
 
 # Update deployment to reference secret
