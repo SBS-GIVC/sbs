@@ -14,8 +14,18 @@
     }
   })();
 
-  // Default is same-origin (empty string => relative URLs).
+  // Default is same-origin.
   // If you host the UI separately, set localStorage[SBS_API_BASE_URL] to an origin
   // (e.g. https://landing.example.com). Never store API keys here.
-  window.SBS_API_BASE_URL = (fromStorage || '').trim();
+  const storageValue = (fromStorage || '').trim();
+  let defaultBase = '';
+  try {
+    if (window.location && window.location.origin) {
+      defaultBase = window.location.origin;
+    }
+  } catch {
+    defaultBase = '';
+  }
+
+  window.SBS_API_BASE_URL = storageValue || defaultBase;
 })();
