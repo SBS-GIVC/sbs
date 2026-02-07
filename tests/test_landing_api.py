@@ -323,7 +323,7 @@ class TestClaimStatus:
 
         # Check stages structure
         expected_stages = ["received", "validation", "normalization",
-                          "financialRules", "signing", "nphiesSubmission"]
+                           "financialRules", "signing", "nphiesSubmission"]
         for stage in expected_stages:
             assert stage in data["stages"]
             assert "status" in data["stages"][stage]
