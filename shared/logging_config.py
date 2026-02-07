@@ -85,12 +85,15 @@ def setup_logging(
         Configured logger instance
     """
     # Get configuration from environment
-    log_level = log_level or os.getenv("LOG_LEVEL", "INFO")
+    raw_log_level = log_level or os.getenv("LOG_LEVEL", "INFO")
+    normalized_log_level = (raw_log_level or "INFO").upper()
+    valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+    level_name = normalized_log_level if normalized_log_level in valid_levels else "INFO"
     use_json = use_json if use_json is not None else os.getenv("LOG_FORMAT", "json") == "json"
     
     # Create logger
     logger = logging.getLogger(service_name)
-    logger.setLevel(getattr(logging, log_level.upper()))
+    logger.setLevel(getattr(logging, level_name))
     
     # Remove existing handlers
     logger.handlers.clear()
