@@ -101,7 +101,11 @@ jobs:
       - name: Run unit tests
         run: |
           cd ${{ matrix.service }}
-          python -m pytest --cov=. --cov-report=xml --cov-report=term-missing -v || echo "No tests found for ${{ matrix.service }}"
+          if ls tests/*.py tests/*/*.py >/dev/null 2>&1; then
+            python -m pytest --cov=. --cov-report=xml --cov-report=term-missing -v
+          else
+            echo "No tests found for ${{ matrix.service }}"
+          fi
 
       - name: Verify service can start
         run: |
