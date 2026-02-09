@@ -30,6 +30,8 @@ const CLAIM_STAGE_ORDER = [
   'signing',
   'nphiesSubmission'
 ];
+const SUCCESS_STATUSES = new Set(['completed', 'approved', 'submitted']);
+const TERMINAL_STATUSES = new Set(['completed', 'approved', 'rejected', 'failed']);
 
 function isValidClaimId(claimId) {
   return /^(CLM|CLAIM)-[A-Za-z0-9-]{3,}$/.test(String(claimId || ''));
@@ -91,6 +93,108 @@ function buildTimeline(stages = {}) {
     status: stages[key] || 'pending'
   }));
 }
+
+function isSuccessfulStatus(status) {
+  return SUCCESS_STATUSES.has(String(status || '').toLowerCase());
+}
+
+function isTerminalStatus(status) {
+  return TERMINAL_STATUSES.has(String(status || '').toLowerCase());
+}
+
+function normalizeBaseUrl(raw) {
+  const value = String(raw || '').trim().replace(/\/+$/, '');
+  if (!value) return '';
+  return /^https?:\/\//i.test(value) ? value : `http://${value}`;
+}
+
+function buildServiceBaseUrls(envValue, defaults = []) {
+  const parts = [];
+  if (typeof envValue === 'string' && envValue.trim()) {
+    for (const item of envValue.split(',')) {
+      const cleaned = normalizeBaseUrl(item);
+      if (cleaned) parts.push(cleaned);
+    }
+  }
+  for (const item of defaults) {
+    const cleaned = normalizeBaseUrl(item);
+    if (cleaned) parts.push(cleaned);
+  }
+  return Array.from(new Set(parts));
+}
+
+function joinServiceUrl(baseUrl, routePath) {
+  const cleanPath = routePath.startsWith('/') ? routePath : `/${routePath}`;
+  return `${baseUrl}${cleanPath}`;
+}
+
+function shouldTryNextServiceCandidate(error, retryOnStatuses) {
+  const status = error?.response?.status;
+  if (!status) return true;
+  return retryOnStatuses.includes(status);
+}
+
+function extractErrorMessage(error, fallback = 'Request failed') {
+  return (
+    error?.response?.data?.detail?.message ||
+    error?.response?.data?.detail?.error ||
+    error?.response?.data?.error ||
+    error?.response?.data?.message ||
+    error?.message ||
+    fallback
+  );
+}
+
+async function requestWithServiceFallback(baseUrls, routePath, options = {}, behavior = {}) {
+  const retryOnStatuses = Array.isArray(behavior.retryOnStatuses) && behavior.retryOnStatuses.length > 0
+    ? behavior.retryOnStatuses
+    : [404, 408, 429, 500, 502, 503, 504];
+  let lastError = null;
+  for (let i = 0; i < baseUrls.length; i++) {
+    const baseUrl = baseUrls[i];
+    try {
+      return await axios({
+        url: joinServiceUrl(baseUrl, routePath),
+        timeout: 20000,
+        ...options
+      });
+    } catch (error) {
+      lastError = error;
+      const hasMore = i < baseUrls.length - 1;
+      if (hasMore && shouldTryNextServiceCandidate(error, retryOnStatuses)) {
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError || new Error('No upstream service candidates configured');
+}
+
+const NORMALIZER_BASE_URLS = buildServiceBaseUrls(process.env.NORMALIZER_URL, [
+  'http://sbs-normalizer:8000',
+  'http://normalizer:8000',
+  'http://localhost:8000'
+]);
+const SIGNER_BASE_URLS = buildServiceBaseUrls(process.env.SIGNER_URL, [
+  'http://sbs-signer:8001',
+  'http://signer:8001',
+  'http://localhost:8001'
+]);
+const FINANCIAL_BASE_URLS = buildServiceBaseUrls(process.env.FINANCIAL_RULES_URL, [
+  'http://sbs-financial-rules:8002',
+  'http://financial-rules:8002',
+  'http://localhost:8002'
+]);
+const NPHIES_BASE_URLS = buildServiceBaseUrls(process.env.NPHIES_BRIDGE_URL, [
+  'http://sbs-nphies-bridge:8003',
+  'http://nphies-bridge:8003',
+  'http://localhost:8003'
+]);
+const SIMULATION_BASE_URLS = buildServiceBaseUrls(process.env.SIMULATION_URL || process.env.SBS_SIMULATION_URL, [
+  'http://sbs-simulation:8005',
+  'http://simulation:8005',
+  'http://localhost:8005'
+]);
 
 // Security middleware with CSP
 // NOTE: 'unsafe-inline' is required for the runtime API config in index.html
@@ -474,11 +578,24 @@ app.use(express.static('public'));
 // Ensure SPA routes under /sbs/* work (serve the built app index)
 app.get('/sbs', (req, res) => res.redirect(301, '/sbs/'));
 app.get('/sbs/*', (req, res) => {
+  const requested = String(req.path || '').replace(/^\/sbs\/?/, '');
+  // Keep explicit asset misses as true 404 instead of returning the SPA shell.
+  if (requested && path.extname(requested)) {
+    return res.status(404).json({
+      success: false,
+      error: 'Static asset not found'
+    });
+  }
   res.sendFile(path.join(__dirname, 'public', 'sbs', 'index.html'));
 });
 
 // Backwards-compatible aliases (older docs/scripts)
 app.get(['/ai-analytics', '/ai-hub'], (req, res) => res.redirect(302, '/sbs/'));
+app.get('/dashboard.html', (req, res) => res.redirect(302, '/sbs/dashboard.html'));
+app.get('/tracking.html', (req, res) => {
+  const claimId = req.query?.claimId ? `?claimId=${encodeURIComponent(req.query.claimId)}` : '';
+  res.redirect(302, `/sbs/dashboard.html${claimId}`);
+});
 
 // File upload configuration
 const storage = multer.diskStorage({
@@ -744,6 +861,476 @@ How can I assist you today?`;
   }
 });
 
+async function handleNormalizeRequest(req, res) {
+  const facility_id = Number(req.body?.facility_id || req.body?.facilityId || 1);
+  const internal_code = String(
+    req.body?.internal_code ||
+    req.body?.internalCode ||
+    req.body?.code ||
+    ''
+  ).trim();
+  const description = String(
+    req.body?.description ||
+    req.body?.service_desc ||
+    req.body?.serviceDesc ||
+    ''
+  ).trim();
+
+  if (!internal_code) {
+    return res.status(400).json({
+      success: false,
+      error: 'internal_code is required'
+    });
+  }
+
+  try {
+    const response = await requestWithServiceFallback(NORMALIZER_BASE_URLS, '/normalize', {
+      method: 'POST',
+      data: { facility_id, internal_code, description }
+    }, {
+      // 404 from normalizer means "no mapping found", which we handle below as a graceful fallback.
+      retryOnStatuses: [408, 429, 500, 502, 503, 504]
+    });
+    return res.json(response.data);
+  } catch (error) {
+    // The normalizer returns 404 when no mapping exists; return a deterministic fallback.
+    if (error?.response?.status === 404) {
+      return res.json({
+        request_id: `NRM-${Date.now()}`,
+        facility_id,
+        internal_code,
+        sbs_mapped_code: internal_code,
+        official_description: description || 'No mapping found in normalizer catalog',
+        confidence: 0,
+        mapping_source: 'fallback-no-match',
+        processing_time_ms: 0,
+        warnings: ['No mapping found in normalizer catalog, returned passthrough code']
+      });
+    }
+    return res.status(502).json({
+      success: false,
+      error: 'Normalizer service unavailable',
+      details: extractErrorMessage(error, 'Failed to normalize code')
+    });
+  }
+}
+
+function buildFallbackSimulationCatalog() {
+  return {
+    professional: [
+      {
+        internal_code: 'CONS-GEN-001',
+        sbs_code: 'SBS-CONS-001',
+        description_en: 'General Medical Consultation',
+        standard_price: 200
+      },
+      {
+        internal_code: 'LAB-CBC-001',
+        sbs_code: 'SBS-LAB-001',
+        description_en: 'Complete Blood Count (CBC)',
+        standard_price: 120
+      }
+    ],
+    institutional: [
+      {
+        internal_code: 'ER-ADM-001',
+        sbs_code: 'SBS-ER-001',
+        description_en: 'Emergency Admission Bundle',
+        standard_price: 950
+      }
+    ],
+    pharmacy: [
+      {
+        internal_code: 'RX-AMOX-500',
+        sbs_code: 'SBS-RX-001',
+        description_en: 'Amoxicillin 500mg',
+        standard_price: 45
+      }
+    ],
+    vision: [
+      {
+        internal_code: 'VIS-EXAM-001',
+        sbs_code: 'SBS-VSN-001',
+        description_en: 'Comprehensive Eye Exam',
+        standard_price: 180
+      }
+    ]
+  };
+}
+
+// Backwards-compatible health alias used by the /sbs SPA bundle.
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    status: 'healthy',
+    service: 'sbs-landing-api',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Backwards-compatible endpoint expected by legacy and dashboard UI.
+app.get('/api/claim-receipt/:claimId', (req, res) => {
+  const { claimId } = req.params;
+  if (!isValidClaimId(claimId)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid claim ID format'
+    });
+  }
+  const record = claimStore.get(claimId);
+  if (!record) {
+    return res.status(404).json({
+      success: false,
+      error: 'Claim not found'
+    });
+  }
+
+  const status = String(record.status || 'processing').toLowerCase();
+  const isComplete = isTerminalStatus(status);
+  const isSuccess = isSuccessfulStatus(status);
+
+  res.json({
+    success: true,
+    receiptId: `RCP-${claimId}`,
+    claimId: record.claimId,
+    status,
+    statusLabel: statusLabel(status),
+    issuedAt: new Date().toISOString(),
+    patient: {
+      id: record.patientId,
+      name: record.patientName
+    },
+    claimType: record.claimType,
+    submissionId: record.submissionId || null,
+    trackingUrl: record.trackingUrl || null,
+    stages: buildStagesObject(record.stages || {}),
+    summary: {
+      isComplete,
+      isSuccess
+    }
+  });
+});
+
+// Risk analyzer endpoint consumed by landing analytics screens.
+app.get('/api/claims/:claimId/analyzer', (req, res) => {
+  const { claimId } = req.params;
+  if (!isValidClaimId(claimId)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid claim ID format'
+    });
+  }
+  const record = claimStore.get(claimId);
+  if (!record) {
+    return res.status(404).json({
+      success: false,
+      error: 'Claim not found'
+    });
+  }
+
+  const status = String(record.status || 'processing').toLowerCase();
+  const stages = record.stages || {};
+  const failedStages = CLAIM_STAGE_ORDER.filter((k) => stages[k] === 'failed').length;
+  const pendingStages = CLAIM_STAGE_ORDER.filter((k) => ['pending', 'in_progress'].includes(stages[k])).length;
+  const completionRatio = CLAIM_STAGE_ORDER.length === 0
+    ? 0
+    : CLAIM_STAGE_ORDER.filter((k) => stages[k] === 'completed').length / CLAIM_STAGE_ORDER.length;
+
+  const dataCompleteness = Math.max(0, Math.min(1, 0.95 - (record.patientId ? 0 : 0.4) - (record.patientName ? 0 : 0.35)));
+  const codeMapping = Math.max(0, Math.min(1, 0.75 + completionRatio * 0.2 - failedStages * 0.08));
+  const eligibility = Math.max(0, Math.min(1, status === 'failed' ? 0.45 : 0.8));
+  const fraudSignals = Math.max(0, Math.min(1, 0.25 + (status === 'failed' ? 0.18 : 0.05)));
+  const slaRisk = Math.max(0, Math.min(1, 0.2 + pendingStages * 0.08 + failedStages * 0.12));
+
+  const score100 = Math.round(((dataCompleteness + codeMapping + eligibility + fraudSignals + slaRisk) / 5) * 100);
+
+  res.json({
+    success: true,
+    claimId,
+    generatedAt: new Date().toISOString(),
+    risk: {
+      score100,
+      level: score100 >= 80 ? 'low' : (score100 >= 60 ? 'medium' : 'high'),
+      subscores: {
+        dataCompleteness,
+        codeMapping,
+        eligibility,
+        fraudSignals,
+        slaRisk
+      }
+    },
+    recommendations: [
+      status === 'failed'
+        ? 'Review signing and NPHIES submission configuration before retrying.'
+        : 'Monitor pending stages and retry only if terminal failure occurs.'
+    ]
+  });
+});
+
+app.post('/api/copilot/chat', async (req, res) => {
+  try {
+    const message = String(req.body?.message || '').trim();
+    const context = req.body?.context || {};
+
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        error: 'message is required'
+      });
+    }
+
+    const prompt = [
+      'You are SBS Copilot. Reply in concise operational language.',
+      `User message: ${message}`,
+      `Context: ${JSON.stringify(context)}`
+    ].join('\n');
+
+    const response = await axios.post(`http://127.0.0.1:${PORT}/api/gemini/generate`, {
+      prompt
+    }, {
+      timeout: 25000
+    });
+
+    const replyText = response.data?.text || 'No response from AI provider';
+
+    return res.json({
+      success: true,
+      reply: replyText,
+      source: response.data?.model || (response.data?.isMock ? 'mock' : 'gemini-proxy'),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    return res.json({
+      success: true,
+      reply: 'Copilot is temporarily degraded. Continue with claim submission, then verify status in dashboard.',
+      source: 'fallback',
+      timestamp: new Date().toISOString(),
+      warning: extractErrorMessage(error, 'Copilot fallback activated')
+    });
+  }
+});
+
+app.post('/api/normalizer/normalize', handleNormalizeRequest);
+app.post('/api/normalize', handleNormalizeRequest);
+
+// Financial and signer aliases used by /sbs SPA bundle.
+app.post('/api/validate', async (req, res) => {
+  try {
+    const response = await requestWithServiceFallback(FINANCIAL_BASE_URLS, '/validate', {
+      method: 'POST',
+      data: req.body || {}
+    });
+    res.json(response.data);
+  } catch (error) {
+    if (error?.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(502).json({
+      success: false,
+      error: 'Financial rules service unavailable',
+      details: extractErrorMessage(error, 'Validation failed')
+    });
+  }
+});
+
+app.post('/api/sign', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const payload = body.payload || body.claim || body;
+    const facility_id = Number(body.facility_id || body.facilityId || payload?.facility_id || 1);
+    const response = await requestWithServiceFallback(SIGNER_BASE_URLS, '/sign', {
+      method: 'POST',
+      data: { facility_id, payload }
+    });
+    res.json(response.data);
+  } catch (error) {
+    if (error?.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    res.status(502).json({
+      success: false,
+      error: 'Signer service unavailable',
+      details: extractErrorMessage(error, 'Signing failed')
+    });
+  }
+});
+
+app.post('/api/eligibility/check', (req, res) => {
+  const memberId = String(req.body?.memberId || '').trim();
+  const payerId = String(req.body?.payerId || '').trim();
+  const dateOfService = String(req.body?.dateOfService || new Date().toISOString().slice(0, 10));
+
+  if (!memberId) {
+    return res.status(400).json({
+      success: false,
+      error: 'memberId is required'
+    });
+  }
+
+  const denied = /deny|blocked|inactive|expired/i.test(`${memberId} ${payerId}`);
+  const eligible = !denied;
+
+  return res.json({
+    success: true,
+    eligible,
+    plan: eligible ? 'SBS Standard Plus' : 'Member Eligibility Review Required',
+    benefits: eligible ? ['consultation', 'diagnostics', 'pharmacy'] : [],
+    coverage: eligible
+      ? { consultation: '80%', diagnostics: '70%', pharmacy: '60%' }
+      : { consultation: '0%', diagnostics: '0%', pharmacy: '0%' },
+    source: 'sbs-landing-eligibility-engine',
+    notes: eligible
+      ? `Eligible as of ${dateOfService}`
+      : 'Member requires manual payer verification before claim submission',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.post('/api/prior-auth/submit', (req, res) => {
+  const memberId = String(req.body?.memberId || '').trim();
+  const procedureCode = String(req.body?.procedureCode || req.body?.serviceCode || '').trim();
+
+  if (!memberId || !procedureCode) {
+    return res.status(400).json({
+      success: false,
+      error: 'memberId and procedureCode are required'
+    });
+  }
+
+  const pending = /surg|mri|ct|onc|high/i.test(procedureCode);
+  const authId = `PA-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+
+  return res.json({
+    success: true,
+    authId,
+    status: pending ? 'pending_review' : 'approved',
+    eta: pending ? '24-48 hours' : 'immediate',
+    notes: pending
+      ? 'Submitted for medical necessity review'
+      : 'Auto-approved for standard policy limits',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/api/simulation/scenarios', async (req, res) => {
+  try {
+    const response = await requestWithServiceFallback(SIMULATION_BASE_URLS, '/scenarios', {
+      method: 'GET'
+    });
+    return res.json(response.data);
+  } catch (error) {
+    return res.json({
+      success: true,
+      scenarios: [
+        { code: 'success', name: 'Successful Claim', description: 'Happy-path claim submission' },
+        { code: 'normalization_error', name: 'Normalization Error', description: 'Invalid or unmapped service code' },
+        { code: 'signing_error', name: 'Signing Error', description: 'Missing/invalid certificate for signing' },
+        { code: 'nphies_reject', name: 'NPHIES Rejection', description: 'Downstream API rejected the claim' }
+      ],
+      source: 'fallback'
+    });
+  }
+});
+
+app.get('/api/simulation/service-catalog', async (req, res) => {
+  try {
+    const response = await requestWithServiceFallback(SIMULATION_BASE_URLS, '/service-catalog', {
+      method: 'GET'
+    });
+    return res.json(response.data);
+  } catch (error) {
+    return res.json({
+      success: true,
+      catalog: buildFallbackSimulationCatalog(),
+      source: 'fallback'
+    });
+  }
+});
+
+app.post('/api/simulation/generate-test-claim', async (req, res) => {
+  try {
+    const response = await requestWithServiceFallback(SIMULATION_BASE_URLS, '/generate-test-claim', {
+      method: 'POST',
+      data: req.body || {}
+    });
+    return res.json(response.data);
+  } catch (error) {
+    const claimType = String(req.body?.claim_type || req.body?.claimType || 'professional');
+    const fallbackCatalog = buildFallbackSimulationCatalog();
+    const services = fallbackCatalog[claimType] || fallbackCatalog.professional;
+    return res.json({
+      success: true,
+      source: 'fallback',
+      claim_data: {
+        patientName: 'Frontend Audit',
+        patientId: `1${Math.floor(100000000 + Math.random() * 899999999)}`,
+        memberId: `MEM-${Math.floor(100000 + Math.random() * 899999)}`,
+        payerId: 'PAYER-001',
+        providerId: 'PROV-001',
+        claimType,
+        userEmail: 'frontend.audit@example.com',
+        diagnosis: { code: 'J06.9', display: 'Acute upper respiratory infection, unspecified' },
+        serviceDate: new Date().toISOString(),
+        services: services.slice(0, 2)
+      }
+    });
+  }
+});
+
+app.post('/api/submit-claim-enhanced', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const services = Array.isArray(body.services) ? body.services : [];
+    const firstService = services[0] || {};
+
+    const mappedItems = services.map((service, index) => ({
+      sequence: index + 1,
+      internal_code: service.internalCode || service.internal_code || service.serviceCode || '',
+      service_code: service.sbsCode || service.sbs_code || service.internalCode || service.internal_code || '',
+      service_desc: service.description || service.description_en || '',
+      description: service.description || service.description_en || '',
+      quantity: Number(service.quantity || 1),
+      unitPrice: Number(service.unitPrice || service.standard_price || 0)
+    }));
+
+    const submitPayload = {
+      patientName: body.patientName,
+      patientId: body.patientId,
+      memberId: body.memberId,
+      payerId: body.payerId,
+      providerId: body.providerId,
+      claimType: body.claimType,
+      userEmail: body.userEmail,
+      facility_id: Number(body.facilityId || body.facility_id || 1),
+      items: mappedItems,
+      internal_code: mappedItems[0]?.internal_code || '',
+      service_code: mappedItems[0]?.service_code || '',
+      service_desc: mappedItems[0]?.service_desc || '',
+      description: mappedItems[0]?.description || '',
+      quantity: Number(mappedItems[0]?.quantity || 1),
+      unit_price: Number(mappedItems[0]?.unitPrice || 0)
+    };
+
+    const response = await axios.post(`http://127.0.0.1:${PORT}/api/submit-claim`, submitPayload, {
+      timeout: 45000,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    return res.status(response.status).json(response.data);
+  } catch (error) {
+    if (error?.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    return res.status(502).json({
+      success: false,
+      error: 'Enhanced claim submission failed',
+      details: extractErrorMessage(error, 'Unable to submit enhanced claim')
+    });
+  }
+});
+
 // Main claim submission endpoint
 app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
   try {
@@ -931,7 +1518,7 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
           normalization: successStatus === 'failed' ? 'pending' : 'completed',
           financialRules: successStatus === 'failed' ? 'pending' : 'completed',
           signing: successStatus === 'failed' ? 'pending' : 'completed',
-          nphiesSubmission: successStatus === 'failed' ? 'failed' : 'in_progress'
+          nphiesSubmission: successStatus === 'failed' ? 'failed' : (successStatus === 'completed' ? 'completed' : 'in_progress')
         }
       });
     }
@@ -942,7 +1529,7 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       claimId,
       submissionId: n8nResponse?.submissionId,
       trackingUrl: n8nResponse?.trackingUrl,
-      status: 'processing',
+      status: n8nResponse?.status || 'processing',
       data: {
         patientId,
         claimType: normalizedClaimType,
@@ -1162,14 +1749,17 @@ app.get('/api/claim-status/:claimId', async (req, res) => {
 
     const stages = record.stages || {};
     const progress = buildProgress(stages);
-    const isComplete = ['completed', 'approved', 'rejected', 'failed'].includes(record.status);
+    const status = String(record.status || 'processing').toLowerCase();
+    const isComplete = isTerminalStatus(status);
+    const isSuccess = isSuccessfulStatus(status);
 
     res.json({
       success: true,
       claimId: record.claimId,
-      status: record.status || 'processing',
-      statusLabel: statusLabel(record.status || 'processing'),
+      status,
+      statusLabel: statusLabel(status),
       isComplete,
+      isSuccess,
       stages: buildStagesObject(stages),
       progress,
       timestamps: {
@@ -1202,19 +1792,29 @@ app.get('/api/claims', async (req, res) => {
     const total = all.length;
     const totalPages = Math.max(1, Math.ceil(total / limit));
     const start = (page - 1) * limit;
-    const claims = all.slice(start, start + limit).map((c) => ({
-      claimId: c.claimId,
-      patientId: c.patientId,
-      patientName: c.patientName,
-      claimType: c.claimType,
-      facilityId: c.facilityId,
-      status: c.status,
-      submissionId: c.submissionId,
-      trackingUrl: c.trackingUrl,
-      createdAt: c.createdAt,
-      lastUpdate: c.lastUpdate,
-      progress: buildProgress(c.stages || {})
-    }));
+    const claims = all.slice(start, start + limit).map((c) => {
+      const status = String(c.status || 'processing').toLowerCase();
+      const isComplete = isTerminalStatus(status);
+      const isSuccess = isSuccessfulStatus(status);
+      return {
+        claimId: c.claimId,
+        patientId: c.patientId,
+        patientName: c.patientName,
+        claimType: c.claimType,
+        facilityId: c.facilityId,
+        status,
+        submissionId: c.submissionId,
+        trackingUrl: c.trackingUrl,
+        createdAt: c.createdAt,
+        lastUpdate: c.lastUpdate,
+        submittedAt: c.createdAt,
+        completedAt: isComplete ? (c.lastUpdate || c.createdAt) : null,
+        isComplete,
+        isSuccess,
+        stages: buildStagesObject(c.stages || {}),
+        progress: buildProgress(c.stages || {})
+      };
+    });
 
     res.json({
       success: true,
@@ -1288,16 +1888,19 @@ app.post('/api/claims/:claimId/retry', async (req, res) => {
 app.get('/api/services/status', async (req, res) => {
   try {
     const services = [
-      { name: 'normalizer', url: (process.env.NORMALIZER_URL || 'http://localhost:8000') + '/health' },
-      { name: 'signer', url: (process.env.SIGNER_URL || 'http://localhost:8001') + '/health' },
-      { name: 'financial-rules', url: (process.env.FINANCIAL_RULES_URL || 'http://localhost:8002') + '/health' },
-      { name: 'nphies-bridge', url: (process.env.NPHIES_BRIDGE_URL || 'http://localhost:8003') + '/health' }
+      { name: 'normalizer', bases: NORMALIZER_BASE_URLS, healthPath: '/health' },
+      { name: 'signer', bases: SIGNER_BASE_URLS, healthPath: '/health' },
+      { name: 'financial-rules', bases: FINANCIAL_BASE_URLS, healthPath: '/health' },
+      { name: 'nphies-bridge', bases: NPHIES_BASE_URLS, healthPath: '/health' }
     ];
 
     const statusChecks = await Promise.allSettled(
       services.map(async (service) => {
         try {
-          const response = await axios.get(service.url, { timeout: 5000 });
+          const response = await requestWithServiceFallback(service.bases, service.healthPath, {
+            method: 'GET',
+            timeout: 8000
+          });
           return {
             name: service.name,
             status: 'healthy',

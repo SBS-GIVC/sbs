@@ -8,12 +8,12 @@ const RUNTIME_CACHE = 'sbs-runtime-v1';
 
 // Assets to cache on install
 const PRECACHE_ASSETS = [
-  '/',
-  '/index.html',
-  '/landing.js',
-  '/config.js',
-  '/api-client.js',
-  '/manifest.json'
+  '/sbs/',
+  '/sbs/index.html',
+  '/sbs/landing.js',
+  '/sbs/config.js',
+  '/sbs/api-client.js',
+  '/sbs/manifest.json'
 ];
 
 // External assets to cache
@@ -111,7 +111,7 @@ self.addEventListener('fetch', (event) => {
       .catch(() => {
         // Network failed and no cache - return offline page for navigation
         if (request.mode === 'navigate') {
-          return caches.match('/index.html');
+          return caches.match('/sbs/index.html');
         }
         return new Response('Offline', { status: 503 });
       })
@@ -156,13 +156,13 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'SBS Engine';
   const options = {
     body: data.body || 'You have a new notification',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-72x72.png',
+    icon: '/sbs/icons/icon.svg',
+    badge: '/sbs/icons/icon.svg',
     vibrate: [100, 50, 100],
     data: {
       dateOfArrival: Date.now(),
       primaryKey: data.claimId || '1',
-      url: data.url || '/'
+      url: data.url || '/sbs/'
     },
     actions: [
       { action: 'view', title: 'View' },

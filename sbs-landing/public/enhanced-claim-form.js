@@ -369,9 +369,9 @@ class EnhancedClaimForm {
       if (data.success) {
         toast?.success(`Claim submitted successfully! Claim ID: ${data.claimId}`);
 
-        // Redirect to tracking page
+        // Redirect to dashboard tracker (legacy /tracking.html is aliased server-side).
         setTimeout(() => {
-          window.location.href = `/tracking.html?claimId=${data.claimId}`;
+          window.location.href = `/sbs/dashboard.html?claimId=${data.claimId}`;
         }, 1500);
       } else {
         toast?.error(data.error || 'Failed to submit claim');
