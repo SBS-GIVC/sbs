@@ -12,6 +12,8 @@ RUN npm ci --only=production
 # Copy application files
 COPY server.cjs ./
 COPY public ./public
+COPY data ./data
+COPY src/data/sbs_codes_full.json ./data/sbs_codes_full.json
 
 # Create upload directory
 RUN mkdir -p /tmp/sbs-uploads

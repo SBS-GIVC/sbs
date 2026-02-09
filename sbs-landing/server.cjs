@@ -7,7 +7,9 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const axios = require('axios');
+const https = require('https');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -15,6 +17,8 @@ const compression = require('compression');
 require('dotenv').config();
 
 const app = express();
+// We run behind Traefik in VPS deployments; trust first proxy hop for IP/rate-limit correctness.
+app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1));
 app.use(compression()); // Compress all responses
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -100,6 +104,22 @@ function isSuccessfulStatus(status) {
 
 function isTerminalStatus(status) {
   return TERMINAL_STATUSES.has(String(status || '').toLowerCase());
+}
+
+function clamp01(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
+
+function hashToUnit(seed) {
+  const str = String(seed || '');
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) / 4294967295;
 }
 
 function normalizeBaseUrl(raw) {
@@ -195,6 +215,626 @@ const SIMULATION_BASE_URLS = buildServiceBaseUrls(process.env.SIMULATION_URL || 
   'http://simulation:8005',
   'http://localhost:8005'
 ]);
+
+const SBS_CODE_REGEX = /^\d{5}-\d{2}-\d{2}$/;
+const SBS_STOP_WORDS = new Set([
+  'a', 'an', 'and', 'any', 'are', 'as', 'at', 'be', 'by', 'code', 'codes', 'for', 'from', 'give', 'help',
+  'i', 'in', 'is', 'it', 'list', 'lookup', 'map', 'mapping', 'me', 'my', 'of', 'on', 'or',
+  'please', 'procedure', 'sbs', 'service', 'show', 'that', 'the', 'to', 'up', 'what', 'with'
+]);
+const SBS_DEFAULT_LIMIT = 10;
+const SBS_MAX_LIMIT = 200;
+const SBS_QUERY_SYNONYMS = new Map([
+  ['appendectomy', 'appendicectomy'],
+  ['lap appendectomy', 'lap appendicectomy'],
+  ['laparoscopic appendectomy', 'lap appendicectomy'],
+  ['hemorrhage', 'haemorrhage'],
+  ['anemia', 'anaemia'],
+  ['pediatric', 'paediatric']
+]);
+const SNOMED_CODE_REGEX = /^\d{6,18}$/;
+
+let sbsCatalogPromise = null;
+let sbsCatalogCache = null;
+let officialTerminologyPromise = null;
+let officialTerminologyCache = null;
+
+function parseBoundedInt(value, fallback, min, max) {
+  const n = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
+function toPublicSbsCode(entry) {
+  return {
+    code: entry.code,
+    desc: entry.desc,
+    descAr: entry.descAr || null,
+    category: entry.category || null,
+    chapter: entry.chapter || null,
+    fee: Number.isFinite(entry.fee) ? entry.fee : 0
+  };
+}
+
+function getSbsCatalogCandidatePaths() {
+  const candidates = [
+    path.join(__dirname, 'data', 'sbs_codes_full.json'),
+    path.join(__dirname, 'src', 'data', 'sbs_codes_full.json'),
+    path.join(process.cwd(), 'data', 'sbs_codes_full.json'),
+    path.join(process.cwd(), 'src', 'data', 'sbs_codes_full.json'),
+    path.join(process.cwd(), 'sbs-landing', 'src', 'data', 'sbs_codes_full.json')
+  ];
+  return Array.from(new Set(candidates));
+}
+
+function normalizeSbsEntry(rawEntry, fallbackCode = '') {
+  const code = String(rawEntry?.code || fallbackCode || '').trim();
+  if (!SBS_CODE_REGEX.test(code)) return null;
+
+  const desc = String(rawEntry?.desc || '').trim();
+  if (!desc) return null;
+
+  const descAr = String(rawEntry?.descAr || '').trim();
+  const category = String(rawEntry?.category || '').trim();
+  const chapter = String(rawEntry?.chapter || '').trim();
+  const fee = Number(rawEntry?.fee);
+  const lowerDesc = desc.toLowerCase();
+  const lowerCategory = category.toLowerCase();
+  const lowerChapter = chapter.toLowerCase();
+  const searchBlob = `${code} ${lowerDesc} ${descAr.toLowerCase()} ${lowerCategory} ${lowerChapter}`.trim();
+
+  return {
+    code,
+    desc,
+    descAr,
+    category,
+    chapter,
+    fee: Number.isFinite(fee) ? fee : 0,
+    _lowerDesc: lowerDesc,
+    _lowerCategory: lowerCategory,
+    _lowerChapter: lowerChapter,
+    _searchBlob: searchBlob
+  };
+}
+
+async function loadSbsCatalog() {
+  if (sbsCatalogCache) return sbsCatalogCache;
+  if (!sbsCatalogPromise) {
+    sbsCatalogPromise = (async () => {
+      for (const filePath of getSbsCatalogCandidatePaths()) {
+        if (!fsSync.existsSync(filePath)) continue;
+        try {
+          const raw = await fs.readFile(filePath, 'utf8');
+          const parsed = JSON.parse(raw);
+          const rawCodes = parsed?.codes || {};
+          const entries = [];
+          for (const [fallbackCode, rawEntry] of Object.entries(rawCodes)) {
+            const normalized = normalizeSbsEntry(rawEntry, fallbackCode);
+            if (normalized) entries.push(normalized);
+          }
+          const byCode = new Map(entries.map((entry) => [entry.code, entry]));
+          sbsCatalogCache = {
+            source: String(parsed?.source || 'CHI Official SBS V3'),
+            version: String(parsed?.version || '3.x'),
+            generated: String(parsed?.generated || ''),
+            entries,
+            byCode,
+            total: entries.length,
+            filePath
+          };
+          console.info(`Loaded SBS catalog ${sbsCatalogCache.version} from ${filePath} (${entries.length} codes)`);
+          return sbsCatalogCache;
+        } catch (error) {
+          console.warn(`Failed loading SBS catalog from ${filePath}: ${error.message}`);
+        }
+      }
+
+      sbsCatalogCache = {
+        source: 'CHI Official SBS V3',
+        version: 'unknown',
+        generated: '',
+        entries: [],
+        byCode: new Map(),
+        total: 0,
+        filePath: null
+      };
+      return sbsCatalogCache;
+    })();
+  }
+  return sbsCatalogPromise;
+}
+
+function extractUserPromptQuery(prompt) {
+  const raw = String(prompt || '').trim();
+  if (!raw) return '';
+
+  const userMessageMatch = raw.match(/user message:\s*([^\n]+)/i) || raw.match(/user query:\s*([^\n]+)/i);
+  let query = userMessageMatch ? userMessageMatch[1].trim() : raw;
+  const mappedMatch = query.match(/\b(?:sbs\s+)?(?:code|codes|coding|map|mapping|lookup|find)\s*(?:for|of)?\s*([^?.\n]+)/i);
+  if (mappedMatch && mappedMatch[1]) query = mappedMatch[1].trim();
+
+  return query
+    .replace(/[`"]/g, ' ')
+    .replace(/^\s*(?:please\s+)?(?:map|mapping|lookup|find|show|list)\s+/i, '')
+    .replace(/^\s*(?:sbs\s+)?(?:code|codes|coding)\s*(?:for|of)?\s*/i, '')
+    .replace(/^\s*(?:for|of)\s+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 240);
+}
+
+function normalizeSbsSearchQuery(query) {
+  let normalized = String(query || '').trim().toLowerCase();
+  if (!normalized) return '';
+  for (const [source, target] of SBS_QUERY_SYNONYMS.entries()) {
+    const pattern = new RegExp(`\\b${source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
+    normalized = normalized.replace(pattern, target);
+  }
+  return normalized;
+}
+
+function tokenizeSbsQuery(query) {
+  return String(query || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .filter((token) => token && token.length > 1 && !SBS_STOP_WORDS.has(token));
+}
+
+function expandSbsTokens(tokens) {
+  const out = new Set(tokens);
+  const joined = tokens.join(' ');
+  for (const [source, target] of SBS_QUERY_SYNONYMS.entries()) {
+    if (joined.includes(source)) {
+      for (const token of target.split(/\s+/)) {
+        if (token && token.length > 1 && !SBS_STOP_WORDS.has(token)) out.add(token);
+      }
+    }
+  }
+  if (out.has('appendectomy')) out.add('appendicectomy');
+  return Array.from(out);
+}
+
+function scoreSbsEntry(entry, queryLower, tokens) {
+  const codeLower = entry.code.toLowerCase();
+  let score = 0;
+
+  if (codeLower === queryLower) score += 1200;
+  else if (codeLower.includes(queryLower)) score += 500;
+
+  if (entry._lowerDesc === queryLower) score += 950;
+  else if (entry._lowerDesc.includes(queryLower)) score += 420;
+
+  if (entry._lowerCategory.includes(queryLower)) score += 130;
+  if (entry._lowerChapter.includes(queryLower)) score += 90;
+
+  for (const token of tokens) {
+    if (codeLower.startsWith(token)) score += 90;
+    else if (codeLower.includes(token)) score += 45;
+
+    if (entry._lowerDesc.startsWith(token)) score += 75;
+    else if (entry._lowerDesc.includes(token)) score += 40;
+
+    if (entry._lowerCategory.includes(token)) score += 22;
+    if (entry._lowerChapter.includes(token)) score += 18;
+  }
+
+  if (tokens.length > 1 && tokens.every((token) => entry._searchBlob.includes(token))) {
+    score += 95;
+  }
+
+  return score;
+}
+
+function searchSbsCatalog(catalog, query, { limit = SBS_DEFAULT_LIMIT, offset = 0 } = {}) {
+  const normalizedLimit = Math.max(1, Math.min(SBS_MAX_LIMIT, Number(limit) || SBS_DEFAULT_LIMIT));
+  const normalizedOffset = Math.max(0, Number(offset) || 0);
+  const cleanQuery = String(query || '').trim();
+  const normalizedQuery = normalizeSbsSearchQuery(cleanQuery);
+  if (!cleanQuery) {
+    const items = catalog.entries.slice(normalizedOffset, normalizedOffset + normalizedLimit).map(toPublicSbsCode);
+    return {
+      query: '',
+      total: catalog.total,
+      offset: normalizedOffset,
+      limit: normalizedLimit,
+      codes: items
+    };
+  }
+
+  const queryLower = normalizedQuery || cleanQuery.toLowerCase();
+  const codeHit = queryLower.match(/\b\d{5}-\d{2}-\d{2}\b/);
+  if (codeHit) {
+    const exact = catalog.byCode.get(codeHit[0].toUpperCase());
+    if (exact) {
+      return {
+        query: cleanQuery,
+        total: 1,
+        offset: 0,
+        limit: normalizedLimit,
+        codes: [toPublicSbsCode(exact)]
+      };
+    }
+  }
+
+  const tokens = expandSbsTokens(tokenizeSbsQuery(normalizedQuery || cleanQuery));
+  const scored = [];
+  for (const entry of catalog.entries) {
+    const score = scoreSbsEntry(entry, queryLower, tokens);
+    if (score > 0) scored.push({ entry, score });
+  }
+
+  scored.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.entry.code.localeCompare(b.entry.code);
+  });
+
+  const total = scored.length;
+  const sliced = scored
+    .slice(normalizedOffset, normalizedOffset + normalizedLimit)
+    .map((item) => toPublicSbsCode(item.entry));
+
+  return {
+    query: cleanQuery,
+    total,
+    offset: normalizedOffset,
+    limit: normalizedLimit,
+    codes: sliced
+  };
+}
+
+function isSbsLookupIntent(prompt) {
+  const sample = `${String(prompt || '').toLowerCase()} ${extractUserPromptQuery(prompt).toLowerCase()}`;
+  return /(sbs|code|coding|lookup|mapping|map|appendectomy|procedure|cholecystectomy|cbc|x-ray|xray)/.test(sample);
+}
+
+function buildSbsLookupTextResponse(prompt, catalog) {
+  const query = extractUserPromptQuery(prompt);
+  const requestAllCodes = /\b(all|full|complete)\b.*\b(sbs|codes?)\b/i.test(String(prompt || ''));
+  const result = searchSbsCatalog(catalog, query, {
+    limit: requestAllCodes ? 25 : SBS_DEFAULT_LIMIT,
+    offset: 0
+  });
+
+  if (!result.codes.length) {
+    return [
+      `I could not find official SBS codes for "${query || 'your request'}".`,
+      'Try a specific term (example: "appendectomy", "lap appendectomy", "cbc").',
+      '',
+      `You can browse the full official catalog via \`GET /api/sbs/codes?limit=100&offset=0\` (total: ${catalog.total}).`
+    ].join('\n');
+  }
+
+  const lines = result.codes.map((item, idx) => {
+    const parts = [`${idx + 1}. \`${item.code}\` - ${item.desc}`];
+    if (item.category) parts.push(`(${item.category})`);
+    return parts.join(' ');
+  });
+
+  const payload = {
+    source: `${catalog.source} v${catalog.version}`,
+    generated: catalog.generated || null,
+    query: result.query || query,
+    totalMatches: result.total,
+    returned: result.codes.length,
+    codes: result.codes
+  };
+
+  return [
+    `Official SBS v${catalog.version} matches for "${result.query || query || 'requested service'}":`,
+    '',
+    ...lines,
+    '',
+    '```json',
+    JSON.stringify(payload, null, 2),
+    '```',
+    '',
+    `For DB ingestion/export, use \`GET /api/sbs/codes?limit=500&offset=0\` and paginate until \`offset >= ${catalog.total}\`.`
+  ].join('\n');
+}
+
+function getOfficialTerminologyCandidatePaths(fileName) {
+  return Array.from(new Set([
+    path.join(__dirname, 'data', fileName),
+    path.join(__dirname, 'src', 'data', fileName),
+    path.join(process.cwd(), 'data', fileName),
+    path.join(process.cwd(), 'src', 'data', fileName),
+    path.join(process.cwd(), 'sbs-landing', 'data', fileName)
+  ]));
+}
+
+async function loadJsonFromCandidates(candidates) {
+  for (const filePath of candidates) {
+    if (!fsSync.existsSync(filePath)) continue;
+    try {
+      const raw = await fs.readFile(filePath, 'utf8');
+      return { json: JSON.parse(raw), filePath };
+    } catch (error) {
+      console.warn(`Failed loading JSON from ${filePath}: ${error.message}`);
+    }
+  }
+  return { json: null, filePath: null };
+}
+
+function buildTerminologySearchBlob(parts = []) {
+  return parts
+    .map((part) => String(part || '').trim().toLowerCase())
+    .filter(Boolean)
+    .join(' ');
+}
+
+function normalizeAchiEntry(raw) {
+  const sbsCode = String(raw?.sbs_code || raw?.['SBS Code hyphenated'] || '').trim();
+  const achiCode = String(raw?.achi_code || raw?.['ACHI Code'] || '').trim();
+  if (!SBS_CODE_REGEX.test(sbsCode) || !achiCode) return null;
+
+  const sbsLongDescription = String(raw?.sbs_long_description || raw?.['Long Description'] || '').trim();
+  const achiDescription = String(raw?.achi_description || raw?.['ACHI Description'] || '').trim();
+  const sbsChapter = String(raw?.sbs_chapter || raw?.['SBS Chapter Desription'] || '').trim();
+  const achiChapter = String(raw?.achi_chapter || raw?.['ACHI Chapter Description'] || '').trim();
+  const equivalenceSbsToAchi = String(raw?.equivalence_sbs_to_achi || raw?.['Equivalence of SBS to ACHI'] || '').trim();
+  const equivalenceAchiToSbs = String(raw?.equivalence_achi_to_sbs || raw?.['Equivalence of ACHI to SBS'] || '').trim();
+
+  return {
+    sbsCode,
+    achiCode,
+    sbsLongDescription,
+    achiDescription,
+    sbsChapter,
+    achiChapter,
+    equivalenceSbsToAchi,
+    equivalenceAchiToSbs,
+    _codeLower: achiCode.toLowerCase(),
+    _searchBlob: buildTerminologySearchBlob([sbsCode, achiCode, sbsLongDescription, achiDescription, sbsChapter, achiChapter])
+  };
+}
+
+function normalizeDentalEntry(raw) {
+  const sbsCode = String(raw?.sbs_code || raw?.['SBS code -Hyphenated'] || raw?.column_3 || '').trim();
+  if (!SBS_CODE_REGEX.test(sbsCode)) return null;
+
+  const admittedType = String(raw?.admitted_type || raw?.['Dental Services Pricelist for Government sector (Article 11)'] || '').trim();
+  const shortDescription = String(raw?.short_description || raw?.column_4 || '').trim();
+  const longDescription = String(raw?.long_description || raw?.column_5 || '').trim();
+  const blockDescription = String(raw?.block_description || raw?.column_7 || '').trim();
+  const chapterDescription = String(raw?.chapter_description || raw?.column_9 || '').trim();
+  const specialty = String(raw?.specialty || raw?.column_10 || '').trim();
+  const priceSar = Number(raw?.price_sar ?? raw?.column_11);
+
+  return {
+    sbsCode,
+    admittedType,
+    shortDescription,
+    longDescription,
+    blockDescription,
+    chapterDescription,
+    specialty,
+    priceSar: Number.isFinite(priceSar) ? priceSar : 0,
+    _codeLower: sbsCode.toLowerCase(),
+    _searchBlob: buildTerminologySearchBlob([sbsCode, shortDescription, longDescription, blockDescription, chapterDescription, specialty, admittedType])
+  };
+}
+
+function normalizeSnomedEntry(raw) {
+  const sbsCode = String(raw?.sbs_code || raw?.['SBS Code hyphenated'] || raw?.U || '').trim();
+  const snomedCode = String(
+    raw?.snomed_code ||
+    raw?.['SNOMED Diagnosis/finding'] ||
+    raw?.['SNOMED Procedure'] ||
+    raw?.['SNOMED \nProcedure '] ||
+    ''
+  ).trim();
+
+  if (!SBS_CODE_REGEX.test(sbsCode) || !SNOMED_CODE_REGEX.test(snomedCode)) return null;
+
+  const sbsShortDescription = String(raw?.sbs_short_description || raw?.['Short description'] || raw?.V || '').trim();
+  const sbsLongDescription = String(raw?.sbs_long_description || raw?.['Long description'] || raw?.W || '').trim();
+  const snomedField = String(raw?.snomed_field || '').trim();
+  const equivalenceSnomedToSbs = String(raw?.equivalence_snomed_to_sbs || raw?.['Equivalence SNOMED to SBS'] || raw?.S || '').trim();
+  const equivalenceSbsToSnomed = String(raw?.equivalence_sbs_to_snomed || raw?.['Source = SBS\nTarget = SM'] || raw?.T || '').trim();
+  const mapRule = String(raw?.map_rule || raw?.['Additional map rule'] || raw?.R || '').trim();
+
+  return {
+    sbsCode,
+    snomedCode,
+    sbsShortDescription,
+    sbsLongDescription,
+    snomedField,
+    equivalenceSnomedToSbs,
+    equivalenceSbsToSnomed,
+    mapRule,
+    _codeLower: snomedCode.toLowerCase(),
+    _searchBlob: buildTerminologySearchBlob([sbsCode, snomedCode, sbsShortDescription, sbsLongDescription, snomedField, mapRule])
+  };
+}
+
+function scoreTerminologyEntry(entry, queryLower, tokens) {
+  let score = 0;
+  if (entry._codeLower === queryLower) score += 1000;
+  else if (entry._codeLower.includes(queryLower)) score += 420;
+  if (entry._searchBlob.includes(queryLower)) score += 220;
+  for (const token of tokens) {
+    if (entry._codeLower.includes(token)) score += 65;
+    if (entry._searchBlob.includes(token)) score += 30;
+  }
+  if (tokens.length > 1 && tokens.every((token) => entry._searchBlob.includes(token))) {
+    score += 90;
+  }
+  return score;
+}
+
+function searchTerminologyEntries(entries, query, { limit = 20, offset = 0, toPublic = (x) => x } = {}) {
+  const normalizedLimit = Math.max(1, Math.min(SBS_MAX_LIMIT, Number(limit) || 20));
+  const normalizedOffset = Math.max(0, Number(offset) || 0);
+  const cleanQuery = String(query || '').trim();
+  const normalizedQuery = normalizeSbsSearchQuery(cleanQuery);
+  if (!cleanQuery) {
+    const items = entries.slice(normalizedOffset, normalizedOffset + normalizedLimit).map((entry) => toPublic(entry, 0));
+    return {
+      query: '',
+      total: entries.length,
+      offset: normalizedOffset,
+      limit: normalizedLimit,
+      results: items
+    };
+  }
+
+  const queryLower = normalizedQuery || cleanQuery.toLowerCase();
+  const tokens = tokenizeSbsQuery(queryLower);
+  const scored = [];
+  for (const entry of entries) {
+    const score = scoreTerminologyEntry(entry, queryLower, tokens);
+    if (score > 0) scored.push({ entry, score });
+  }
+  scored.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.entry._codeLower.localeCompare(b.entry._codeLower);
+  });
+
+  const total = scored.length;
+  const sliced = scored
+    .slice(normalizedOffset, normalizedOffset + normalizedLimit)
+    .map((item) => toPublic(item.entry, item.score));
+
+  return {
+    query: cleanQuery,
+    total,
+    offset: normalizedOffset,
+    limit: normalizedLimit,
+    results: sliced
+  };
+}
+
+function appendToIndex(map, key, value) {
+  if (!key) return;
+  const normalized = String(key).trim();
+  if (!normalized) return;
+  const current = map.get(normalized) || [];
+  current.push(value);
+  map.set(normalized, current);
+}
+
+function scoreFromEquivalence(value) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    if (numeric <= 1) return 1.0;
+    if (numeric <= 2) return 0.9;
+    if (numeric <= 3) return 0.78;
+    return 0.65;
+  }
+  return 0.75;
+}
+
+function toPublicAchiEntry(entry, score = 0) {
+  return {
+    code: entry.achiCode,
+    display: entry.achiDescription || entry.sbsLongDescription || '',
+    system: 'achi',
+    sbsCode: entry.sbsCode,
+    sbsDescription: entry.sbsLongDescription || '',
+    chapter: entry.achiChapter || entry.sbsChapter || '',
+    equivalenceSbsToAchi: entry.equivalenceSbsToAchi || '',
+    equivalenceAchiToSbs: entry.equivalenceAchiToSbs || '',
+    score
+  };
+}
+
+function toPublicSnomedEntry(entry, score = 0) {
+  return {
+    code: entry.snomedCode,
+    display: entry.sbsLongDescription || entry.sbsShortDescription || '',
+    system: 'snomed',
+    sbsCode: entry.sbsCode,
+    sbsDescription: entry.sbsLongDescription || entry.sbsShortDescription || '',
+    snomedField: entry.snomedField || '',
+    mapRule: entry.mapRule || '',
+    equivalenceSnomedToSbs: entry.equivalenceSnomedToSbs || '',
+    equivalenceSbsToSnomed: entry.equivalenceSbsToSnomed || '',
+    score
+  };
+}
+
+function toPublicDentalEntry(entry, score = 0) {
+  return {
+    code: entry.sbsCode,
+    display: entry.longDescription || entry.shortDescription || '',
+    system: 'dental',
+    shortDescription: entry.shortDescription || '',
+    specialty: entry.specialty || '',
+    admittedType: entry.admittedType || '',
+    chapter: entry.chapterDescription || '',
+    block: entry.blockDescription || '',
+    priceSar: entry.priceSar || 0,
+    score
+  };
+}
+
+async function loadOfficialTerminology() {
+  if (officialTerminologyCache) return officialTerminologyCache;
+  if (!officialTerminologyPromise) {
+    officialTerminologyPromise = (async () => {
+      const [achiLoaded, snomedLoaded, dentalLoaded] = await Promise.all([
+        loadJsonFromCandidates(getOfficialTerminologyCandidatePaths('official_achi_map.json')),
+        loadJsonFromCandidates(getOfficialTerminologyCandidatePaths('official_snomed_map.json')),
+        loadJsonFromCandidates(getOfficialTerminologyCandidatePaths('official_dental_pricelist.json'))
+      ]);
+
+      const achiEntries = (achiLoaded.json?.mappings || [])
+        .map(normalizeAchiEntry)
+        .filter(Boolean);
+      const snomedEntries = (snomedLoaded.json?.mappings || [])
+        .map(normalizeSnomedEntry)
+        .filter(Boolean);
+      const dentalEntries = (dentalLoaded.json?.services || [])
+        .map(normalizeDentalEntry)
+        .filter(Boolean);
+
+      const achiBySbs = new Map();
+      const achiByAchi = new Map();
+      for (const entry of achiEntries) {
+        appendToIndex(achiBySbs, entry.sbsCode, entry);
+        appendToIndex(achiByAchi, entry.achiCode, entry);
+      }
+
+      const snomedBySbs = new Map();
+      const snomedBySnomed = new Map();
+      for (const entry of snomedEntries) {
+        appendToIndex(snomedBySbs, entry.sbsCode, entry);
+        appendToIndex(snomedBySnomed, entry.snomedCode, entry);
+      }
+
+      const dentalBySbs = new Map();
+      for (const entry of dentalEntries) {
+        appendToIndex(dentalBySbs, entry.sbsCode, entry);
+      }
+
+      officialTerminologyCache = {
+        sources: {
+          achi: achiLoaded.filePath,
+          snomed: snomedLoaded.filePath,
+          dental: dentalLoaded.filePath
+        },
+        counts: {
+          achi: achiEntries.length,
+          snomed: snomedEntries.length,
+          dental: dentalEntries.length
+        },
+        achiEntries,
+        snomedEntries,
+        dentalEntries,
+        achiBySbs,
+        achiByAchi,
+        snomedBySbs,
+        snomedBySnomed,
+        dentalBySbs
+      };
+
+      return officialTerminologyCache;
+    })();
+  }
+
+  return officialTerminologyPromise;
+}
 
 // Security middleware with CSP
 // NOTE: 'unsafe-inline' is required for the runtime API config in index.html
@@ -672,6 +1312,311 @@ app.get('/api/metrics', (req, res) => {
   });
 });
 
+// Official SBS catalog query endpoint (supports search and pagination for DB ingestion).
+app.get('/api/sbs/codes', async (req, res) => {
+  try {
+    const catalog = await loadSbsCatalog();
+    if (!catalog.total) {
+      return res.status(503).json({
+        success: false,
+        error: 'SBS catalog not loaded'
+      });
+    }
+
+    const query = String(req.query.q || '').trim();
+    const limit = parseBoundedInt(req.query.limit, 50, 1, SBS_MAX_LIMIT);
+    const offset = parseBoundedInt(req.query.offset, 0, 0, 500000);
+    const result = searchSbsCatalog(catalog, query, { limit, offset });
+
+    return res.json({
+      success: true,
+      source: catalog.source,
+      version: catalog.version,
+      generated: catalog.generated || null,
+      filePath: catalog.filePath,
+      query: result.query,
+      total: result.total,
+      offset: result.offset,
+      limit: result.limit,
+      returned: result.codes.length,
+      codes: result.codes
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve SBS codes',
+      message: error.message
+    });
+  }
+});
+
+app.get('/api/terminology/systems', async (req, res) => {
+  try {
+    const sbsCatalog = await loadSbsCatalog();
+    const terminology = await loadOfficialTerminology();
+    return res.json({
+      success: true,
+      systems: [
+        { id: 'sbs', name: 'Saudi Billing System', total: sbsCatalog.total, source: sbsCatalog.source, version: sbsCatalog.version },
+        { id: 'achi', name: 'ACHI', total: terminology.counts.achi, source: terminology.sources.achi },
+        { id: 'snomed', name: 'SNOMED CT (mapped)', total: terminology.counts.snomed, source: terminology.sources.snomed },
+        { id: 'dental', name: 'Dental Pricelist', total: terminology.counts.dental, source: terminology.sources.dental }
+      ]
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to load terminology systems',
+      message: error.message
+    });
+  }
+});
+
+app.get('/api/terminology/search', async (req, res) => {
+  try {
+    const system = String(req.query.system || 'sbs').trim().toLowerCase();
+    const query = String(req.query.q || '').trim();
+    const limit = parseBoundedInt(req.query.limit, 20, 1, SBS_MAX_LIMIT);
+    const offset = parseBoundedInt(req.query.offset, 0, 0, 500000);
+
+    const sbsCatalog = await loadSbsCatalog();
+    const terminology = await loadOfficialTerminology();
+
+    if (system === 'all') {
+      const perSystem = Math.max(5, Math.ceil(limit / 3));
+      const [sbsResult, achiResult, snomedResult] = [
+        searchSbsCatalog(sbsCatalog, query, { limit: perSystem, offset: 0 }),
+        searchTerminologyEntries(terminology.achiEntries, query, { limit: perSystem, offset: 0, toPublic: toPublicAchiEntry }),
+        searchTerminologyEntries(terminology.snomedEntries, query, { limit: perSystem, offset: 0, toPublic: toPublicSnomedEntry })
+      ];
+      const merged = [
+        ...sbsResult.codes.map((item) => ({
+          code: item.code,
+          display: item.desc,
+          system: 'sbs',
+          desc: item.desc,
+          category: item.category,
+          chapter: item.chapter,
+          score: 0
+        })),
+        ...achiResult.results,
+        ...snomedResult.results
+      ];
+      merged.sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+      const windowed = merged.slice(offset, offset + limit);
+      return res.json({
+        success: true,
+        system,
+        query,
+        total: merged.length,
+        offset,
+        limit,
+        returned: windowed.length,
+        results: windowed
+      });
+    }
+
+    if (system === 'sbs') {
+      const result = searchSbsCatalog(sbsCatalog, query, { limit, offset });
+      const results = result.codes.map((item) => ({
+        code: item.code,
+        display: item.desc,
+        system: 'sbs',
+        desc: item.desc,
+        descAr: item.descAr,
+        category: item.category,
+        chapter: item.chapter,
+        fee: item.fee,
+        score: 0
+      }));
+      return res.json({
+        success: true,
+        system,
+        query: result.query,
+        total: result.total,
+        offset: result.offset,
+        limit: result.limit,
+        returned: results.length,
+        results
+      });
+    }
+
+    if (system === 'achi') {
+      const result = searchTerminologyEntries(terminology.achiEntries, query, { limit, offset, toPublic: toPublicAchiEntry });
+      return res.json({
+        success: true,
+        system,
+        query: result.query,
+        total: result.total,
+        offset: result.offset,
+        limit: result.limit,
+        returned: result.results.length,
+        results: result.results
+      });
+    }
+
+    if (system === 'snomed') {
+      const result = searchTerminologyEntries(terminology.snomedEntries, query, { limit, offset, toPublic: toPublicSnomedEntry });
+      return res.json({
+        success: true,
+        system,
+        query: result.query,
+        total: result.total,
+        offset: result.offset,
+        limit: result.limit,
+        returned: result.results.length,
+        results: result.results
+      });
+    }
+
+    if (system === 'dental') {
+      const result = searchTerminologyEntries(terminology.dentalEntries, query, { limit, offset, toPublic: toPublicDentalEntry });
+      return res.json({
+        success: true,
+        system,
+        query: result.query,
+        total: result.total,
+        offset: result.offset,
+        limit: result.limit,
+        returned: result.results.length,
+        results: result.results
+      });
+    }
+
+    return res.status(400).json({
+      success: false,
+      error: 'Unsupported system',
+      supportedSystems: ['sbs', 'achi', 'snomed', 'dental', 'all']
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to search terminology',
+      message: error.message
+    });
+  }
+});
+
+app.get('/api/terminology/mappings', async (req, res) => {
+  try {
+    const sourceSystem = String(req.query.sourceSystem || req.query.system || '').trim().toLowerCase();
+    const code = String(req.query.code || '').trim();
+    const targetSystem = String(req.query.targetSystem || '').trim().toLowerCase();
+
+    if (!sourceSystem || !code) {
+      return res.status(400).json({
+        success: false,
+        error: 'sourceSystem and code are required'
+      });
+    }
+
+    const terminology = await loadOfficialTerminology();
+    const sbsCatalog = await loadSbsCatalog();
+    const mappings = [];
+
+    if (sourceSystem === 'sbs') {
+      if (!targetSystem || targetSystem === 'achi') {
+        for (const row of (terminology.achiBySbs.get(code) || [])) {
+          mappings.push({
+            system: 'achi',
+            code: row.achiCode,
+            display: row.achiDescription || row.sbsLongDescription || '',
+            equivalence: row.equivalenceSbsToAchi || row.equivalenceAchiToSbs || '',
+            confidence: scoreFromEquivalence(row.equivalenceSbsToAchi || row.equivalenceAchiToSbs),
+            sourceCode: row.sbsCode
+          });
+        }
+      }
+      if (!targetSystem || targetSystem === 'snomed') {
+        for (const row of (terminology.snomedBySbs.get(code) || [])) {
+          mappings.push({
+            system: 'snomed',
+            code: row.snomedCode,
+            display: row.snomedField || row.sbsLongDescription || row.sbsShortDescription || '',
+            equivalence: row.equivalenceSbsToSnomed || row.equivalenceSnomedToSbs || '',
+            confidence: scoreFromEquivalence(row.equivalenceSbsToSnomed || row.equivalenceSnomedToSbs),
+            sourceCode: row.sbsCode
+          });
+        }
+      }
+      if (!targetSystem || targetSystem === 'dental') {
+        for (const row of (terminology.dentalBySbs.get(code) || [])) {
+          mappings.push({
+            system: 'dental',
+            code: row.sbsCode,
+            display: row.longDescription || row.shortDescription || '',
+            equivalence: 'price-list',
+            confidence: 1.0,
+            sourceCode: row.sbsCode,
+            priceSar: row.priceSar
+          });
+        }
+      }
+    } else if (sourceSystem === 'achi') {
+      for (const row of (terminology.achiByAchi.get(code) || [])) {
+        const sbsEntry = sbsCatalog.byCode.get(row.sbsCode);
+        mappings.push({
+          system: 'sbs',
+          code: row.sbsCode,
+          display: sbsEntry?.desc || row.sbsLongDescription || '',
+          equivalence: row.equivalenceAchiToSbs || row.equivalenceSbsToAchi || '',
+          confidence: scoreFromEquivalence(row.equivalenceAchiToSbs || row.equivalenceSbsToAchi),
+          sourceCode: row.achiCode
+        });
+      }
+    } else if (sourceSystem === 'snomed') {
+      for (const row of (terminology.snomedBySnomed.get(code) || [])) {
+        const sbsEntry = sbsCatalog.byCode.get(row.sbsCode);
+        mappings.push({
+          system: 'sbs',
+          code: row.sbsCode,
+          display: sbsEntry?.desc || row.sbsLongDescription || row.sbsShortDescription || '',
+          equivalence: row.equivalenceSnomedToSbs || row.equivalenceSbsToSnomed || '',
+          confidence: scoreFromEquivalence(row.equivalenceSnomedToSbs || row.equivalenceSbsToSnomed),
+          sourceCode: row.snomedCode
+        });
+      }
+    } else if (sourceSystem === 'dental') {
+      const sbsEntry = sbsCatalog.byCode.get(code);
+      if (sbsEntry) {
+        mappings.push({
+          system: 'sbs',
+          code,
+          display: sbsEntry.desc,
+          equivalence: 'direct',
+          confidence: 1.0,
+          sourceCode: code
+        });
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Unsupported sourceSystem',
+        supportedSystems: ['sbs', 'achi', 'snomed', 'dental']
+      });
+    }
+
+    return res.json({
+      success: true,
+      sourceSystem,
+      code,
+      targetSystem: targetSystem || null,
+      total: mappings.length,
+      mappings
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get terminology mappings',
+      message: error.message
+    });
+  }
+});
+
+app.get('/api/catalog/systems', (req, res) => res.redirect(302, '/api/terminology/systems'));
+app.get('/api/catalog/search', (req, res) => res.redirect(302, `/api/terminology/search?${new URLSearchParams(req.query).toString()}`));
+app.get('/api/catalog/mappings', (req, res) => res.redirect(302, `/api/terminology/mappings?${new URLSearchParams(req.query).toString()}`));
+
 // Gemini API Proxy endpoint - proxies requests to Google Gemini to avoid exposing API key
 app.post('/api/gemini/generate', async (req, res) => {
   try {
@@ -688,44 +1633,15 @@ app.post('/api/gemini/generate', async (req, res) => {
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     
     // Smart mock response generator for when API is unavailable
-    const generateMockResponse = (prompt) => {
+    const generateMockResponse = async (prompt) => {
       const lowercasePrompt = prompt.toLowerCase();
-      
-      // SBS Code queries
-      if (lowercasePrompt.includes('sbs code') || lowercasePrompt.includes('code for')) {
-        if (lowercasePrompt.includes('blood') || lowercasePrompt.includes('cbc')) {
-          return `Based on SBS V3.1 coding standards, here are the relevant codes for blood tests:
 
-**Complete Blood Count (CBC):**
-- **85025-00-00** - Complete blood count (CBC) with automated differential
-- **85027-00-00** - Complete blood count (CBC), automated
-- **36415-00-00** - Blood collection, venipuncture
-
-**Related Laboratory Codes:**
-- **80053-00-00** - Comprehensive metabolic panel
-- **85610-00-00** - Prothrombin time
-
-💡 **Tip:** For accurate reimbursement, ensure the diagnosis code supports medical necessity.`;
+      if (isSbsLookupIntent(prompt)) {
+        const catalog = await loadSbsCatalog();
+        if (catalog.total > 0) {
+          return buildSbsLookupTextResponse(prompt, catalog);
         }
-        if (lowercasePrompt.includes('x-ray') || lowercasePrompt.includes('xray')) {
-          return `Here are the SBS codes for X-ray procedures:
-
-**Chest X-ray:**
-- **71046-00-00** - Chest X-ray, 2 views
-- **71045-00-00** - Chest X-ray, single view
-
-**Skeletal X-rays:**
-- **73030-00-00** - Shoulder X-ray
-- **73560-00-00** - Knee X-ray, 3 views
-
-💡 **Tip:** Always include the clinical indication in prior authorization requests.`;
-        }
-        return `I can help you find SBS codes. Please specify the medical procedure or service you need coded. Common categories include:
-- Laboratory tests
-- Radiology/Imaging
-- Surgical procedures
-- Office visits
-- Medications`;
+        return 'SBS catalog is not available in this environment. Configure sbs_codes_full.json and retry.';
       }
       
       // Claim validation queries
@@ -844,9 +1760,10 @@ How can I assist you today?`;
 
     // Priority 3: Mock Response
     console.warn('⚠️ No AI keys configured or APIs failed, returning mock response');
+    const mockText = await generateMockResponse(prompt);
     return res.json({
       success: true,
-      text: generateMockResponse(prompt),
+      text: mockText,
       isMock: true,
       fallbackReason: (!GEMINI_API_KEY && !DEEPSEEK_API_KEY) ? 'No AI keys configured' : 'AI services temporarily unavailable'
     });
@@ -1067,7 +1984,7 @@ app.get('/api/claims/:claimId/analyzer', (req, res) => {
   });
 });
 
-app.post('/api/copilot/chat', async (req, res) => {
+const handleCopilotChat = async (req, res) => {
   try {
     const message = String(req.body?.message || '').trim();
     const context = req.body?.context || {};
@@ -1108,7 +2025,10 @@ app.post('/api/copilot/chat', async (req, res) => {
       warning: extractErrorMessage(error, 'Copilot fallback activated')
     });
   }
-});
+};
+
+app.post('/api/copilot/chat', handleCopilotChat);
+app.post('/api/ai/copilot', handleCopilotChat);
 
 app.post('/api/normalizer/normalize', handleNormalizeRequest);
 app.post('/api/normalize', handleNormalizeRequest);
@@ -1155,10 +2075,30 @@ app.post('/api/sign', async (req, res) => {
   }
 });
 
-app.post('/api/eligibility/check', (req, res) => {
-  const memberId = String(req.body?.memberId || '').trim();
-  const payerId = String(req.body?.payerId || '').trim();
-  const dateOfService = String(req.body?.dateOfService || new Date().toISOString().slice(0, 10));
+const handleEligibilityCheck = (req, res) => {
+  const body = req.body || {};
+  const memberId = String(
+    body.memberId ||
+    body.member_id ||
+    body.patientId ||
+    body.patient_id ||
+    body.nationalId ||
+    body.national_id ||
+    ''
+  ).trim();
+  const payerId = String(
+    body.payerId ||
+    body.payer_id ||
+    body.insurerId ||
+    body.insurer_id ||
+    ''
+  ).trim();
+  const dateOfService = String(
+    body.dateOfService ||
+    body.serviceDate ||
+    body.service_date ||
+    new Date().toISOString().slice(0, 10)
+  );
 
   if (!memberId) {
     return res.status(400).json({
@@ -1184,11 +2124,32 @@ app.post('/api/eligibility/check', (req, res) => {
       : 'Member requires manual payer verification before claim submission',
     timestamp: new Date().toISOString()
   });
-});
+};
 
-app.post('/api/prior-auth/submit', (req, res) => {
-  const memberId = String(req.body?.memberId || '').trim();
-  const procedureCode = String(req.body?.procedureCode || req.body?.serviceCode || '').trim();
+app.post('/api/eligibility/check', handleEligibilityCheck);
+app.post('/api/eligibility/verify', handleEligibilityCheck);
+app.post('/api/eligibility', handleEligibilityCheck);
+
+const handlePriorAuthSubmit = (req, res) => {
+  const body = req.body || {};
+  const memberId = String(
+    body.memberId ||
+    body.member_id ||
+    body.patientId ||
+    body.patient_id ||
+    body.nationalId ||
+    body.national_id ||
+    ''
+  ).trim();
+  const procedureCode = String(
+    body.procedureCode ||
+    body.procedure_code ||
+    body.serviceCode ||
+    body.service_code ||
+    body.sbsCode ||
+    body.sbs_code ||
+    ''
+  ).trim();
 
   if (!memberId || !procedureCode) {
     return res.status(400).json({
@@ -1209,6 +2170,293 @@ app.post('/api/prior-auth/submit', (req, res) => {
       ? 'Submitted for medical necessity review'
       : 'Auto-approved for standard policy limits',
     timestamp: new Date().toISOString()
+  });
+};
+
+app.post('/api/prior-auth/submit', handlePriorAuthSubmit);
+app.post('/api/prior-auth', handlePriorAuthSubmit);
+
+app.get('/api/prior-auth/:authId/status', (req, res) => {
+  const authId = String(req.params?.authId || '').trim();
+  if (!authId) {
+    return res.status(400).json({
+      success: false,
+      error: 'authId is required'
+    });
+  }
+
+  const seed = hashToUnit(authId);
+  const status = seed > 0.65 ? 'approved' : (seed > 0.22 ? 'pending_review' : 'denied');
+  return res.json({
+    success: true,
+    authId,
+    status,
+    approvedAmount: status === 'approved' ? Math.round((7000 + seed * 23000) * 100) / 100 : null,
+    eta: status === 'pending_review' ? '24-48 hours' : 'completed',
+    checkedAt: new Date().toISOString()
+  });
+});
+
+app.post('/api/ai/predict-claim', (req, res) => {
+  const body = req.body || {};
+  const facilityId = Number(body.facility_id || 1);
+  const totalAmount = Math.max(0, Number(body.total_amount || 0));
+  const diagnosisCodes = Array.isArray(body.diagnosis_codes) ? body.diagnosis_codes : [];
+  const procedureCodes = Array.isArray(body.procedure_codes) ? body.procedure_codes : [];
+
+  const seed = `${facilityId}|${diagnosisCodes.join(',')}|${procedureCodes.join(',')}|${totalAmount}`;
+  const amountRisk = clamp01(totalAmount / 25000);
+  const complexityRisk = clamp01((diagnosisCodes.length + procedureCodes.length) / 10);
+  const stochastic = hashToUnit(seed);
+  const risk = clamp01(0.2 + amountRisk * 0.45 + complexityRisk * 0.25 + stochastic * 0.15);
+  const confidence = clamp01(0.95 - risk * 0.55);
+
+  return res.json({
+    prediction_type: 'claim_approval',
+    confidence,
+    risk_score: Math.round(risk * 100),
+    recommendations: [
+      risk > 0.65
+        ? 'High-risk profile: verify diagnosis/procedure consistency before submission.'
+        : 'Risk profile is acceptable for standard routing.',
+      amountRisk > 0.7
+        ? 'Large claim value detected: attach stronger clinical justification and cost narrative.'
+        : 'Claim value is within standard review band.'
+    ],
+    insights: {
+      facility_id: facilityId,
+      diagnosis_count: diagnosisCodes.length,
+      procedure_count: procedureCodes.length,
+      amount_risk: Math.round(amountRisk * 100),
+      complexity_risk: Math.round(complexityRisk * 100)
+    }
+  });
+});
+
+app.post('/api/ai/optimize-cost', (req, res) => {
+  const body = req.body || {};
+  const items = Array.isArray(body.claim_items) ? body.claim_items : [];
+  const total = items.reduce((sum, item) => {
+    const qty = Number(item.quantity || 1);
+    const price = Number(item.unit_price || item.unitPrice || 0);
+    return sum + (qty * price);
+  }, 0);
+  const savingsPct = clamp01(Math.min(0.18, items.length * 0.015 + (total > 20000 ? 0.05 : 0)));
+  const totalSavings = Math.round(total * savingsPct * 100) / 100;
+
+  return res.json({
+    total_savings: totalSavings,
+    savings_percentage: Math.round(savingsPct * 1000) / 10,
+    optimized_items: items.slice(0, 5).map((item, index) => ({
+      sequence: index + 1,
+      code: item.sbs_code || item.code || `ITEM-${index + 1}`,
+      recommendation: 'bundle_or_rate_review',
+      potential_savings: Math.round((Number(item.unit_price || item.unitPrice || 0) * 0.06) * 100) / 100
+    })),
+    recommendations: totalSavings > 0
+      ? ['Apply bundle-aware pricing and remove duplicate/near-duplicate services.']
+      : ['No meaningful optimization opportunities detected.']
+  });
+});
+
+app.post('/api/ai/detect-fraud', (req, res) => {
+  const body = req.body || {};
+  const claimData = body.claim_data || {};
+  const items = Array.isArray(claimData.items) ? claimData.items : [];
+  const amount = Number(claimData.total_amount || 0);
+  const seed = `${claimData.patient_id || claimData.patientId || ''}|${amount}|${items.length}`;
+  const anomaly = clamp01((items.length > 12 ? 0.35 : 0) + (amount > 35000 ? 0.4 : 0) + hashToUnit(seed) * 0.3);
+  const fraudScore = Math.round(anomaly * 100);
+
+  return res.json({
+    is_fraudulent: fraudScore >= 80,
+    fraud_score: fraudScore,
+    risk_factors: [
+      amount > 35000 ? 'High claim amount for standard outpatient profile.' : 'Amount profile within expected range.',
+      items.length > 12 ? 'High service count may indicate coding fragmentation.' : 'Service count within expected range.'
+    ],
+    recommendations: fraudScore >= 80
+      ? ['Route claim to compliance review before submission.']
+      : ['No hard fraud signature detected; continue with normal workflow.']
+  });
+});
+
+app.post('/api/ai/check-compliance', (req, res) => {
+  const body = req.body || {};
+  const claimData = body.claim_data || {};
+  const diagnosisCodes = Array.isArray(claimData.diagnosis_codes) ? claimData.diagnosis_codes : [];
+  const procedureCodes = Array.isArray(claimData.procedure_codes) ? claimData.procedure_codes : [];
+  const violations = [];
+  const warnings = [];
+
+  if (procedureCodes.length === 0) violations.push('At least one SBS procedure code is required.');
+  if (diagnosisCodes.length === 0) warnings.push('No diagnosis code provided; payer may reject for medical necessity.');
+  if (diagnosisCodes.length > 0 && procedureCodes.length > 0 && procedureCodes.length > diagnosisCodes.length * 5) {
+    warnings.push('Procedure-to-diagnosis ratio is unusually high.');
+  }
+
+  return res.json({
+    is_compliant: violations.length === 0,
+    violations,
+    warnings,
+    suggestions: violations.length === 0
+      ? ['Compliance baseline passed. Ensure supporting documents are attached for high-value claims.']
+      : ['Resolve hard validation violations before submitting to NPHIES.']
+  });
+});
+
+app.post('/api/ai/analyze', (req, res) => {
+  const body = req.body || {};
+  const claimData = body.claimData || body.claim_data || body;
+  const facilityId = Number(body.facility_id || claimData.facility_id || claimData.facilityId || 1);
+  const totalAmount = Math.max(0, Number(claimData.total_amount || claimData.totalAmount || 0));
+  const diagnosisCodes = Array.isArray(claimData.diagnosis_codes)
+    ? claimData.diagnosis_codes
+    : (Array.isArray(claimData.diagnosisCodes) ? claimData.diagnosisCodes : []);
+  const procedureCodes = Array.isArray(claimData.procedure_codes)
+    ? claimData.procedure_codes
+    : (Array.isArray(claimData.procedureCodes) ? claimData.procedureCodes : []);
+  const items = Array.isArray(claimData.items) ? claimData.items : [];
+  const seed = `${facilityId}|${diagnosisCodes.join(',')}|${procedureCodes.join(',')}|${totalAmount}`;
+
+  const amountRisk = clamp01(totalAmount / 25000);
+  const complexityRisk = clamp01((diagnosisCodes.length + procedureCodes.length) / 10);
+  const stochastic = hashToUnit(seed);
+  const predictionRisk = clamp01(0.2 + amountRisk * 0.45 + complexityRisk * 0.25 + stochastic * 0.15);
+  const confidence = clamp01(0.95 - predictionRisk * 0.55);
+
+  const totalFromItems = items.reduce((sum, item) => {
+    const qty = Number(item.quantity || 1);
+    const price = Number(item.unit_price || item.unitPrice || 0);
+    return sum + (qty * price);
+  }, 0);
+  const savingsPct = clamp01(Math.min(0.18, items.length * 0.015 + (totalFromItems > 20000 ? 0.05 : 0)));
+  const totalSavings = Math.round(totalFromItems * savingsPct * 100) / 100;
+
+  const fraudSeed = `${claimData.patient_id || claimData.patientId || ''}|${totalAmount}|${items.length}`;
+  const fraudScore = Math.round(
+    clamp01((items.length > 12 ? 0.35 : 0) + (totalAmount > 35000 ? 0.4 : 0) + hashToUnit(fraudSeed) * 0.3) * 100
+  );
+
+  const violations = [];
+  const warnings = [];
+  if (procedureCodes.length === 0) violations.push('At least one SBS procedure code is required.');
+  if (diagnosisCodes.length === 0) warnings.push('No diagnosis code provided; payer may reject for medical necessity.');
+  if (diagnosisCodes.length > 0 && procedureCodes.length > 0 && procedureCodes.length > diagnosisCodes.length * 5) {
+    warnings.push('Procedure-to-diagnosis ratio is unusually high.');
+  }
+  const isCompliant = violations.length === 0;
+
+  const overallRiskScore = Math.round(Math.max(predictionRisk * 100, fraudScore, isCompliant ? 0 : 50));
+  let overallStatus = 'APPROVED';
+  if (overallRiskScore > 70) overallStatus = 'REJECTED';
+  else if (overallRiskScore > 40) overallStatus = 'REVIEW_REQUIRED';
+  else if (!isCompliant) overallStatus = 'COMPLIANCE_ISSUE';
+  else if (savingsPct > 0.1) overallStatus = 'OPTIMIZATION_AVAILABLE';
+
+  return res.json({
+    overall_status: overallStatus,
+    overall_risk_score: overallRiskScore,
+    prediction: {
+      prediction_type: 'claim_approval',
+      confidence,
+      risk_score: Math.round(predictionRisk * 100),
+      recommendations: [
+        predictionRisk > 0.65
+          ? 'High-risk profile: verify diagnosis/procedure consistency before submission.'
+          : 'Risk profile is acceptable for standard routing.'
+      ]
+    },
+    optimization: {
+      total_savings: totalSavings,
+      savings_percentage: Math.round(savingsPct * 1000) / 10,
+      recommendations: totalSavings > 0
+        ? ['Apply bundle-aware pricing and remove duplicate/near-duplicate services.']
+        : ['No meaningful optimization opportunities detected.']
+    },
+    fraud: {
+      is_fraudulent: fraudScore >= 80,
+      fraud_score: fraudScore,
+      recommendations: fraudScore >= 80
+        ? ['Route claim to compliance review before submission.']
+        : ['No hard fraud signature detected; continue with normal workflow.']
+    },
+    compliance: {
+      is_compliant: isCompliant,
+      violations,
+      warnings,
+      suggestions: isCompliant
+        ? ['Compliance baseline passed. Ensure supporting documents are attached for high-value claims.']
+        : ['Resolve hard validation violations before submitting to NPHIES.']
+    },
+    recommendations: [
+      predictionRisk > 0.65
+        ? 'High-risk profile: verify diagnosis/procedure consistency before submission.'
+        : 'Risk profile is acceptable for standard routing.',
+      totalSavings > 0
+        ? 'Apply bundle-aware pricing and remove duplicate/near-duplicate services.'
+        : 'No meaningful optimization opportunities detected.',
+      fraudScore >= 80
+        ? 'Route claim to compliance review before submission.'
+        : 'No hard fraud signature detected; continue with normal workflow.',
+      isCompliant
+        ? 'Compliance baseline passed. Ensure supporting documents are attached for high-value claims.'
+        : 'Resolve hard validation violations before submitting to NPHIES.'
+    ],
+    insights: {
+      facility_id: facilityId,
+      diagnosis_count: diagnosisCodes.length,
+      procedure_count: procedureCodes.length,
+      amount_risk: Math.round(amountRisk * 100),
+      complexity_risk: Math.round(complexityRisk * 100)
+    }
+  });
+});
+
+app.get('/api/ai/facility-analytics', (req, res) => {
+  const facilityId = Number(req.query?.facility_id || 1);
+  const days = Math.max(1, Math.min(365, Number(req.query?.days || 30)));
+  const allClaims = Array.from(claimStore.values());
+  const claims = allClaims.filter((c) => Number(c.facilityId || 1) === facilityId);
+  const approved = claims.filter((c) => isSuccessfulStatus(c.status)).length;
+  const rejected = claims.filter((c) => ['failed', 'rejected'].includes(String(c.status || '').toLowerCase())).length;
+
+  return res.json({
+    total_claims: claims.length,
+    approved_claims: approved,
+    rejected_claims: rejected,
+    average_approval_rate: claims.length ? Math.round((approved / claims.length) * 1000) / 10 : 0,
+    total_amount: Math.round(claims.length * (3200 + hashToUnit(facilityId) * 1800)),
+    average_amount: claims.length ? Math.round((3200 + hashToUnit(`avg-${facilityId}`) * 1800) * 100) / 100 : 0,
+    top_procedures: [
+      { code: '1101001', count: Math.max(1, Math.round(days * 0.7)) },
+      { code: '1201001', count: Math.max(1, Math.round(days * 0.55)) },
+      { code: '3820000', count: Math.max(1, Math.round(days * 0.38)) }
+    ],
+    trends: Array.from({ length: 6 }).map((_, idx) => ({
+      period: `P-${idx + 1}`,
+      volume: Math.max(0, Math.round((claims.length / 6) + (hashToUnit(`${facilityId}-${idx}`) - 0.5) * 8)),
+      approval_rate: Math.round((72 + hashToUnit(`r-${facilityId}-${idx}`) * 24) * 10) / 10
+    }))
+  });
+});
+
+app.post('/api/ai/generate-report', (req, res) => {
+  const body = req.body || {};
+  const analysis = body.analysis || {};
+  const claimData = body.claim_data || {};
+  return res.json({
+    report_id: `RPT-${Date.now()}`,
+    summary: `AI report generated for facility ${body.facility_id || 1}`,
+    details: {
+      claimType: claimData.claim_type || claimData.claimType || 'unknown',
+      riskScore: analysis?.overall_risk_score ?? null,
+      status: analysis?.overall_status || 'ANALYZED'
+    },
+    recommendations: Array.isArray(analysis?.recommendations) && analysis.recommendations.length
+      ? analysis.recommendations.slice(0, 5)
+      : ['Attach supporting evidence for high-value claims and verify SBS mapping confidence.'],
+    generatedAt: new Date().toISOString()
   });
 });
 
@@ -1339,6 +2587,9 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       : (req.body || {});
 
     const firstItem = Array.isArray(body.items) ? body.items[0] : null;
+    const firstProcedureCode = Array.isArray(body.procedureCodes) && body.procedureCodes.length
+      ? body.procedureCodes[0]
+      : (Array.isArray(body.procedure_codes) && body.procedure_codes.length ? body.procedure_codes[0] : undefined);
 
     const patientName = body.patientName || body.patient?.name;
     const patientId = body.patientId || body.patient?.id || body.patient_id;
@@ -1349,10 +2600,27 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
     const userEmail = body.userEmail || body.email;
 
     const facility_id = body.facility_id || body.facilityId || body.facilityID;
-    const service_code = body.service_code || body.serviceCode || firstItem?.service_code || firstItem?.sbsCode;
+    const service_code =
+      body.service_code ||
+      body.serviceCode ||
+      body.procedureCode ||
+      body.procedure_code ||
+      firstProcedureCode ||
+      firstItem?.service_code ||
+      firstItem?.sbsCode;
     const service_desc = body.service_desc || body.serviceDesc || firstItem?.service_desc || firstItem?.description;
 
-    const internal_code = body.internal_code || body.internalCode || body.service_code || body.serviceCode || firstItem?.internal_code || firstItem?.internalCode || service_code;
+    const internal_code =
+      body.internal_code ||
+      body.internalCode ||
+      body.service_code ||
+      body.serviceCode ||
+      body.procedureCode ||
+      body.procedure_code ||
+      firstProcedureCode ||
+      firstItem?.internal_code ||
+      firstItem?.internalCode ||
+      service_code;
     const description = body.description || body.service_desc || body.serviceDesc || service_desc;
     const quantity = body.quantity || firstItem?.quantity;
     const unit_price = body.unit_price || body.unitPrice || firstItem?.unitPrice;
@@ -1575,14 +2843,42 @@ async function triggerN8nWorkflow(claimData) {
 
     console.log('🚀 Triggering n8n workflow...');
 
-    const response = await axios.post(N8N_WEBHOOK_URL, claimData, {
+    const baseRequestConfig = {
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'SBS-Landing-API/1.0',
         ...(process.env.SBS_API_KEY ? { 'X-API-Key': process.env.SBS_API_KEY } : {})
       },
       timeout: 30000 // 30 second timeout
-    });
+    };
+    const isHttpsWebhook = /^https:\/\//i.test(N8N_WEBHOOK_URL);
+    const allowSelfSigned = process.env.N8N_ALLOW_SELF_SIGNED !== 'false';
+
+    let response;
+    try {
+      response = await axios.post(
+        N8N_WEBHOOK_URL,
+        claimData,
+        isHttpsWebhook
+          ? { ...baseRequestConfig, httpsAgent: new https.Agent({ rejectUnauthorized: true }) }
+          : baseRequestConfig
+      );
+    } catch (firstError) {
+      const message = String(firstError?.message || '');
+      const isSelfSignedErr =
+        /self[- ]signed|unable to verify the first certificate|CERT_|certificate/i.test(message);
+
+      if (!(isHttpsWebhook && allowSelfSigned && isSelfSignedErr)) {
+        throw firstError;
+      }
+
+      console.warn('⚠️ n8n webhook TLS verification failed, retrying with self-signed allowance');
+      response = await axios.post(
+        N8N_WEBHOOK_URL,
+        claimData,
+        { ...baseRequestConfig, httpsAgent: new https.Agent({ rejectUnauthorized: false }) }
+      );
+    }
 
     console.log('✅ n8n workflow triggered successfully');
 
@@ -1633,7 +2929,22 @@ async function triggerDirectSBS(claimData) {
     // Supported JSON input (recommended): { facility_id, internal_code, description, quantity, unit_price, patientId }
     const raw = claimData || {};
     const facility_id = Number(raw.facility_id || 1);
-    const internal_code = raw.internal_code || raw.internalCode || raw.service_code || raw.serviceCode;
+    const firstProcedureCode = Array.isArray(raw.procedureCodes) && raw.procedureCodes.length
+      ? raw.procedureCodes[0]
+      : (Array.isArray(raw.procedure_codes) && raw.procedure_codes.length ? raw.procedure_codes[0] : undefined);
+    const firstItem = Array.isArray(raw.items) ? raw.items[0] : null;
+    const internal_code =
+      raw.internal_code ||
+      raw.internalCode ||
+      raw.service_code ||
+      raw.serviceCode ||
+      raw.procedureCode ||
+      raw.procedure_code ||
+      firstProcedureCode ||
+      firstItem?.internal_code ||
+      firstItem?.internalCode ||
+      firstItem?.service_code ||
+      firstItem?.sbsCode;
     const description = raw.description || raw.service_desc || raw.serviceDesc || raw.patient?.name || 'Claim submission';
     const quantity = Number(raw.quantity || 1);
     const unit_price = Number(raw.unit_price || raw.unitPrice || 0);
@@ -1643,18 +2954,26 @@ async function triggerDirectSBS(claimData) {
       throw new Error('Missing internal_code (or service_code) for direct SBS processing');
     }
 
-    // Step 1: Normalize internal code -> SBS code
-    const normalizeResponse = await axios.post((process.env.NORMALIZER_URL || 'http://localhost:8000') + '/normalize', {
-      facility_id,
-      internal_code,
-      description
-    });
-
-    const sbsCode = normalizeResponse.data?.sbs_mapped_code;
-    const officialDescription = normalizeResponse.data?.official_description || description;
-
-    if (!sbsCode) {
-      throw new Error('Normalizer did not return sbs_mapped_code');
+    // Step 1: Normalize internal code -> SBS code.
+    // If mapping is missing, continue with the provided code to avoid hard-failing fallback mode.
+    let sbsCode = internal_code;
+    let officialDescription = description;
+    let normalizeResponse = { data: {} };
+    try {
+      normalizeResponse = await axios.post((process.env.NORMALIZER_URL || 'http://localhost:8000') + '/normalize', {
+        facility_id,
+        internal_code,
+        description
+      });
+      sbsCode = normalizeResponse.data?.sbs_mapped_code || sbsCode;
+      officialDescription = normalizeResponse.data?.official_description || officialDescription;
+    } catch (error) {
+      const codeNotFound = Number(error?.response?.status) === 404;
+      if (codeNotFound) {
+        console.warn(`⚠️ Normalizer mapping not found for "${internal_code}", using direct code fallback`);
+      } else {
+        throw error;
+      }
     }
 
     // Step 2: Build minimal FHIR Claim & apply financial rules

@@ -93,16 +93,27 @@ export const CODE_SYSTEMS = {
     color: '#14b8a6',
     icon: 'surgical',
     loaded: false
+  },
+  DENTAL: {
+    id: 'dental',
+    name: 'Dental Pricelist',
+    uri: 'http://chi.gov.sa/sbs/dental',
+    version: 'Gov Sector',
+    publisher: 'CHI',
+    count: 713,
+    color: '#0ea5a4',
+    icon: 'dentistry',
+    loaded: true
   }
 };
 
 // Code system category mappings
 export const SYSTEM_CATEGORIES = {
   diagnosis: ['icd10am', 'icd11', 'snomed'],
-  procedure: ['sbs', 'achi', 'snomed'],
+  procedure: ['sbs', 'achi', 'snomed', 'dental'],
   laboratory: ['loinc'],
   medication: ['rxnorm'],
-  billing: ['sbs', 'drg'],
+  billing: ['sbs', 'drg', 'dental'],
   clinical: ['snomed', 'icd10am', 'icd11']
 };
 
@@ -114,6 +125,7 @@ class UnifiedTerminologyService {
     this.systems = CODE_SYSTEMS;
     this.cache = new Map();
     this.mappings = new Map();
+    this.landingApiBase = (typeof window !== 'undefined' && window.SBS_API_URL) ? window.SBS_API_URL : '';
     
     // WHO ICD-11 API configuration
     this.icd11Config = {
@@ -222,6 +234,10 @@ class UnifiedTerminologyService {
     switch (systemId) {
       case 'sbs':
         return this.searchSBS(query, limit);
+      case 'achi':
+        return this.searchACHI(query, limit);
+      case 'dental':
+        return this.searchDental(query, limit);
       case 'icd11':
         return this.searchICD11(query, limit, language);
       case 'snomed':
@@ -237,10 +253,47 @@ class UnifiedTerminologyService {
     }
   }
 
+  async searchLandingTerminology(systemId, query, limit) {
+    const cacheKey = `landing:${systemId}:${query}:${limit}`;
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey);
+    }
+
+    const params = new URLSearchParams({
+      system: systemId,
+      q: query,
+      limit: String(limit),
+      offset: '0'
+    });
+    const response = await fetch(`${this.landingApiBase}/api/terminology/search?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error(`Landing terminology error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const results = (data.results || []).map(item => ({
+      code: item.code,
+      display: item.display || item.desc || '',
+      category: item.category || item.chapter || null,
+      score: item.score || 0.9,
+      sbsCode: item.sbsCode || null,
+      specialty: item.specialty || null,
+      priceSar: item.priceSar
+    }));
+    this.cache.set(cacheKey, results);
+    return results;
+  }
+
   /**
    * Search SBS codes (local)
    */
   async searchSBS(query, limit) {
+    try {
+      return await this.searchLandingTerminology('sbs', query, limit);
+    } catch (error) {
+      console.warn('Landing SBS search unavailable, using local index:', error?.message || error);
+    }
+
     // Use the existing AI assistant service
     const { aiAssistant } = await import('./aiAssistantService');
     const results = aiAssistant.localSearch(query, null, limit);
@@ -251,6 +304,24 @@ class UnifiedTerminologyService {
       category: code.category,
       score: code.score
     }));
+  }
+
+  async searchACHI(query, limit) {
+    try {
+      return await this.searchLandingTerminology('achi', query, limit);
+    } catch (error) {
+      console.warn('Landing ACHI search unavailable:', error?.message || error);
+      return [];
+    }
+  }
+
+  async searchDental(query, limit) {
+    try {
+      return await this.searchLandingTerminology('dental', query, limit);
+    } catch (error) {
+      console.warn('Landing dental search unavailable:', error?.message || error);
+      return [];
+    }
   }
 
   /**
@@ -339,6 +410,15 @@ class UnifiedTerminologyService {
    * Search SNOMED CT via Snowstorm
    */
   async searchSNOMED(query, limit) {
+    try {
+      const localMapped = await this.searchLandingTerminology('snomed', query, limit);
+      if (localMapped.length > 0) {
+        return localMapped;
+      }
+    } catch (error) {
+      console.warn('Landing SNOMED search unavailable, falling back to Snowstorm:', error?.message || error);
+    }
+
     const cacheKey = `snomed:${query}:${limit}`;
     if (this.cache.has(cacheKey)) {
       return this.cache.get(cacheKey);
@@ -482,8 +562,25 @@ class UnifiedTerminologyService {
    * Get local mappings from database
    */
   async getLocalMappings(code, sourceSystem) {
-    // This will query the PostgreSQL mapping table when implemented
-    return [];
+    try {
+      const params = new URLSearchParams({
+        sourceSystem,
+        code
+      });
+      const response = await fetch(`${this.landingApiBase}/api/terminology/mappings?${params.toString()}`);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return (data.mappings || []).map(m => ({
+        system: m.system,
+        code: m.code,
+        display: m.display,
+        equivalence: m.equivalence || 'related',
+        confidence: m.confidence || 0.8
+      }));
+    } catch (error) {
+      console.warn('Local mapping lookup failed:', error?.message || error);
+      return [];
+    }
   }
 
   /**

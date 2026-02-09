@@ -3,14 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="GIVC HEALTH - Global Integrated Virtual Care Health Platform powered by SBS Engine" />
-    <meta name="keywords" content="healthcare, virtual care, NPHIES, Saudi Arabia, medical coding, SBS" />
-    <meta name="author" content="BrainSAIT" />
+    <meta name="description" content="GIVC-SBS (Global Integrated Virtual Care · Saudi Billing System) powered by BrainSAITبرينسايت · Auth: Dr. Mohamed El Fadil" />
+    <meta name="keywords" content="GIVC-SBS, Saudi Billing System, SBS, healthcare, NPHIES, Saudi Arabia, medical coding" />
+    <meta name="author" content="BrainSAITبرينسايت · Auth: Dr. Mohamed El Fadil" />
+    <meta name="theme-color" content="#f8fafc" />
 
     <!-- Open Graph / Social Media -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="GIVC HEALTH - Virtual Care Intelligence" />
-    <meta property="og:description" content="Automated Virtual Care Intelligence Platform" />
+    <meta property="og:title" content="GIVC-SBS - Global Integrated Virtual Care · Saudi Billing System" />
+    <meta property="og:description" content="Premium Saudi Billing System platform powered by BrainSAITبرينسايت · Auth: Dr. Mohamed El Fadil" />
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
@@ -22,18 +23,53 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
 
     <!-- Title -->
-    <title>GIVC HEALTH - Virtual Care Intelligence</title>
+    <title>GIVC-SBS · Global Integrated Virtual Care · Saudi Billing System</title>
+    <style>
+      :root { color-scheme: light; }
+      body { background: #f8fafc; color: #0f172a; }
+      .brainsait-brand-badge {
+        position: fixed;
+        right: 12px;
+        bottom: 12px;
+        z-index: 50;
+        background: rgba(255,255,255,0.95);
+        border: 1px solid #e2e8f0;
+        border-radius: 9999px;
+        padding: 8px 12px;
+        font: 600 11px/1.2 Manrope, Inter, sans-serif;
+        color: #334155;
+        box-shadow: 0 10px 30px rgba(15,23,42,.12);
+        backdrop-filter: blur(8px);
+      }
+      .brainsait-brand-badge a {
+        color: #1d4ed8;
+        text-decoration: none;
+        font-weight: 700;
+      }
+    </style>
 
-    <!-- API Base URL (injected by GitHub Pages workflow or default to same origin) -->
+    <!-- Runtime API configuration -->
     <script>
-      // Default to same-origin so the deployed UI always calls the correct backend.
-      // (You can still override by setting window.SBS_API_URL before this runs.)
-      window.SBS_API_URL = window.SBS_API_URL || (window.location && window.location.origin ? window.location.origin : '');
+      (function () {
+        if (window.SBS_API_URL) return;
+        // Use same-origin by default so UI routes and API calls stay in sync
+        // across local, staging, and production deployments.
+        window.SBS_API_URL = window.location.origin;
+      })();
     </script>
-    <script type="module" crossorigin src="./assets/main-C1BGIkP2.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/main-CTpvNZM_.css">
+    <script type="module" crossorigin src="./assets/main-6gSpl887.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/ui-core-CJgDYHCE.js">
+    <link rel="modulepreload" crossorigin href="./assets/vendor-react-DM7epOza.js">
+    <link rel="modulepreload" crossorigin href="./assets/analytics-BU3FKnFC.js">
+    <link rel="modulepreload" crossorigin href="./assets/ai-features-DQve4Ov2.js">
+    <link rel="modulepreload" crossorigin href="./assets/code-management-Dwjt4v3O.js">
+    <link rel="stylesheet" crossorigin href="./assets/main-DJW9z7lp.css">
   </head>
   <body>
     <div id="root"></div>
+    <div class="brainsait-brand-badge">
+      Powered by BrainSAITبرينسايت · Auth: Dr. Mohamed El Fadil ·
+      <a href="https://gravatar.com/fadil369" target="_blank" rel="noreferrer">Profile</a>
+    </div>
   </body>
 </html>
