@@ -805,14 +805,22 @@ class SBSCommandCenter {
   async sendCopilot(event) {
     event.preventDefault();
     if (this.copilotBusy) return;
-
     const input = document.getElementById('copilot-input');
     const text = (input?.value || '').trim();
     if (!text) return;
-
-    this.chatMessages.push({ role: 'me', ts: nowIso(), text });
     if (input) input.value = '';
+    await this.sendCopilotMessage(text);
+  }
 
+  async sendCopilotPreset(text) {
+    if (this.copilotBusy) return;
+    const msg = String(text || '').trim();
+    if (!msg) return;
+    await this.sendCopilotMessage(msg);
+  }
+
+  async sendCopilotMessage(text) {
+    this.chatMessages.push({ role: 'me', ts: nowIso(), text });
     this.copilotBusy = true;
     this.render();
 
@@ -841,7 +849,6 @@ class SBSCommandCenter {
 
       const raw = data.reply || 'No response';
       let rendered = raw;
-      // If reply is a strict JSON object (recommended), render a readable report.
       const maybe = safeJsonParse(raw, null);
       if (maybe && typeof maybe === 'object' && (maybe.reply || maybe.category || maybe.actions || maybe.warnings)) {
         const lines = [];
@@ -849,11 +856,7 @@ class SBSCommandCenter {
           lines.push(`[category=${maybe.category || 'unknown'} confidence=${typeof maybe.confidence === 'number' ? maybe.confidence.toFixed(2) : '—'}]`);
           lines.push('');
         }
-        if (maybe.reply) {
-          lines.push(String(maybe.reply));
-        } else {
-          lines.push(raw);
-        }
+        lines.push(maybe.reply ? String(maybe.reply) : raw);
         if (Array.isArray(maybe.actions) && maybe.actions.length) {
           lines.push('');
           lines.push('Actions:');
@@ -868,14 +871,11 @@ class SBSCommandCenter {
       }
 
       this.chatMessages.push({ role: 'ai', ts: nowIso(), text: rendered });
-
     } catch (err) {
       this.chatMessages.push({ role: 'ai', ts: nowIso(), text: `HUD error: ${err.message || 'request failed'}` });
-
     } finally {
       this.copilotBusy = false;
       this.render();
-
       const feed = document.getElementById('chat-feed');
       if (feed) feed.scrollTop = feed.scrollHeight;
     }
@@ -1343,9 +1343,15 @@ class SBSCommandCenter {
               ${this.chatMessages.map(m => `
                 <div class="chat-msg ${m.role === 'me' ? 'me' : 'ai'}">
                   <div class="chat-meta">${m.role === 'me' ? 'operator' : 'copilot'} • ${this.escapeHtml(new Date(m.ts).toLocaleTimeString())}</div>
-                  <div class="chat-text">${this.escapeHtml(m.text)}</div>
-                </div>
-              `).join('')}
+                <div class="chat-text">${this.escapeHtml(m.text)}</div>
+              </div>
+            `).join('')}
+            </div>
+            <div class="chat-quick" style="padding: 0 12px 8px 12px;">
+              <button class="chat-chip" onclick="app.sendCopilotPreset('Summarize current claim risk and next best action.')">Risk Summary</button>
+              <button class="chat-chip" onclick="app.sendCopilotPreset('Generate prior-authorization checklist for MRI lumbar claim.')">PA Checklist</button>
+              <button class="chat-chip" onclick="app.sendCopilotPreset('Explain why claim may fail signing and how to fix quickly.')">Signing Fix</button>
+              <button class="chat-chip" onclick="app.sendCopilotPreset('Give concise front-desk steps from submit to NPHIES confirmation.')">Front-Desk SOP</button>
             </div>
             <form class="chat-compose" onsubmit="app.sendCopilot(event)">
               <input id="copilot-input" class="sbs-input" placeholder="${this.escapeHtml(t.copilot.placeholder)}" ${this.copilotBusy ? 'disabled' : ''} />
@@ -1608,9 +1614,11 @@ class SBSCommandCenter {
         </aside>
 
         <main class="cc-main">
-          ${this.renderWorkspace()}
-          <div style="margin-top: 18px; color: rgba(226,232,240,0.45); font-size: 12px;">
-            © 2026 SBS Integration Engine • Command Center UI
+          <div class="cc-main-wrap">
+            ${this.renderWorkspace()}
+            <div style="color: rgba(226,232,240,0.45); font-size: 12px; padding-bottom: 6px;">
+              © 2026 SBS Integration Engine • Command Center UI
+            </div>
           </div>
         </main>
       </div>

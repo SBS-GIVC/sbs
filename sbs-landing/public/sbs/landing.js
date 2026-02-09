@@ -415,7 +415,9 @@ class SBSLandingPage {
       ` : ''}
     `;
 
-    document.getElementById('app').innerHTML = html;
+    const root = document.getElementById('app');
+    if (!root) return;
+    root.innerHTML = html;
   }
 
   attachEventListeners() {
@@ -424,4 +426,6 @@ class SBSLandingPage {
 }
 
 // Initialize the app
-const app = new SBSLandingPage();
+if (document.getElementById('app')) {
+  window.app = new SBSLandingPage();
+}

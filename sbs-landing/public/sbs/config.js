@@ -48,28 +48,27 @@ const getCodespaceApiUrl = () => {
 // Environment configuration
 const environments = {
     development: {
-        apiBaseUrl: 'http://localhost:5000',
+        apiBaseUrl: (window.location && window.location.origin) ? window.location.origin : '',
         apiTimeout: 30000,
         retryAttempts: 3,
         retryDelay: 1000
     },
     codespaces: {
-        // Will be dynamically set if in codespace
-        apiBaseUrl: getCodespaceApiUrl() || 'http://localhost:5000',
+        // If the UI is running in a codespace, try to derive the API origin; otherwise use same-origin.
+        apiBaseUrl: getCodespaceApiUrl() ? `https://${getCodespaceApiUrl()}` : ((window.location && window.location.origin) ? window.location.origin : ''),
         apiTimeout: 30000,
         retryAttempts: 3,
         retryDelay: 1000
     },
     staging: {
-        apiBaseUrl: 'https://sbs-api-staging.brainsait.cloud',
+        apiBaseUrl: window.SBS_API_URL || ((window.location && window.location.origin) ? window.location.origin : ''),
         apiTimeout: 30000,
         retryAttempts: 2,
         retryDelay: 2000
     },
     production: {
-        // For GitHub Pages, the API is hosted in Codespaces or your own server
-        // Update this URL to your actual API endpoint
-        apiBaseUrl: window.SBS_API_URL || 'https://sbs-api.brainsait.cloud',
+        // Default to same-origin so brainsait.cloud (and api.brainsait.cloud) work without extra config.
+        apiBaseUrl: window.SBS_API_URL || ((window.location && window.location.origin) ? window.location.origin : ''),
         apiTimeout: 30000,
         retryAttempts: 2,
         retryDelay: 2000

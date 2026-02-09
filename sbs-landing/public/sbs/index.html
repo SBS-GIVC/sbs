@@ -26,8 +26,9 @@
 
     <!-- API Base URL (injected by GitHub Pages workflow or default to same origin) -->
     <script>
-      // This will be replaced by the GitHub Pages workflow or can be set dynamically
-      window.SBS_API_URL = window.SBS_API_URL || 'http://localhost:3000';
+      // Default to same-origin so the deployed UI always calls the correct backend.
+      // (You can still override by setting window.SBS_API_URL before this runs.)
+      window.SBS_API_URL = window.SBS_API_URL || (window.location && window.location.origin ? window.location.origin : '');
     </script>
     <script type="module" crossorigin src="./assets/main-C1BGIkP2.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/main-CTpvNZM_.css">

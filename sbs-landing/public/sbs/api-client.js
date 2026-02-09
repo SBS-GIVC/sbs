@@ -6,7 +6,7 @@
 class SBSAPIClient {
     constructor(baseUrl = null) {
             const baseConfig = window.SBS_CONFIG || {
-                        apiBaseUrl: 'http://localhost:5000',
+                        apiBaseUrl: (window.location && window.location.origin) ? window.location.origin : '',
                         apiTimeout: 30000,
                         retryAttempts: 3,
                         retryDelay: 1000
