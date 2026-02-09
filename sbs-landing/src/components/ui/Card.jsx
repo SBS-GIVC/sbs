@@ -4,13 +4,16 @@ import React from 'react';
  * Premium Card Component
  * Optimized for GIVC-SBS Ultra-Premium Design System
  */
-export function Card({ children, className = '', animate = true }) {
+export function Card({ children, className = '', animate = true, ...props }) {
   return (
-    <div className={`
+    <div
+      {...props}
+      className={`
       glass-card rounded-[24px] overflow-hidden
       ${animate ? 'animate-premium-in' : ''}
       ${className}
-    `}>
+    `}
+    >
       {children}
     </div>
   );

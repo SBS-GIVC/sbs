@@ -11,8 +11,7 @@ import { SectionHeader } from '../components/ui/SectionHeader';
  * Optimized for GIVC-SBS Ultra-Premium Design System
  */
 export function PriorAuthPage() {
-  const [activeTab, setActiveTab] = useState('new');
-  const [formData, setFormData] = useState({
+  const initialFormData = {
     patientId: '',
     patientName: '',
     facilityId: 'FAC001',
@@ -23,7 +22,10 @@ export function PriorAuthPage() {
     expectedDate: '',
     clinicalNotes: '',
     urgency: 'routine'
-  });
+  };
+
+  const [activeTab, setActiveTab] = useState('new');
+  const [formData, setFormData] = useState(initialFormData);
   const [sbsSuggestions, setSbsSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -125,18 +127,7 @@ export function PriorAuthPage() {
       }, ...prev]);
 
       toast.success(`Prior authorization ${result.authNumber} submitted`);
-      setFormData({
-        patientId: '',
-        patientName: '',
-        facilityId: 'FAC001',
-        sbsCode: '',
-        sbsDescription: '',
-        diagnosis: '',
-        estimatedAmount: '',
-        expectedDate: '',
-        clinicalNotes: '',
-        urgency: 'routine'
-      });
+      setFormData(initialFormData);
       setActiveTab('pending');
     } catch (error) {
       toast.error('Submission failed');
@@ -315,7 +306,16 @@ export function PriorAuthPage() {
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4 border-t border-slate-200/50 dark:border-slate-800/50">
-                   <Button variant="secondary" onClick={() => setShowSuggestions(false)}>Reset</Button>
+                   <Button
+                     variant="secondary"
+                     onClick={() => {
+                       setFormData(initialFormData);
+                       setShowSuggestions(false);
+                       setSbsSuggestions([]);
+                     }}
+                   >
+                     Reset
+                   </Button>
                    <Button icon="send" loading={submitting} onClick={handleSubmit} className="px-10">Submit Request</Button>
                 </div>
               </CardBody>

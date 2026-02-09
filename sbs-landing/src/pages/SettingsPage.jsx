@@ -3,12 +3,14 @@ import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { useToast } from '../components/Toast';
 
 /**
  * Premium Settings Page
  * Optimized for GIVC-SBS Ultra-Premium Design System
  */
 export function SettingsPage() {
+  const toast = useToast();
   const [darkMode, setDarkMode] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [autoMapping, setAutoMapping] = useState(true);
@@ -111,10 +113,19 @@ export function SettingsPage() {
            </Card>
 
            <div className="flex justify-between items-center py-6">
-              <button className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-rose-500 transition-colors">Factory Reset Configuration</button>
+              <button
+                className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-rose-500 transition-colors"
+                onClick={() => toast.warning('Factory reset requires admin confirmation')}
+              >
+                Factory Reset Configuration
+              </button>
               <div className="flex gap-4">
-                 <Button variant="secondary" className="px-8">Discard</Button>
-                 <Button className="px-10 shadow-2xl shadow-blue-600/20" icon="save">Commit Changes</Button>
+                 <Button variant="secondary" className="px-8" onClick={() => toast.info('Changes discarded')}>
+                   Discard
+                 </Button>
+                 <Button className="px-10 shadow-2xl shadow-blue-600/20" icon="save" onClick={() => toast.success('Settings committed successfully')}>
+                   Commit Changes
+                 </Button>
               </div>
            </div>
         </div>

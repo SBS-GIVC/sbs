@@ -2,12 +2,37 @@ import React from 'react';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { Button } from '../components/ui/Button';
+import { useToast } from '../components/Toast';
 
 /**
  * Premium Facility Performance Report
  * Optimized for GIVC-SBS Ultra-Premium Design System
  */
 export function FacilityPerformanceReport() {
+  const toast = useToast();
+
+  const exportCsv = () => {
+    const csv = [
+      ['Facility', 'Claims', 'Accuracy', 'FailureRate'],
+      ['King Salman Hospital', '1240', '98.2', '1.2%'],
+      ['Jeddah Specialized Clinic', '850', '92.5', '4.5%'],
+      ['Dammam Central Hub', '3100', '85.0', '12.4%'],
+      ['Al-Amal Medical', '1050', '95.4', '2.1%']
+    ]
+      .map((row) => row.join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `facility-performance-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('CSV exported');
+  };
+
   return (
     <div className="flex-1 overflow-y-auto bg-grid scrollbar-hide">
       <main className="max-w-[1400px] mx-auto p-6 sm:p-8 space-y-8 stagger-children">
@@ -21,7 +46,7 @@ export function FacilityPerformanceReport() {
                 badge="Network Intelligence"
               />
               <div className="flex gap-3">
-                 <Button variant="secondary" icon="file_download">Export CSV</Button>
+                 <Button variant="secondary" icon="file_download" onClick={exportCsv}>Export CSV</Button>
                  <Button icon="refresh" onClick={() => window.location.reload()}>Sync Nodes</Button>
               </div>
            </div>
@@ -50,7 +75,9 @@ export function FacilityPerformanceReport() {
                  </div>
               </div>
               <div className="p-1 items-center justify-center hidden lg:flex">
-                 <Button className="w-full py-3.5 rounded-[22px]" variant="secondary">Update Query</Button>
+                 <Button className="w-full py-3.5 rounded-[22px]" variant="secondary" onClick={() => toast.info('Performance query updated')}>
+                   Update Query
+                 </Button>
               </div>
            </div>
         </section>
@@ -120,7 +147,12 @@ export function FacilityPerformanceReport() {
                           Anomaly vectors suggest a training gap in SBS V3.1 procedural mapping.
                        </p>
                     </div>
-                    <button className="text-xs font-black uppercase tracking-widest text-blue-600 hover:text-blue-700 transition-colors">Deploy Training Logic →</button>
+                    <button
+                      className="text-xs font-black uppercase tracking-widest text-blue-600 hover:text-blue-700 transition-colors"
+                      onClick={() => window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: 'mapping_rules' } }))}
+                    >
+                      Deploy Training Logic →
+                    </button>
                  </CardBody>
               </Card>
            </div>

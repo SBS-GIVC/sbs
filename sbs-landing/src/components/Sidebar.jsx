@@ -1,10 +1,17 @@
 import React from 'react';
+import { i18n } from '../utils/i18n';
 
 /**
  * Premium Sidebar Component
  * Optimized for GIVC-SBS Ultra-Premium Design System
  */
-export function Sidebar({ currentView, setCurrentView, isOpen, onClose }) {
+export function Sidebar({ currentView, setCurrentView, isOpen, onClose, lang = 'en', isRTL = false }) {
+  const copy = i18n[lang] || i18n.en;
+  const hiddenTranslate = isRTL ? 'translate-x-full' : '-translate-x-full';
+  const sidePlacement = isRTL
+    ? 'right-0 border-l border-slate-200/50 dark:border-slate-800/50'
+    : 'left-0 border-r border-slate-200/50 dark:border-slate-800/50';
+
   const navigate = (view) => {
     setCurrentView(view);
     if (onClose) onClose();
@@ -21,12 +28,12 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose }) {
       )}
 
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-72 
+        fixed inset-y-0 z-50 w-72 
         bg-white/90 dark:bg-slate-900/90
-        backdrop-blur-xl border-r border-slate-200/50 dark:border-slate-800/50
+        backdrop-blur-xl ${sidePlacement}
         transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1)
-        ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}
-        md:relative md:translate-x-0 md:shadow-none
+        ${isOpen ? 'translate-x-0 shadow-2xl' : hiddenTranslate}
+        md:relative md:translate-x-0 md:shadow-none ${isRTL ? 'md:order-last' : ''}
         flex flex-col h-full
       `}>
         {/* Brand/Logo Section */}
@@ -40,7 +47,7 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose }) {
                 GIVC <span className="text-blue-600">SBS</span>
               </span>
               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">
-                V3.1 Compliance
+                {lang === 'ar' ? 'امتثال V3.1' : 'V3.1 Compliance'}
               </span>
             </div>
           </div>
@@ -48,106 +55,106 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose }) {
 
         {/* Navigation Section */}
         <div className="flex-1 overflow-y-auto px-4 py-2 space-y-8 scrollbar-hide">
-          <SidebarSection title="NPHIES Integration">
+          <SidebarSection title={copy.nav.sections.nphies}>
             <SidebarItem 
               icon="dashboard" 
-              label="Dashboard" 
+              label={copy.nav.items.dashboard} 
               active={currentView === 'dashboard'} 
               onClick={() => navigate('dashboard')} 
             />
             <SidebarItem 
               icon="verified_user" 
-              label="Eligibility" 
+              label={copy.nav.items.eligibility} 
               active={currentView === 'eligibility'} 
               onClick={() => navigate('eligibility')} 
             />
             <SidebarItem 
               icon="approval" 
-              label="Prior Auth" 
+              label={copy.nav.items.priorAuth} 
               active={currentView === 'prior-auth'} 
               onClick={() => navigate('prior-auth')} 
             />
             <SidebarItem 
               icon="add_box" 
-              label="Claim Builder" 
+              label={copy.nav.items.claimBuilder} 
               active={currentView === 'claim-builder'} 
               onClick={() => navigate('claim-builder')} 
               badge="NEW"
             />
             <SidebarItem 
               icon="queue" 
-              label="Claims Queue" 
+              label={copy.nav.items.claims} 
               active={currentView === 'claims'} 
               onClick={() => navigate('claims')} 
               badge="12"
             />
           </SidebarSection>
 
-          <SidebarSection title="Code Management">
+          <SidebarSection title={copy.nav.sections.code}>
             <SidebarItem 
               icon="database" 
-              label="SBS Code Browser" 
+              label={copy.nav.items.codeBrowser} 
               active={currentView === 'code-browser'} 
               onClick={() => navigate('code-browser')} 
             />
             <SidebarItem 
               icon="terminal" 
-              label="Unified Browser" 
+              label={copy.nav.items.unifiedBrowser} 
               active={currentView === 'unified-browser'} 
               onClick={() => navigate('unified-browser')} 
             />
             <SidebarItem 
               icon="sync_alt" 
-              label="Mappings" 
+              label={copy.nav.items.mappings} 
               active={currentView === 'mappings'} 
               onClick={() => navigate('mappings')} 
             />
             <SidebarItem 
               icon="settings_suggest" 
-              label="Rules Engine" 
+              label={copy.nav.items.rulesEngine} 
               active={currentView === 'mapping_rules'} 
               onClick={() => navigate('mapping_rules')} 
             />
           </SidebarSection>
 
-          <SidebarSection title="AI Tools">
+          <SidebarSection title={copy.nav.sections.ai}>
             <SidebarItem 
               icon="hub" 
-              label="AI Hub" 
-              active={currentView === 'ai_hub'} 
-              onClick={() => navigate('ai_hub')} 
+              label={copy.nav.items.aiHub} 
+              active={currentView === 'ai-hub' || currentView === 'ai_hub' || currentView === 'ai-copilot'} 
+              onClick={() => navigate('ai-hub')} 
               glow
             />
             <SidebarItem 
               icon="trending_up" 
-              label="Analytics Hub" 
+              label={copy.nav.items.analyticsHub} 
               active={currentView === 'ai-analytics'} 
               onClick={() => navigate('ai-analytics')} 
             />
             <SidebarItem 
               icon="monitoring" 
-              label="Predictive Analytics" 
+              label={copy.nav.items.predictiveAnalytics} 
               active={currentView === 'predictive-analytics'} 
               onClick={() => navigate('predictive-analytics')} 
             />
           </SidebarSection>
 
-          <SidebarSection title="System">
+          <SidebarSection title={copy.nav.sections.system}>
             <SidebarItem 
               icon="sensors" 
-              label="IoT Dashboard" 
-              active={currentView === 'iot_dashboard'} 
-              onClick={() => navigate('iot_dashboard')} 
+              label={copy.nav.items.iotDashboard} 
+              active={currentView === 'iot-dashboard' || currentView === 'iot_dashboard'} 
+              onClick={() => navigate('iot-dashboard')} 
             />
             <SidebarItem 
               icon="api" 
-              label="Developer Portal" 
+              label={copy.nav.items.developerPortal} 
               active={currentView === 'developer'} 
               onClick={() => navigate('developer')} 
             />
             <SidebarItem 
               icon="settings" 
-              label="Settings" 
+              label={copy.nav.items.settings} 
               active={currentView === 'settings'} 
               onClick={() => navigate('settings')} 
             />
@@ -157,7 +164,7 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose }) {
         {/* User Profile Section */}
         <div className="p-4 border-t border-slate-200/50 dark:border-slate-800/50">
           <a 
-            href="https://fadil369.github.io/profile" 
+            href="https://gravatar.com/fadil369" 
             target="_blank"
             rel="noreferrer"
             className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-700/50 flex items-center gap-3 group cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-all duration-300"
@@ -169,8 +176,10 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose }) {
               <div className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-white dark:border-slate-800 bg-emerald-500"></div>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-slate-900 dark:text-white truncate">Mohamed El Fadil</p>
-              <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Administrator</p>
+              <p className="text-sm font-bold text-slate-900 dark:text-white truncate">Dr. Mohamed El Fadil</p>
+              <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
+                {lang === 'ar' ? 'توثيق • BrainSAITبرينسايت' : 'Auth • BrainSAITبرينسايت'}
+              </p>
             </div>
             <button className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 group-hover:text-primary transition-colors">
               <span className="material-symbols-outlined text-lg">more_vert</span>

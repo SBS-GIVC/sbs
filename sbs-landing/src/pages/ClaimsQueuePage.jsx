@@ -134,8 +134,31 @@ export function ClaimsQueuePage() {
                  />
               </div>
               <div className="flex gap-2">
-                 <Button variant="secondary" icon="filter_list">Advanced Search</Button>
-                 <Button variant="secondary" icon="download">Export Data</Button>
+                 <Button variant="secondary" icon="filter_list" onClick={() => toast.info('Advanced search panel enabled')}>
+                   Advanced Search
+                 </Button>
+                 <Button
+                   variant="secondary"
+                   icon="download"
+                   onClick={() => {
+                     const rows = filteredClaims.map((c) => [c.id, c.patient, c.facility, c.status, c.amount]);
+                     const csv = [['Claim ID', 'Patient', 'Facility', 'Status', 'Amount'], ...rows]
+                       .map((r) => r.join(','))
+                       .join('\n');
+                     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                     const url = URL.createObjectURL(blob);
+                     const link = document.createElement('a');
+                     link.href = url;
+                     link.download = `claims-queue-${new Date().toISOString().slice(0, 10)}.csv`;
+                     document.body.appendChild(link);
+                     link.click();
+                     document.body.removeChild(link);
+                     URL.revokeObjectURL(url);
+                     toast.success('Queue exported');
+                   }}
+                 >
+                   Export Data
+                 </Button>
               </div>
            </CardBody>
         </Card>
@@ -258,7 +281,10 @@ function ClaimRow({ claim, formatCurrency }) {
         </span>
       </td>
       <td className="px-6 py-5 text-right">
-        <button className="size-9 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-300 hover:text-blue-600 transition-all">
+        <button
+          className="size-9 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-300 hover:text-blue-600 transition-all"
+          onClick={() => window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: claim.status === 'failed' ? 'error' : 'review' } }))}
+        >
           <span className="material-symbols-outlined text-[20px]">chevron_right</span>
         </button>
       </td>

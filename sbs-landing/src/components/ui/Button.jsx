@@ -12,7 +12,9 @@ export function Button({
   className = '', 
   disabled = false,
   loading = false,
-  type = 'button'
+  size = 'md',
+  type = 'button',
+  ...props
 }) {
   const variants = {
     primary: 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 hover:shadow-blue-600/30',
@@ -22,14 +24,21 @@ export function Button({
     success: 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-600',
   };
 
+  const sizes = {
+    sm: 'px-3 py-2 text-xs rounded-lg',
+    md: 'px-5 py-2.5 text-sm rounded-xl',
+    lg: 'px-6 py-3 text-base rounded-2xl'
+  };
+
   return (
     <button
+      {...props}
       type={type}
       onClick={onClick}
       disabled={disabled || loading}
       className={`
         btn-premium inline-flex items-center justify-center gap-2 
-        px-5 py-2.5 rounded-xl text-sm font-bold tracking-tight
+        ${sizes[size] || sizes.md} font-bold tracking-tight
         disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100
         ${variants[variant]}
         ${className}

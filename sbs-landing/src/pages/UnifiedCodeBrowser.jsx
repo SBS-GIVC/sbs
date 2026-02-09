@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { unifiedTerminology, CODE_SYSTEMS } from '../services/unifiedTerminologyService';
 import { useToast } from '../components/Toast';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
@@ -60,13 +60,26 @@ export function UnifiedCodeBrowser() {
   };
 
   const copyCode = (code, system) => {
-    navigator.clipboard.writeText(`${system}|${code}`);
-    toast.success(`${system} code synchronized`);
+    navigator.clipboard
+      .writeText(`${system}|${code}`)
+      .then(() => toast.success(`${system} code synchronized`))
+      .catch(() => toast.error('Clipboard access denied by browser'));
+  };
+
+  const getRegistryLink = (code) => {
+    const system = String(code?.system || '').toLowerCase();
+    const encoded = encodeURIComponent(code?.code || '');
+    if (system === 'sbs') return 'https://portal.nphies.sa';
+    if (system === 'icd11') return `https://icd.who.int/browse11/l-m/en?q=${encoded}`;
+    if (system === 'icd10am') return `https://www.who.int/standards/classifications/classification-of-diseases?q=${encoded}`;
+    if (system === 'snomed') return `https://browser.ihtsdotools.org/?perspective=full&conceptId1=${encoded}`;
+    if (system === 'loinc') return `https://loinc.org/search/?search=${encoded}`;
+    return `https://www.google.com/search?q=${encodeURIComponent(`${code?.systemName || 'healthcare code'} ${code?.code || ''}`)}`;
   };
 
   return (
     <div className="flex-1 overflow-hidden bg-grid flex flex-col">
-       <header className="flex-shrink-0 bg-slate-950 px-8 py-12 sm:px-12 border-b border-white/5 space-y-10 relative overflow-hidden">
+       <header className="flex-shrink-0 bg-gradient-to-r from-blue-50 via-white to-cyan-50 px-4 py-8 sm:px-8 sm:py-10 border-b border-slate-200/70 space-y-8 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
              <span className="material-symbols-outlined text-[200px] font-black">hub</span>
           </div>
@@ -77,24 +90,23 @@ export function UnifiedCodeBrowser() {
                   title="Unified Registry" 
                   subtitle={`Autonomous search across ${allSystems.length} global healthcare systems.`}
                   badge="Network Node"
-                  dark
                 />
              </div>
-             <div className="flex items-center gap-4">
-                <div className="px-5 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-black uppercase tracking-widest">FHIR R4 Native</div>
-                <div className="px-5 py-2 rounded-2xl bg-violet-600/10 border border-violet-600/20 text-violet-500 text-[10px] font-black uppercase tracking-widest">DeepSeek AI</div>
+             <div className="flex items-center gap-3">
+                <div className="px-4 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-[10px] font-black uppercase tracking-widest">FHIR R4 Native</div>
+                <div className="px-4 py-2 rounded-2xl bg-blue-600/10 border border-blue-600/20 text-blue-600 text-[10px] font-black uppercase tracking-widest">AI Enhanced</div>
              </div>
           </div>
 
           <div className="relative z-10 space-y-6">
              <div className="relative group">
                 <span className="absolute left-6 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-500">search</span>
-                <input 
+                <input
                   type="text" 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Query across clinical ontologies (e.g. 'cardiology', 'glucose', 'I10')..."
-                  className="w-full h-20 bg-white/5 border border-white/10 rounded-[32px] pl-16 pr-20 text-lg font-bold text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-600/50 focus:ring-4 focus:ring-blue-600/5 transition-all"
+                  className="w-full h-16 sm:h-20 bg-white border border-slate-200 rounded-[24px] sm:rounded-[32px] pl-14 sm:pl-16 pr-16 sm:pr-20 text-base sm:text-lg font-bold text-slate-900 placeholder:text-slate-500 focus:outline-none focus:border-blue-600/30 focus:ring-4 focus:ring-blue-600/10 transition-all shadow-sm"
                 />
                 {isSearching && <div className="absolute right-8 top-1/2 -translate-y-1/2 size-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>}
              </div>
@@ -104,12 +116,12 @@ export function UnifiedCodeBrowser() {
                    <button 
                      key={s.id}
                      onClick={() => toggleSystem(s.id)}
-                     className={`px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-2 ${
+                     className={`px-3 sm:px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-2 ${
                        selectedSystems.includes(s.id) 
                          ? 'border-current shadow-lg shadow-current/20' 
-                         : 'opacity-40 border-white/10 text-white'
+                         : 'opacity-80 border-slate-200 text-slate-600 hover:border-slate-300'
                      }`}
-                     style={{ color: selectedSystems.includes(s.id) ? s.color : '#fff', backgroundColor: selectedSystems.includes(s.id) ? `${s.color}15` : 'transparent' }}
+                     style={{ color: selectedSystems.includes(s.id) ? s.color : undefined, backgroundColor: selectedSystems.includes(s.id) ? `${s.color}15` : 'white' }}
                    >
                       <span className="size-2 rounded-full" style={{ backgroundColor: s.color }}></span>
                       {s.name}
@@ -192,8 +204,36 @@ export function UnifiedCodeBrowser() {
                    </Card>
 
                    <div className="space-y-4 py-4">
-                      <Button className="w-full py-6 shadow-2xl shadow-blue-600/20" icon="add_reaction">Add to Claim Context</Button>
-                      <Button variant="secondary" className="w-full py-6" icon="share">Registry Deep-Link</Button>
+                      <Button
+                        className="w-full py-6 shadow-2xl shadow-blue-600/20"
+                        icon="add_reaction"
+                        onClick={() => {
+                          const payload = {
+                            source: 'unified-browser',
+                            system: selectedCode.system,
+                            systemName: selectedCode.systemName,
+                            code: selectedCode.code,
+                            description: selectedCode.display
+                          };
+                          window.localStorage.setItem('sbs_claim_context_code', JSON.stringify(payload));
+                          toast.success('Code context added and claim builder opened');
+                          window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: 'claim-builder' } }));
+                        }}
+                      >
+                        Add to Claim Context
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="w-full py-6"
+                        icon="share"
+                        onClick={() => {
+                          const url = getRegistryLink(selectedCode);
+                          window.open(url, '_blank', 'noopener,noreferrer');
+                          toast.info('Opened registry reference in a new tab');
+                        }}
+                      >
+                        Registry Deep-Link
+                      </Button>
                    </div>
                 </div>
              </aside>

@@ -3,12 +3,14 @@ import { normalizeCode } from '../utils/middleware';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { SectionHeader } from '../components/ui/SectionHeader';
+import { useToast } from '../components/Toast';
 
 /**
  * Premium Mapping Review Page (Triage)
  * Optimized for GIVC-SBS Ultra-Premium Design System
  */
 export function MappingReviewPage() {
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
   const [selectedMapping, setSelectedMapping] = useState(null);
@@ -54,7 +56,7 @@ export function MappingReviewPage() {
   };
 
   const handleConfirm = () => {
-    alert(`Relay Payload Synchronized:\n${sourceData.code} -> ${selectedMapping.code}`);
+    toast.success(`Relay synchronized: ${sourceData.code} -> ${selectedMapping.code}`);
   };
 
   return (
@@ -125,6 +127,7 @@ export function MappingReviewPage() {
                     rec={rec} 
                     active={selectedMapping?.code === rec.code} 
                     onSelect={() => setSelectedMapping(rec)}
+                    onInspect={() => window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: 'code-browser' } }))}
                   />
                 ))
               )}
@@ -187,7 +190,17 @@ export function MappingReviewPage() {
 
            <div className="p-8 border-t border-slate-200/50 dark:border-slate-800/50 bg-white/50 backdrop-blur-md">
               <div className="grid grid-cols-3 gap-3">
-                 <Button variant="secondary" className="bg-rose-500/5 text-rose-500 border-rose-500/10 hover:bg-rose-500 hover:text-white" icon="close">Drop</Button>
+                 <Button
+                   variant="secondary"
+                   className="bg-rose-500/5 text-rose-500 border-rose-500/10 hover:bg-rose-500 hover:text-white"
+                   icon="close"
+                   onClick={() => {
+                     setSelectedMapping(null);
+                     toast.info('Mapping selection dropped');
+                   }}
+                 >
+                   Drop
+                 </Button>
                  <Button className="col-span-2 shadow-2xl shadow-blue-600/20" icon="verified" disabled={!selectedMapping} onClick={handleConfirm}>Relay Confirm</Button>
               </div>
            </div>
@@ -205,7 +218,7 @@ function MetaMetric({ label, value }) {
   );
 }
 
-function InferenceCard({ rec, active, onSelect }) {
+function InferenceCard({ rec, active, onSelect, onInspect }) {
   return (
     <div 
       onClick={onSelect}
@@ -247,7 +260,13 @@ function InferenceCard({ rec, active, onSelect }) {
              </div>
 
              <div className="flex gap-4">
-                <button className="text-[10px] font-black uppercase tracking-widest text-blue-600 flex items-center gap-1 group-hover:gap-2 transition-all">
+                <button
+                   className="text-[10px] font-black uppercase tracking-widest text-blue-600 flex items-center gap-1 group-hover:gap-2 transition-all"
+                   onClick={(e) => {
+                     e.stopPropagation();
+                     onInspect?.();
+                   }}
+                >
                    System Definition <span className="material-symbols-outlined text-sm font-black">arrow_right_alt</span>
                 </button>
              </div>

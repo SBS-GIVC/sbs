@@ -37,8 +37,8 @@ export function DashboardPage() {
       <main className="max-w-[1700px] mx-auto p-6 sm:p-12 space-y-12 stagger-children">
         
         {/* Cinematic Hero */}
-        <section className="relative overflow-hidden rounded-[48px] bg-slate-950 border border-white/5 shadow-3xl animate-premium-in group">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-indigo-900/40 opacity-50"></div>
+        <section className="relative overflow-hidden rounded-[48px] bg-gradient-to-br from-white via-blue-50 to-cyan-50 border border-slate-200/70 shadow-xl animate-premium-in group">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 to-cyan-600/10 opacity-70"></div>
           
           {/* Neural Network Visualization Background (CSS only) */}
           <div className="absolute inset-0 opacity-20 pointer-events-none">
@@ -48,17 +48,17 @@ export function DashboardPage() {
 
           <div className="relative p-12 lg:p-20 flex flex-col lg:flex-row items-center justify-between gap-16">
             <div className="max-w-3xl space-y-8 text-center lg:text-left">
-              <div className="inline-flex items-center gap-3 px-4 py-2 rounded-2xl bg-blue-600 text-white shadow-2xl shadow-blue-600/40 text-[10px] font-black uppercase tracking-[0.3em]">
+              <div className="inline-flex items-center gap-3 px-4 py-2 rounded-2xl bg-blue-600 text-white shadow-xl shadow-blue-600/25 text-[10px] font-black uppercase tracking-[0.3em]">
                  <span className="flex size-2 bg-white rounded-full animate-pulse"></span>
                  System Protocol 3.1 Active
               </div>
               
-              <h1 className="text-5xl sm:text-7xl font-black text-white tracking-tighter leading-[0.95] stagger-children">
+              <h1 className="text-5xl sm:text-7xl font-black text-slate-900 tracking-tighter leading-[0.95] stagger-children">
                  The Future of <br />
                  <span className="text-blue-500 bg-clip-text">Clinical Relay</span>
               </h1>
               
-              <p className="text-lg sm:text-xl text-slate-400 font-bold leading-relaxed max-w-2xl opacity-80">
+              <p className="text-lg sm:text-xl text-slate-600 font-bold leading-relaxed max-w-2xl">
                 Orchestrating the Saudi healthcare economy with adaptive AI, 
                 real-time NPHIES compliance, and autonomous revenue intelligence.
               </p>
@@ -75,7 +75,7 @@ export function DashboardPage() {
                   variant="secondary" 
                   icon="hub" 
                   onClick={() => handleAction('Analyze Network', 'ai-analytics')}
-                  className="px-10 py-4 text-sm bg-white/5 border-white/10 text-white hover:bg-white/10"
+                  className="px-10 py-4 text-sm bg-white border-slate-200 text-slate-700 hover:bg-blue-50"
                 >
                   Neural Insights
                 </Button>
@@ -84,7 +84,7 @@ export function DashboardPage() {
 
             {/* Live Telemetry Mini-Card */}
             <div className="hidden xl:flex flex-col gap-6 w-96 animate-float">
-               <div className="glass-card p-8 rounded-[38px] border-white/10 bg-white/5 backdrop-blur-3xl space-y-6 select-none border-2">
+                 <div className="glass-card p-8 rounded-[38px] border-blue-100 bg-white/80 backdrop-blur-3xl space-y-6 select-none border">
                   <div className="flex justify-between items-center">
                      <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">System Pulse</span>
                      <span className="text-[10px] font-black text-emerald-500">OPTIMAL</span>
@@ -94,7 +94,7 @@ export function DashboardPage() {
                         <span className="material-symbols-outlined text-3xl text-blue-500 font-black">electric_bolt</span>
                      </div>
                      <div className="space-y-1">
-                        <p className="text-2xl font-black text-white tracking-tighter">1.2s</p>
+                        <p className="text-2xl font-black text-slate-900 tracking-tighter">1.2s</p>
                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Avg Relay Latency</p>
                      </div>
                   </div>
@@ -119,7 +119,7 @@ export function DashboardPage() {
               <CardHeader 
                 title="Live Operations Registry" 
                 subtitle="Aggregated throughput from active clinical nodes."
-                action={<Button variant="secondary" size="sm" icon="filter_list">System Filter</Button>}
+                action={<Button variant="secondary" size="sm" icon="filter_list" onClick={() => handleAction('System Filter', 'facility_usage')}>System Filter</Button>}
               />
               <CardBody className="p-0 overflow-hidden">
                  <div className="overflow-x-auto">
@@ -154,7 +154,14 @@ export function DashboardPage() {
                     <p className="text-sm font-bold text-blue-100/80 leading-relaxed">
                        Your local V3.1 inference models have reached 99.2% accuracy on staging. Ready for production synchronization.
                     </p>
-                    <Button variant="secondary" className="w-full bg-white text-blue-600 border-none hover:bg-blue-50 shadow-xl" icon="sync">Sync Production Node</Button>
+                    <Button
+                      variant="secondary"
+                      className="w-full bg-white text-blue-600 border-none hover:bg-blue-50 shadow-xl"
+                      icon="sync"
+                      onClick={() => handleAction('Production Sync', 'settings')}
+                    >
+                      Sync Production Node
+                    </Button>
                  </CardBody>
               </Card>
 

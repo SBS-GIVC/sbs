@@ -4,46 +4,142 @@ import { TopHeader } from './components/TopHeader';
 import { AICopilot, AICopilotFAB } from './components/AICopilot';
 
 // Lazy load pages for better code splitting
-const DashboardPage = lazy(() => import('./pages/DashboardPage').then(m => ({ default: m.DashboardPage })));
-const MappingsPage = lazy(() => import('./pages/MappingsPage').then(m => ({ default: m.MappingsPage })));
-const MappingReviewPage = lazy(() => import('./pages/MappingReviewPage').then(m => ({ default: m.MappingReviewPage })));
-const ErrorDetailPage = lazy(() => import('./pages/ErrorDetailPage').then(m => ({ default: m.ErrorDetailPage })));
-const FacilityPerformanceReport = lazy(() => import('./pages/FacilityPerformanceReport').then(m => ({ default: m.FacilityPerformanceReport })));
-const FacilityUsagePage = lazy(() => import('./pages/FacilityUsagePage').then(m => ({ default: m.FacilityUsagePage })));
-const MappingRulesConfig = lazy(() => import('./pages/MappingRulesConfig').then(m => ({ default: m.MappingRulesConfig })));
-const DeveloperPortal = lazy(() => import('./pages/DeveloperPortal').then(m => ({ default: m.DeveloperPortal })));
-const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
-const ClaimsQueuePage = lazy(() => import('./pages/ClaimsQueuePage').then(m => ({ default: m.ClaimsQueuePage })));
-const EligibilityPage = lazy(() => import('./pages/EligibilityPage').then(m => ({ default: m.EligibilityPage })));
-const PriorAuthPage = lazy(() => import('./pages/PriorAuthPage').then(m => ({ default: m.PriorAuthPage })));
-const ClaimBuilderPage = lazy(() => import('./pages/ClaimBuilderPage').then(m => ({ default: m.ClaimBuilderPage })));
-const SBSCodeBrowser = lazy(() => import('./pages/SBSCodeBrowser').then(m => ({ default: m.SBSCodeBrowser })));
-const UnifiedCodeBrowser = lazy(() => import('./pages/UnifiedCodeBrowser').then(m => ({ default: m.UnifiedCodeBrowser })));
-const AIHubPage = lazy(() => import('./pages/AIHubPage').then(m => ({ default: m.AIHubPage })));
-const PredictiveAnalyticsPage = lazy(() => import('./pages/PredictiveAnalyticsPage').then(m => ({ default: m.PredictiveAnalyticsPage })));
-const AIAnalyticsHub = lazy(() => import('./pages/AIAnalyticsHub').then(m => ({ default: m.AIAnalyticsHub })));
-const IoTDashboardPage = lazy(() => import('./pages/IoTDashboardPage').then(m => ({ default: m.IoTDashboardPage })));
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const MappingsPage = lazy(() => import('./pages/MappingsPage').then((m) => ({ default: m.MappingsPage })));
+const MappingReviewPage = lazy(() => import('./pages/MappingReviewPage').then((m) => ({ default: m.MappingReviewPage })));
+const ErrorDetailPage = lazy(() => import('./pages/ErrorDetailPage').then((m) => ({ default: m.ErrorDetailPage })));
+const FacilityPerformanceReport = lazy(() => import('./pages/FacilityPerformanceReport').then((m) => ({ default: m.FacilityPerformanceReport })));
+const FacilityUsagePage = lazy(() => import('./pages/FacilityUsagePage').then((m) => ({ default: m.FacilityUsagePage })));
+const MappingRulesConfig = lazy(() => import('./pages/MappingRulesConfig').then((m) => ({ default: m.MappingRulesConfig })));
+const DeveloperPortal = lazy(() => import('./pages/DeveloperPortal').then((m) => ({ default: m.DeveloperPortal })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const ClaimsQueuePage = lazy(() => import('./pages/ClaimsQueuePage').then((m) => ({ default: m.ClaimsQueuePage })));
+const EligibilityPage = lazy(() => import('./pages/EligibilityPage').then((m) => ({ default: m.EligibilityPage })));
+const PriorAuthPage = lazy(() => import('./pages/PriorAuthPage').then((m) => ({ default: m.PriorAuthPage })));
+const ClaimBuilderPage = lazy(() => import('./pages/ClaimBuilderPage').then((m) => ({ default: m.ClaimBuilderPage })));
+const SBSCodeBrowser = lazy(() => import('./pages/SBSCodeBrowser').then((m) => ({ default: m.SBSCodeBrowser })));
+const UnifiedCodeBrowser = lazy(() => import('./pages/UnifiedCodeBrowser').then((m) => ({ default: m.UnifiedCodeBrowser })));
+const AIHubPage = lazy(() => import('./pages/AIHubPage').then((m) => ({ default: m.AIHubPage })));
+const PredictiveAnalyticsPage = lazy(() => import('./pages/PredictiveAnalyticsPage').then((m) => ({ default: m.PredictiveAnalyticsPage })));
+const AIAnalyticsHub = lazy(() => import('./pages/AIAnalyticsHub').then((m) => ({ default: m.AIAnalyticsHub })));
+const IoTDashboardPage = lazy(() => import('./pages/IoTDashboardPage').then((m) => ({ default: m.IoTDashboardPage })));
+
+const VIEW_META = {
+  dashboard: {
+    en: { title: 'Active Integration Status', subtitle: '', breadcrumbs: ['Home', 'Data Ingestion & Normalization'] },
+    ar: { title: 'حالة التكامل النشطة', subtitle: '', breadcrumbs: ['الرئيسية', 'استيعاب البيانات والمعالجة'] }
+  },
+  mappings: {
+    en: { title: 'Claims Mapping Analytics', subtitle: 'Real-time performance metrics for hospital integration gateway', breadcrumbs: ['Home', 'Analytics'] },
+    ar: { title: 'تحليلات ربط المطالبات', subtitle: 'مؤشرات أداء لحظية لبوابة تكامل المنشآت الصحية', breadcrumbs: ['الرئيسية', 'التحليلات'] }
+  },
+  review: {
+    en: { title: 'Healthcare Integration Gateway', subtitle: '', breadcrumbs: ['Worklist', 'Review Ticket #8842'] },
+    ar: { title: 'بوابة التكامل الصحي', subtitle: '', breadcrumbs: ['قائمة العمل', 'مراجعة التذكرة #8842'] }
+  },
+  error: {
+    en: { title: 'Healthcare Integration Gateway', subtitle: '', breadcrumbs: ['Claims', 'Queue', 'Review'] },
+    ar: { title: 'بوابة التكامل الصحي', subtitle: '', breadcrumbs: ['المطالبات', 'الطابور', 'المراجعة'] }
+  },
+  facility_performance: {
+    en: { title: 'Facility Performance', subtitle: 'Network-wide operational metrics comparison', breadcrumbs: ['Home', 'Facilities', 'Performance'] },
+    ar: { title: 'أداء المنشآت', subtitle: 'مقارنة مؤشرات التشغيل على مستوى الشبكة', breadcrumbs: ['الرئيسية', 'المنشآت', 'الأداء'] }
+  },
+  facility_usage: {
+    en: { title: 'Usage & Quotas', subtitle: 'API limits and throughput management', breadcrumbs: ['Home', 'Facilities', 'Usage'] },
+    ar: { title: 'الاستخدام والحصص', subtitle: 'إدارة حدود واجهات البرمجة والسعة التشغيلية', breadcrumbs: ['الرئيسية', 'المنشآت', 'الاستخدام'] }
+  },
+  mapping_rules: {
+    en: { title: 'Configuration', subtitle: 'AI Normalization Logic & Thresholds', breadcrumbs: ['Home', 'Configuration', 'Mapping Rules'] },
+    ar: { title: 'الإعدادات', subtitle: 'منطق المعايرة الذكية وحدود الثقة', breadcrumbs: ['الرئيسية', 'الإعدادات', 'قواعد الربط'] }
+  },
+  developer: {
+    en: { title: 'Developer Portal', subtitle: '', breadcrumbs: ['Home', 'Developers'] },
+    ar: { title: 'بوابة المطور', subtitle: '', breadcrumbs: ['الرئيسية', 'المطورون'] }
+  },
+  settings: {
+    en: { title: 'Settings', subtitle: 'Manage application preferences', breadcrumbs: ['Home', 'Settings'] },
+    ar: { title: 'الإعدادات', subtitle: 'إدارة تفضيلات التطبيق', breadcrumbs: ['الرئيسية', 'الإعدادات'] }
+  },
+  claims: {
+    en: { title: 'Claims Queue', subtitle: 'Manage incoming healthcare claims', breadcrumbs: ['Home', 'Claims'] },
+    ar: { title: 'طابور المطالبات', subtitle: 'إدارة مطالبات الرعاية الصحية الواردة', breadcrumbs: ['الرئيسية', 'المطالبات'] }
+  },
+  eligibility: {
+    en: { title: 'Eligibility Verification', subtitle: 'Real-time coverage verification', breadcrumbs: ['Home', 'Eligibility'] },
+    ar: { title: 'التحقق من الاستحقاق', subtitle: 'التحقق اللحظي من التغطية', breadcrumbs: ['الرئيسية', 'الاستحقاق'] }
+  },
+  'prior-auth': {
+    en: { title: 'Prior Authorization', subtitle: 'Request and track pre-approvals', breadcrumbs: ['Home', 'Prior Authorization'] },
+    ar: { title: 'الموافقة المسبقة', subtitle: 'طلب وتتبع الموافقات المسبقة', breadcrumbs: ['الرئيسية', 'الموافقة المسبقة'] }
+  },
+  'claim-builder': {
+    en: { title: 'Smart Claim Builder', subtitle: 'AI-powered claim creation', breadcrumbs: ['Home', 'Claim Builder'] },
+    ar: { title: 'منشئ المطالبة الذكي', subtitle: 'إنشاء المطالبات بالذكاء الاصطناعي', breadcrumbs: ['الرئيسية', 'منشئ المطالبة'] }
+  },
+  'code-browser': {
+    en: { title: 'SBS Code Catalogue', subtitle: 'Browse official CHI codes', breadcrumbs: ['Home', 'Code Browser'] },
+    ar: { title: 'دليل أكواد SBS', subtitle: 'استعراض أكواد مجلس الضمان الرسمية', breadcrumbs: ['الرئيسية', 'متصفح الأكواد'] }
+  },
+  'unified-browser': {
+    en: { title: 'Unified Code Browser', subtitle: 'Search across all healthcare code systems', breadcrumbs: ['Home', 'Unified Browser'] },
+    ar: { title: 'المتصفح الموحد للأكواد', subtitle: 'بحث عبر جميع أنظمة الأكواد الصحية', breadcrumbs: ['الرئيسية', 'المتصفح الموحد'] }
+  },
+  'ai-hub': {
+    en: { title: 'AI Hub', subtitle: 'AI-powered healthcare billing tools', breadcrumbs: ['Home', 'AI Tools'] },
+    ar: { title: 'مركز الذكاء الاصطناعي', subtitle: 'أدوات فوترة صحية مدعومة بالذكاء الاصطناعي', breadcrumbs: ['الرئيسية', 'أدوات الذكاء'] }
+  },
+  'predictive-analytics': {
+    en: { title: 'Predictive Analytics', subtitle: 'AI-powered insights and forecasting', breadcrumbs: ['Home', 'Analytics', 'Predictions'] },
+    ar: { title: 'التحليلات التنبؤية', subtitle: 'رؤى وتوقعات مدعومة بالذكاء الاصطناعي', breadcrumbs: ['الرئيسية', 'التحليلات', 'التوقعات'] }
+  },
+  'ai-analytics': {
+    en: { title: 'AI Analytics Hub', subtitle: 'Comprehensive AI-powered claim analytics', breadcrumbs: ['Home', 'AI Tools', 'Analytics Hub'] },
+    ar: { title: 'مركز التحليلات الذكية', subtitle: 'تحليلات شاملة للمطالبات بالذكاء الاصطناعي', breadcrumbs: ['الرئيسية', 'أدوات الذكاء', 'مركز التحليلات'] }
+  },
+  'iot-dashboard': {
+    en: { title: 'IoT Monitoring', subtitle: 'Real-time device monitoring and event streaming', breadcrumbs: ['Home', 'IoT', 'Dashboard'] },
+    ar: { title: 'مراقبة إنترنت الأشياء', subtitle: 'مراقبة الأجهزة وبث الأحداث لحظياً', breadcrumbs: ['الرئيسية', 'إنترنت الأشياء', 'لوحة التحكم'] }
+  }
+};
 
 // Loading component for Suspense
-function PageLoader() {
+function PageLoader({ lang = 'en' }) {
   return (
     <div className="flex-1 flex items-center justify-center">
       <div className="text-center">
         <div className="size-12 mx-auto mb-4 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
-        <p className="text-slate-500 dark:text-slate-400 text-sm">Loading...</p>
+        <p className="text-slate-500 text-sm">{lang === 'ar' ? 'جارٍ التحميل...' : 'Loading...'}</p>
       </div>
     </div>
   );
 }
 
+function getViewMeta(normalizedView, lang) {
+  const meta = VIEW_META[normalizedView] || VIEW_META.dashboard;
+  return meta[lang] || meta.en;
+}
 
 export default function App() {
   const [currentView, setCurrentView] = useState('dashboard');
-  const [pageTitle, setPageTitle] = useState('Active Integration Status');
-  const [breadcrumbs, setBreadcrumbs] = useState(['Home', 'Data Ingestion & Normalization']);
-  const [subtitle, setSubtitle] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [copilotOpen, setCopilotOpen] = useState(false);
+  const [lang, setLang] = useState(() => {
+    const saved = typeof window !== 'undefined' ? window.localStorage.getItem('sbs_lang') : null;
+    return saved === 'ar' ? 'ar' : 'en';
+  });
+
+  const isRTL = lang === 'ar';
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = lang;
+      document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
+    }
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('sbs_lang', lang);
+    }
+  }, [lang, isRTL]);
 
   useEffect(() => {
     const handleNavigate = (event) => {
@@ -57,184 +153,87 @@ export default function App() {
     return () => window.removeEventListener('sbs:navigate', handleNavigate);
   }, []);
 
-  // Update header based on view
-  useEffect(() => {
-    switch (currentView) {
-        case 'dashboard':
-            setPageTitle('Active Integration Status');
-            setSubtitle('');
-            setBreadcrumbs(['Home', 'Data Ingestion & Normalization']);
-            break;
-        case 'mappings':
-            setPageTitle('Claims Mapping Analytics');
-            setSubtitle('Real-time performance metrics for hospital integration gateway');
-            setBreadcrumbs(['Home', 'Analytics']);
-            break;
-        case 'review':
-            setPageTitle('Healthcare Integration Gateway');
-            setSubtitle('');
-            setBreadcrumbs(['Worklist', 'Review Ticket #8842']);
-            break;
-        case 'error':
-            setPageTitle('Healthcare Integration Gateway'); // Header reused in layout
-            setBreadcrumbs(['Claims', 'Queue', 'Review']);
-            break;
-        case 'facility_performance':
-            setPageTitle('Facility Performance');
-            setSubtitle('Network-wide operational metrics comparison');
-            setBreadcrumbs(['Home', 'Facilities', 'Performance']);
-            break;
-        case 'facility_usage':
-            setPageTitle('Usage & Quotas');
-            setSubtitle('API limits and throughput management');
-            setBreadcrumbs(['Home', 'Facilities', 'Usage']);
-            break;
-        case 'mapping_rules':
-            setPageTitle('Configuration');
-            setSubtitle('AI Normalization Logic & Thresholds');
-            setBreadcrumbs(['Home', 'Configuration', 'Mapping Rules']);
-            break;
-        case 'developer':
-            // Developer portal has its own internal header usually
-            setPageTitle('Developer Portal');
-            setBreadcrumbs(['Home', 'Developers']);
-            break;
-        case 'settings':
-            setPageTitle('Settings');
-            setSubtitle('Manage application preferences');
-            setBreadcrumbs(['Home', 'Settings']);
-            break;
-        case 'claims':
-            setPageTitle('Claims Queue');
-            setSubtitle('Manage incoming healthcare claims');
-            setBreadcrumbs(['Home', 'Claims']);
-            break;
-        case 'eligibility':
-            setPageTitle('Eligibility Verification');
-            setSubtitle('Real-time coverage verification');
-            setBreadcrumbs(['Home', 'Eligibility']);
-            break;
-        case 'prior-auth':
-            setPageTitle('Prior Authorization');
-            setSubtitle('Request and track pre-approvals');
-            setBreadcrumbs(['Home', 'Prior Authorization']);
-            break;
-        case 'claim-builder':
-            setPageTitle('Smart Claim Builder');
-            setSubtitle('AI-powered claim creation');
-            setBreadcrumbs(['Home', 'Claim Builder']);
-            break;
-        case 'code-browser':
-            setPageTitle('SBS Code Catalogue');
-            setSubtitle('Browse official CHI codes');
-            setBreadcrumbs(['Home', 'Code Browser']);
-            break;
-        case 'unified-browser':
-            setPageTitle('Unified Code Browser');
-            setSubtitle('Search across all healthcare code systems');
-            setBreadcrumbs(['Home', 'Unified Browser']);
-            break;
-        case 'ai-copilot':
-        case 'claim-optimizer':
-            setPageTitle('AI Hub');
-            setSubtitle('AI-powered healthcare billing tools');
-            setBreadcrumbs(['Home', 'AI Tools']);
-            break;
-        case 'predictive-analytics':
-            setPageTitle('Predictive Analytics');
-            setSubtitle('AI-powered insights and forecasting');
-            setBreadcrumbs(['Home', 'Analytics', 'Predictions']);
-            break;
-        case 'ai-analytics':
-            setPageTitle('AI Analytics Hub');
-            setSubtitle('Comprehensive AI-powered claim analytics');
-            setBreadcrumbs(['Home', 'AI Tools', 'Analytics Hub']);
-            break;
-        case 'iot-dashboard':
-            setPageTitle('IoT Monitoring');
-            setSubtitle('Real-time device monitoring and event streaming');
-            setBreadcrumbs(['Home', 'IoT', 'Dashboard']);
-            break;
-        default:
-            setPageTitle('Dashboard');
-    }
-  }, [currentView]);
+  const normalizedView = (() => {
+    const v = String(currentView || '');
+    if (v === 'ai_hub' || v === 'ai-copilot' || v === 'claim-optimizer') return 'ai-hub';
+    if (v === 'iot_dashboard') return 'iot-dashboard';
+    return v;
+  })();
+
+  const { title, subtitle, breadcrumbs } = getViewMeta(normalizedView, lang);
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background-light dark:bg-background-dark font-body text-slate-900 dark:text-white antialiased">
-      {/* Mobile overlay */}
+    <div
+      dir={isRTL ? 'rtl' : 'ltr'}
+      className="flex h-screen w-full overflow-hidden bg-background-light font-body text-slate-900 antialiased"
+    >
       {sidebarOpen && (
         <button
           type="button"
-          aria-label="Close navigation"
+          aria-label={lang === 'ar' ? 'إغلاق التنقل' : 'Close navigation'}
           onClick={() => setSidebarOpen(false)}
           className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 md:hidden"
         />
       )}
 
-      {/* Sidebar */}
-      <Sidebar 
-        currentView={currentView} 
+      <Sidebar
+        currentView={currentView}
         setCurrentView={(view) => {
           setCurrentView(view);
           setSidebarOpen(false);
-        }} 
+        }}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        lang={lang}
+        isRTL={isRTL}
       />
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        {/* Helper function to determine if we show the standard TopHeader or if the page has its own headers */}
-        {/* For now, we will use the standard TopHeader for most pages except DeveloperPortal which might look better full screen or handled differently */}
-        {/* Standard TopHeader for all main operational pages */}
-        {!['developer', 'iot-dashboard'].includes(currentView) && (
-            <TopHeader 
-              title={pageTitle} 
-              subtitle={subtitle} 
-              breadcrumbs={breadcrumbs} 
-              onMenuClick={() => setSidebarOpen(true)}
-            />
+        {!['developer', 'iot-dashboard'].includes(normalizedView) && (
+          <TopHeader
+            title={title}
+            subtitle={subtitle}
+            breadcrumbs={breadcrumbs}
+            onMenuClick={() => setSidebarOpen(true)}
+            lang={lang}
+            isRTL={isRTL}
+            onToggleLanguage={() => setLang((prev) => (prev === 'en' ? 'ar' : 'en'))}
+          />
         )}
 
         <main className="flex-1 overflow-hidden relative flex flex-col">
-          <Suspense fallback={<PageLoader />}>
-            {currentView === 'dashboard' && <DashboardPage />}
-            {currentView === 'mappings' && <MappingsPage />}
-            {currentView === 'review' && <MappingReviewPage />}
-            {currentView === 'error' && <ErrorDetailPage />}
-            
-            {currentView === 'facility_performance' && <FacilityPerformanceReport />}
-            {currentView === 'facility_usage' && <FacilityUsagePage />}
-            {currentView === 'mapping_rules' && <MappingRulesConfig />}
-            {currentView === 'developer' && <DeveloperPortal />}
-            
-            {currentView === 'claims' && <ClaimsQueuePage />}
-            {currentView === 'settings' && <SettingsPage />}
-            {currentView === 'eligibility' && <EligibilityPage />}
-            {currentView === 'prior-auth' && <PriorAuthPage />}
-            {currentView === 'claim-builder' && <ClaimBuilderPage />}
-            {currentView === 'code-browser' && <SBSCodeBrowser />}
-            {currentView === 'unified-browser' && <UnifiedCodeBrowser />}
-            {(currentView === 'ai-copilot' || currentView === 'claim-optimizer') && <AIHubPage />}
-            {currentView === 'predictive-analytics' && <PredictiveAnalyticsPage />}
-            {currentView === 'ai-analytics' && <AIAnalyticsHub />}
-            {currentView === 'iot-dashboard' && <IoTDashboardPage />}
+          <Suspense fallback={<PageLoader lang={lang} />}>
+            {normalizedView === 'dashboard' && <DashboardPage />}
+            {normalizedView === 'mappings' && <MappingsPage />}
+            {normalizedView === 'review' && <MappingReviewPage />}
+            {normalizedView === 'error' && <ErrorDetailPage />}
+            {normalizedView === 'facility_performance' && <FacilityPerformanceReport />}
+            {normalizedView === 'facility_usage' && <FacilityUsagePage />}
+            {normalizedView === 'mapping_rules' && <MappingRulesConfig />}
+            {normalizedView === 'developer' && <DeveloperPortal />}
+            {normalizedView === 'claims' && <ClaimsQueuePage />}
+            {normalizedView === 'settings' && <SettingsPage />}
+            {normalizedView === 'eligibility' && <EligibilityPage />}
+            {normalizedView === 'prior-auth' && <PriorAuthPage />}
+            {normalizedView === 'claim-builder' && <ClaimBuilderPage />}
+            {normalizedView === 'code-browser' && <SBSCodeBrowser />}
+            {normalizedView === 'unified-browser' && <UnifiedCodeBrowser />}
+            {normalizedView === 'ai-hub' && <AIHubPage />}
+            {normalizedView === 'predictive-analytics' && <PredictiveAnalyticsPage />}
+            {normalizedView === 'ai-analytics' && <AIAnalyticsHub />}
+            {normalizedView === 'iot-dashboard' && <IoTDashboardPage />}
           </Suspense>
         </main>
       </div>
 
-      {/* AI Copilot */}
-      <AICopilot 
-        isOpen={copilotOpen} 
+      <AICopilot
+        isOpen={copilotOpen}
         onClose={() => setCopilotOpen(false)}
-        context={{ currentPage: currentView }}
+        lang={lang}
+        context={{ currentPage: normalizedView, lang }}
       />
-      
-      {/* AI Copilot FAB */}
-      {!copilotOpen && (
-        <AICopilotFAB onClick={() => setCopilotOpen(true)} />
-      )}
+
+      {!copilotOpen && <AICopilotFAB onClick={() => setCopilotOpen(true)} />}
     </div>
   );
 }

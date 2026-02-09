@@ -42,33 +42,34 @@ const AI_FEATURES = [
 export function AIHubPage() {
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [analyzerOpen, setAnalyzerOpen] = useState(false);
+  const appLang = typeof document !== 'undefined' && document.documentElement.lang === 'ar' ? 'ar' : 'en';
 
   return (
     <div className="flex-1 overflow-y-auto bg-grid scrollbar-hide">
       <main className="max-w-[1400px] mx-auto p-6 sm:p-8 space-y-12 stagger-children">
         
         {/* Cinematic Hero */}
-        <section className="relative overflow-hidden rounded-[40px] bg-slate-900 text-white p-8 sm:p-12 animate-premium-in shadow-2xl">
-           <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 via-transparent to-indigo-900/40"></div>
+        <section className="relative overflow-hidden rounded-[40px] bg-gradient-to-br from-white via-blue-50 to-cyan-50 text-slate-900 p-8 sm:p-12 animate-premium-in shadow-xl border border-slate-200/70">
+           <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-transparent to-cyan-500/10"></div>
            <div className="absolute top-0 right-0 w-1/2 h-full opacity-20 pointer-events-none">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-500 via-transparent to-transparent blur-3xl"></div>
            </div>
 
            <div className="relative flex flex-col lg:flex-row items-center gap-12">
               <div className="flex-1 space-y-8 text-center lg:text-left">
-                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600/10 border border-blue-600/30 text-blue-400">
+                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600/10 border border-blue-600/30 text-blue-700">
                     <span className="material-symbols-outlined text-sm font-black animate-pulse">auto_awesome</span>
                     <span className="text-[10px] font-black uppercase tracking-widest">Next-Gen Integration Intelligence</span>
                  </div>
                  
                  <h1 className="text-5xl sm:text-7xl font-black tracking-tighter leading-none">
                     The Pulse of <br/>
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">Autonomous Billing</span>
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600">Autonomous Billing</span>
                  </h1>
 
-                 <p className="text-lg font-bold text-slate-400 max-w-xl leading-relaxed">
+                 <p className="text-lg font-bold text-slate-600 max-w-xl leading-relaxed">
                     Leverage specialized neural agents trained specifically on the Saudi SBS and NPHIES ecosystems. 
-                    Guaranteed <span className="text-white">99.8% normalization accuracy</span> for enterprise health systems.
+                    Guaranteed <span className="text-slate-900">99.8% normalization accuracy</span> for enterprise health systems.
                  </p>
 
                  <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
@@ -78,9 +79,9 @@ export function AIHubPage() {
               </div>
 
               <div className="hidden lg:block relative group">
-                 <div className="absolute inset-0 bg-blue-600 blur-3xl opacity-20 group-hover:opacity-40 transition-opacity"></div>
-                 <div className="size-64 rounded-[48px] glass-panel border border-white/10 flex items-center justify-center animate-float shadow-2xl">
-                    <span className="material-symbols-outlined text-9xl text-white opacity-80 group-hover:scale-110 transition-transform duration-500">smart_toy</span>
+                 <div className="absolute inset-0 bg-blue-600 blur-3xl opacity-10 group-hover:opacity-20 transition-opacity"></div>
+                 <div className="size-64 rounded-[48px] bg-white/80 border border-blue-100 flex items-center justify-center animate-float shadow-2xl">
+                    <span className="material-symbols-outlined text-9xl text-blue-600 opacity-80 group-hover:scale-110 transition-transform duration-500">smart_toy</span>
                  </div>
               </div>
            </div>
@@ -110,7 +111,7 @@ export function AIHubPage() {
 
       </main>
 
-      <AICopilot isOpen={copilotOpen} onClose={() => setCopilotOpen(false)} />
+      <AICopilot isOpen={copilotOpen} onClose={() => setCopilotOpen(false)} lang={appLang} />
       <SmartClaimAnalyzer 
         isOpen={analyzerOpen} 
         onClose={() => setAnalyzerOpen(false)} 

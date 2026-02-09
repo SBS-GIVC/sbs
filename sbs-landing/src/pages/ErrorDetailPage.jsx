@@ -2,12 +2,15 @@ import React from 'react';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { Button } from '../components/ui/Button';
+import { useToast } from '../components/Toast';
 
 /**
  * Premium Error Detail Page
  * Optimized for GIVC-SBS Ultra-Premium Design System
  */
 export function ErrorDetailPage() {
+  const toast = useToast();
+
   return (
     <div className="flex-1 overflow-y-auto bg-grid scrollbar-hide">
       <main className="max-w-[1400px] mx-auto p-6 sm:p-12 space-y-12 stagger-children">
@@ -27,8 +30,16 @@ export function ErrorDetailPage() {
                  </div>
               </div>
               <div className="flex gap-3">
-                 <Button variant="secondary" icon="history">Event Log</Button>
-                 <Button className="bg-rose-500 hover:bg-rose-600 shadow-xl shadow-rose-500/20" icon="block">Void Payload</Button>
+                 <Button variant="secondary" icon="history" onClick={() => toast.info('Loading event timeline')}>
+                   Event Log
+                 </Button>
+                 <Button
+                   className="bg-rose-500 hover:bg-rose-600 shadow-xl shadow-rose-500/20"
+                   icon="block"
+                   onClick={() => toast.warning('Payload marked for cancellation review')}
+                 >
+                   Void Payload
+                 </Button>
               </div>
            </div>
         </section>
@@ -55,7 +66,12 @@ export function ErrorDetailPage() {
                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Payload Insight</p>
                        <div className="bg-slate-950 rounded-[32px] p-8 font-mono text-xs text-blue-400 border border-white/5 relative group">
                           <div className="absolute right-6 top-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                             <Button variant="secondary" size="sm" icon="content_copy">Copy JSON</Button>
+                             <Button variant="secondary" size="sm" icon="content_copy" onClick={() => {
+                               navigator.clipboard.writeText('{"resourceType":"Claim","id":"CLM-88291","error":"MISSING_DIAGNOSIS"}');
+                               toast.success('JSON payload copied');
+                             }}>
+                               Copy JSON
+                             </Button>
                           </div>
                           <pre className="space-y-1">
                              <code className="text-slate-500">"procedure": [</code>{"\n"}
@@ -82,13 +98,19 @@ export function ErrorDetailPage() {
                                    placeholder="Try M17.0 (Primary gonarthrosis)..." 
                                 />
                                 <div className="absolute right-2 top-1.5 flex gap-1">
-                                   <Button variant="secondary" size="sm" className="h-9 px-4 text-[9px] font-black uppercase">Dictionary Map</Button>
+                                   <Button variant="secondary" size="sm" className="h-9 px-4 text-[9px] font-black uppercase" onClick={() => window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: 'code-browser' } }))}>
+                                     Dictionary Map
+                                   </Button>
                                 </div>
                              </div>
                           </div>
                           <div className="flex justify-end gap-3">
-                             <Button variant="secondary" className="px-8">Discard Change</Button>
-                             <Button className="px-10 shadow-xl shadow-blue-600/20" icon="save_as">Relay & Re-validate</Button>
+                             <Button variant="secondary" className="px-8" onClick={() => toast.info('Pending diagnosis edit discarded')}>
+                               Discard Change
+                             </Button>
+                             <Button className="px-10 shadow-xl shadow-blue-600/20" icon="save_as" onClick={() => toast.success('Payload relayed for re-validation')}>
+                               Relay & Re-validate
+                             </Button>
                           </div>
                        </div>
                     </div>
@@ -132,7 +154,28 @@ export function ErrorDetailPage() {
 }`}
                        </pre>
                     </div>
-                    <Button variant="secondary" className="w-full mt-6 border-white/5 hover:bg-white/5 text-[10px] font-black uppercase tracking-widest" icon="download">Download Raw JSON</Button>
+                    <Button
+                      variant="secondary"
+                      className="w-full mt-6 border-white/5 hover:bg-white/5 text-[10px] font-black uppercase tracking-widest"
+                      icon="download"
+                      onClick={() => {
+                        const blob = new Blob(
+                          ['{\n  "resourceType": "Claim",\n  "id": "CLM-88291",\n  "error": "MISSING_DIAGNOSIS"\n}'],
+                          { type: 'application/json;charset=utf-8;' }
+                        );
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = 'claim-error-CLM-88291.json';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                        toast.success('Raw JSON downloaded');
+                      }}
+                    >
+                      Download Raw JSON
+                    </Button>
                  </CardBody>
               </Card>
            </div>

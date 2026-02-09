@@ -3,7 +3,7 @@ export const i18n = {
   en: {
     title: "GIVC-SBS",
     tagline: "Global Integrated Virtual Care · Saudi Billing System",
-    subtitle: "Powered by BrainSAIT برينسايت · Dr. Mohamed El Fadil",
+    subtitle: "Powered by BrainSAITبرينسايت · Auth: Dr. Mohamed El Fadil",
     clinician: "Clinician",
     coder: "Medical Coder",
     validator: "Origin Validator",
@@ -32,7 +32,39 @@ export const i18n = {
     errorPipeline: "System Error: Pipeline execution interrupted.",
     waitingData: "Awaiting ambient dialogue input...",
     processEncounter: "Finalize doctor encounter to trigger coding pipeline.",
-    poweredBy: "Powered by BrainSAIT برينسايت · Dr. Mohamed El Fadil"
+    poweredBy: "Powered by BrainSAITبرينسايت · Auth: Dr. Mohamed El Fadil",
+    ui: {
+      language: "العربية",
+      searchPlaceholder: "Search claims, codes, and insights...",
+      notifications: "Notifications",
+      copilot: "AI Copilot",
+      profile: "Profile"
+    },
+    nav: {
+      sections: {
+        nphies: "NPHIES Integration",
+        code: "Code Management",
+        ai: "AI Tools",
+        system: "System"
+      },
+      items: {
+        dashboard: "Dashboard",
+        eligibility: "Eligibility",
+        priorAuth: "Prior Auth",
+        claimBuilder: "Claim Builder",
+        claims: "Claims Queue",
+        codeBrowser: "SBS Code Browser",
+        unifiedBrowser: "Unified Browser",
+        mappings: "Mappings",
+        rulesEngine: "Rules Engine",
+        aiHub: "AI Hub",
+        analyticsHub: "Analytics Hub",
+        predictiveAnalytics: "Predictive Analytics",
+        iotDashboard: "IoT Dashboard",
+        developerPortal: "Developer Portal",
+        settings: "Settings"
+      }
+    }
   },
   ar: {
     title: "GIVC-SBS",
@@ -66,6 +98,38 @@ export const i18n = {
     errorPipeline: "خطأ في النظام: تعذر إكمال المعالجة.",
     waitingData: "في انتظار الحوار السريري...",
     processEncounter: "قم بإنهاء معاينة الطبيب لبدء عملية الترميز.",
-    poweredBy: "Powered by BrainSAIT برينسايت · Dr. Mohamed El Fadil"
+    poweredBy: "Powered by BrainSAITبرينسايت · Auth: Dr. Mohamed El Fadil",
+    ui: {
+      language: "English",
+      searchPlaceholder: "ابحث في المطالبات والأكواد والتحليلات...",
+      notifications: "الإشعارات",
+      copilot: "المساعد الذكي",
+      profile: "الملف الشخصي"
+    },
+    nav: {
+      sections: {
+        nphies: "تكامل نفيس",
+        code: "إدارة الأكواد",
+        ai: "أدوات الذكاء الاصطناعي",
+        system: "النظام"
+      },
+      items: {
+        dashboard: "لوحة التحكم",
+        eligibility: "الاستحقاق",
+        priorAuth: "الموافقة المسبقة",
+        claimBuilder: "منشئ المطالبة",
+        claims: "قائمة المطالبات",
+        codeBrowser: "متصفح أكواد SBS",
+        unifiedBrowser: "المتصفح الموحد",
+        mappings: "الربط",
+        rulesEngine: "محرك القواعد",
+        aiHub: "مركز الذكاء",
+        analyticsHub: "مركز التحليلات",
+        predictiveAnalytics: "التحليلات التنبؤية",
+        iotDashboard: "لوحة إنترنت الأشياء",
+        developerPortal: "بوابة المطور",
+        settings: "الإعدادات"
+      }
+    }
   }
 };

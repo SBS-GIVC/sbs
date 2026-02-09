@@ -3,12 +3,20 @@ import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { useToast } from '../components/Toast';
 
 /**
  * Premium Facility Usage & Quota Management
  * Optimized for GIVC-SBS Ultra-Premium Design System
  */
 export function FacilityUsagePage() {
+  const toast = useToast();
+
+  const openView = (view, message) => {
+    toast.info(message);
+    window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view } }));
+  };
+
   return (
     <div className="flex-1 overflow-y-auto bg-grid scrollbar-hide">
       <main className="max-w-[1400px] mx-auto p-6 sm:p-8 space-y-8 stagger-children">
@@ -22,8 +30,12 @@ export function FacilityUsagePage() {
                 badge="Operational Governance"
               />
               <div className="flex gap-3">
-                 <Button variant="secondary" icon="analytics">Usage Report</Button>
-                 <Button icon="add_location">Provision Node</Button>
+                 <Button variant="secondary" icon="analytics" onClick={() => openView('facility_performance', 'Opening usage performance report')}>
+                   Usage Report
+                 </Button>
+                 <Button icon="add_location" onClick={() => openView('settings', 'Provisioning workflow opened in settings')}>
+                   Provision Node
+                 </Button>
               </div>
            </div>
 
@@ -44,8 +56,12 @@ export function FacilityUsagePage() {
                        <Input icon="search" placeholder="Filter nodes by identifier or facility name..." />
                     </div>
                     <div className="flex gap-2">
-                       <Button variant="secondary" icon="tune">Governance</Button>
-                       <Button variant="secondary" icon="sort">Priority Sort</Button>
+                       <Button variant="secondary" icon="tune" onClick={() => openView('mapping_rules', 'Opening governance rules')}>
+                         Governance
+                       </Button>
+                       <Button variant="secondary" icon="sort" onClick={() => toast.success('Facilities sorted by utilization')}>
+                         Priority Sort
+                       </Button>
                     </div>
                  </CardBody>
               </Card>
@@ -82,7 +98,12 @@ export function FacilityUsagePage() {
                        <textarea className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-600/20" rows="3" placeholder="admin@health.sa, ops@relay.sa" />
                     </div>
 
-                    <Button className="w-full py-4 rounded-2xl shadow-xl shadow-blue-600/10">Apply Global Rule</Button>
+                    <Button
+                      className="w-full py-4 rounded-2xl shadow-xl shadow-blue-600/10"
+                      onClick={() => toast.success('Global usage governance rule applied')}
+                    >
+                      Apply Global Rule
+                    </Button>
                  </CardBody>
               </Card>
            </div>

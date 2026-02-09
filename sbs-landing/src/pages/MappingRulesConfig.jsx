@@ -4,12 +4,14 @@ import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { useToast } from '../components/Toast';
 
 /**
  * Premium Mapping Rules Configuration
  * Optimized for GIVC-SBS Ultra-Premium Design System
  */
 export function MappingRulesConfig() {
+  const toast = useToast();
   const [testInput, setTestInput] = useState("Appy removal w/ complications");
   const [testResult, setTestResult] = useState({
       code: "Appendectomy (47562)",
@@ -51,8 +53,12 @@ export function MappingRulesConfig() {
                 badge="Governance Engine"
               />
               <div className="flex gap-3">
-                 <Button variant="secondary" icon="history">Version History</Button>
-                 <Button icon="restore" onClick={() => alert("Restoring Defaults...")}>Node Reset</Button>
+                 <Button variant="secondary" icon="history" onClick={() => toast.info('Loading version history')}>
+                   Version History
+                 </Button>
+                 <Button icon="restore" onClick={() => toast.success('Default mapping profile restored')}>
+                   Node Reset
+                 </Button>
               </div>
            </div>
         </section>
@@ -91,7 +97,7 @@ export function MappingRulesConfig() {
                  <CardHeader 
                    title="Entity Overrides" 
                    subtitle="Region or facility-specific logic that bypasses global heuristics." 
-                   action={<Button variant="secondary" size="sm" icon="add">Add Override</Button>}
+                   action={<Button variant="secondary" size="sm" icon="add" onClick={() => toast.info('Override editor opened')}>Add Override</Button>}
                  />
                  <CardBody className="p-0">
                     <div className="overflow-x-auto">

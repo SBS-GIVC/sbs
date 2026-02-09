@@ -50,6 +50,10 @@ export function SBSCodeBrowser() {
     return () => clearTimeout(timer);
   }, [searchQuery, selectedCategory, allCodes]);
 
+  useEffect(() => {
+    setDisplayLimit(100);
+  }, [searchQuery, selectedCategory]);
+
   const displayedCodes = useMemo(() => searchResults.results.slice(0, displayLimit), [searchResults, displayLimit]);
 
   const handleScroll = (e) => {
@@ -60,8 +64,10 @@ export function SBSCodeBrowser() {
   };
 
   const copyCode = (code) => {
-    navigator.clipboard.writeText(code);
-    toast.success(`Code ${code} synchronized to clipboard`);
+    navigator.clipboard
+      .writeText(code)
+      .then(() => toast.success(`Code ${code} synchronized to clipboard`))
+      .catch(() => toast.error('Clipboard access denied by browser'));
   };
 
   return (
@@ -182,7 +188,22 @@ export function SBSCodeBrowser() {
               </div>
 
               <div className="space-y-4 pt-4">
-                 <Button className="w-full py-6 text-sm shadow-xl shadow-blue-600/20" icon="add_box" onClick={() => toast.success('Agent assigned code to claim')}>Enroll in Workspace</Button>
+                 <Button
+                   className="w-full py-6 text-sm shadow-xl shadow-blue-600/20"
+                   icon="add_box"
+                   onClick={() => {
+                     const context = {
+                       code: selectedCode.code,
+                       description: selectedCode.desc,
+                       category: selectedCode.category || null
+                     };
+                     window.localStorage.setItem('sbs_claim_context_code', JSON.stringify(context));
+                     toast.success('Code context assigned to claim builder');
+                     window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: 'claim-builder' } }));
+                   }}
+                 >
+                   Enroll in Workspace
+                 </Button>
                  <Button variant="secondary" className="w-full py-6 text-sm" icon="content_copy" onClick={() => copyCode(selectedCode.code)}>Copy Entity ID</Button>
               </div>
            </div>

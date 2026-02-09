@@ -220,7 +220,15 @@ export function EligibilityPage() {
                 <ActionCard icon="add_box" label="Create Claim" sub="Use current eligibility" onClick={() => window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: 'claim-builder' } }))} />
                 <ActionCard icon="approval" label="Request Auth" sub="Pre-approval portal" onClick={() => window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: 'prior-auth' } }))} />
                 <ActionCard icon="print" label="Print Summary" sub="Generate PDF export" onClick={() => window.print()} />
-                <ActionCard icon="history" label="Verify History" sub="Audit older sessions" onClick={() => {}} />
+                <ActionCard
+                  icon="history"
+                  label="Verify History"
+                  sub="Audit older sessions"
+                  onClick={() => {
+                    toast.info('Opening historical eligibility sessions');
+                    window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: 'claims' } }));
+                  }}
+                />
               </div>
             </div>
           ) : !loading && (

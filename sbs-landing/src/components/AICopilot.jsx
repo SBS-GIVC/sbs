@@ -16,18 +16,34 @@ How may I assist with your clinical workflow or SBS registry today?`,
     placeholder: 'Execute neural query...',
     thinking: 'Synthesizing clinical vectors...',
     footer: 'SBS V3.1 Neural Layer • Autonomous'
+  },
+  ar: {
+    greeting: `👋 **تم تفعيل البروتوكول.** أنا **مساعد GIVC-SBS الذكي**.
+
+كيف يمكنني مساعدتك في سير العمل السريري أو أكواد SBS اليوم؟`,
+    placeholder: 'اكتب استفسارك الذكي...',
+    thinking: 'جاري تحليل المتجهات السريرية...',
+    footer: 'طبقة SBS V3.1 الذكية • تشغيل ذاتي'
   }
 };
 
-export function AICopilot({ isOpen, onClose, context = {} }) {
+export function AICopilot({ isOpen, onClose, context = {}, lang = 'en' }) {
+  const copy = LOCALE_TEXT[lang] || LOCALE_TEXT.en;
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: LOCALE_TEXT.en.greeting, timestamp: new Date() }
+    { role: 'assistant', content: copy.greeting, timestamp: new Date() }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
-  const copy = LOCALE_TEXT.en;
+  useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length === 1 && prev[0].role === 'assistant') {
+        return [{ ...prev[0], content: copy.greeting }];
+      }
+      return prev;
+    });
+  }, [copy.greeting]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
