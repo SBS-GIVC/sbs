@@ -106,6 +106,35 @@ function isTerminalStatus(status) {
   return TERMINAL_STATUSES.has(String(status || '').toLowerCase());
 }
 
+function normalizeWorkflowStatus(rawStatus) {
+  const value = String(rawStatus || '').trim().toLowerCase();
+  if (!value) return 'processing';
+
+  if (['submitted_successfully', 'submitted-successfully', 'submission_success'].includes(value)) return 'submitted';
+  if (['accepted', 'success', 'ok'].includes(value)) return 'completed';
+  if (['error', 'failed', 'failure', 'rejected', 'denied'].includes(value)) return 'failed';
+  if (['in_progress', 'in-progress', 'pending'].includes(value)) return 'processing';
+
+  return value;
+}
+
+function isEnvEnabled(value, defaultValue = false) {
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (!raw) return defaultValue;
+  return ['1', 'true', 'yes', 'on'].includes(raw);
+}
+
+function shouldAllowUnsignedSubmissions() {
+  if (String(process.env.ALLOW_UNSIGNED_SUBMISSIONS ?? '').trim()) {
+    return isEnvEnabled(process.env.ALLOW_UNSIGNED_SUBMISSIONS, false);
+  }
+  const nphiesEnv = String(process.env.NPHIES_ENV || 'sandbox').trim().toLowerCase();
+  if (nphiesEnv === 'sandbox') {
+    return isEnvEnabled(process.env.ALLOW_UNSIGNED_IN_SANDBOX, true);
+  }
+  return false;
+}
+
 function clamp01(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 0;
@@ -244,6 +273,27 @@ function parseBoundedInt(value, fallback, min, max) {
   if (!Number.isFinite(n)) return fallback;
   return Math.max(min, Math.min(max, n));
 }
+
+function parseFacilityId(value, fallback = 1) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return fallback;
+
+  const direct = Number.parseInt(raw, 10);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+
+  const digits = raw.match(/\d{1,10}/);
+  if (digits) {
+    const parsed = Number.parseInt(digits[0], 10);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  return fallback;
+}
+
+const DEFAULT_FACILITY_ID = parseFacilityId(
+  process.env.DEFAULT_FACILITY_ID || process.env.PROVIDER_CHI_ID || 1,
+  1
+);
 
 function toPublicSbsCode(entry) {
   return {
@@ -1248,7 +1298,7 @@ app.get('/sbs/*', (req, res) => {
 });
 
 // Backwards-compatible aliases (older docs/scripts)
-app.get(['/ai-analytics', '/ai-hub'], (req, res) => res.redirect(302, '/sbs/'));
+app.get(['/ai-analytics', '/ai-hub'], (req, res) => res.redirect(302, '/sbs/ai-analytics'));
 app.get('/dashboard.html', (req, res) => res.redirect(302, '/sbs/dashboard.html'));
 app.get('/tracking.html', (req, res) => {
   const claimId = req.query?.claimId ? `?claimId=${encodeURIComponent(req.query.claimId)}` : '';
@@ -1341,7 +1391,7 @@ app.get('/api/sbs/codes', async (req, res) => {
       });
     }
 
-    const query = String(req.query.q || '').trim();
+    const query = String(req.query.q || req.query.search || req.query.query || '').trim();
     const limit = parseBoundedInt(req.query.limit, 50, 1, SBS_MAX_LIMIT);
     const offset = parseBoundedInt(req.query.offset, 0, 0, 500000);
     const result = searchSbsCatalog(catalog, query, { limit, offset });
@@ -1978,27 +2028,34 @@ app.get('/api/claims/:claimId/analyzer', (req, res) => {
   const slaRisk = Math.max(0, Math.min(1, 0.2 + pendingStages * 0.08 + failedStages * 0.12));
 
   const score100 = Math.round(((dataCompleteness + codeMapping + eligibility + fraudSignals + slaRisk) / 5) * 100);
+  const risk = {
+    score100,
+    level: score100 >= 80 ? 'low' : (score100 >= 60 ? 'medium' : 'high'),
+    subscores: {
+      dataCompleteness,
+      codeMapping,
+      eligibility,
+      fraudSignals,
+      slaRisk
+    }
+  };
+  const recommendations = [
+    status === 'failed'
+      ? 'Review signing and NPHIES submission configuration before retrying.'
+      : 'Monitor pending stages and retry only if terminal failure occurs.'
+  ];
 
   res.json({
     success: true,
     claimId,
     generatedAt: new Date().toISOString(),
-    risk: {
-      score100,
-      level: score100 >= 80 ? 'low' : (score100 >= 60 ? 'medium' : 'high'),
-      subscores: {
-        dataCompleteness,
-        codeMapping,
-        eligibility,
-        fraudSignals,
-        slaRisk
-      }
-    },
-    recommendations: [
-      status === 'failed'
-        ? 'Review signing and NPHIES submission configuration before retrying.'
-        : 'Monitor pending stages and retry only if terminal failure occurs.'
-    ]
+    risk,
+    recommendations,
+    // Backward compatibility for older frontend payload contract.
+    analysis: {
+      risk,
+      recommendations
+    }
   });
 });
 
@@ -2150,11 +2207,16 @@ app.post('/api/eligibility', handleEligibilityCheck);
 
 const handlePriorAuthSubmit = (req, res) => {
   const body = req.body || {};
+  const firstItem = Array.isArray(body.items) ? body.items[0] : null;
+  const firstProcedureCode = Array.isArray(body.procedureCodes) && body.procedureCodes.length
+    ? body.procedureCodes[0]
+    : (Array.isArray(body.procedure_codes) && body.procedure_codes.length ? body.procedure_codes[0] : undefined);
   const memberId = String(
     body.memberId ||
     body.member_id ||
     body.patientId ||
     body.patient_id ||
+    body.patient?.memberId ||
     body.nationalId ||
     body.national_id ||
     ''
@@ -2166,6 +2228,12 @@ const handlePriorAuthSubmit = (req, res) => {
     body.service_code ||
     body.sbsCode ||
     body.sbs_code ||
+    body.procedure ||
+    firstProcedureCode ||
+    firstItem?.code ||
+    firstItem?.serviceCode ||
+    firstItem?.service_code ||
+    firstItem?.sbsCode ||
     ''
   ).trim();
 
@@ -2373,6 +2441,8 @@ app.post('/api/ai/analyze', (req, res) => {
   else if (savingsPct > 0.1) overallStatus = 'OPTIMIZATION_AVAILABLE';
 
   return res.json({
+    success: true,
+    source: 'sbs-landing-ai-analyzer',
     overall_status: overallStatus,
     overall_risk_score: overallRiskScore,
     prediction: {
@@ -2617,12 +2687,16 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
     const claimType = body.claimType || body.claim_type;
     const userEmail = body.userEmail || body.email;
 
-    const facility_id = body.facility_id || body.facilityId || body.facilityID;
+    const facility_id = parseFacilityId(
+      body.facility_id || body.facilityId || body.facilityID || body.patient?.facilityId,
+      DEFAULT_FACILITY_ID
+    );
     const service_code =
       body.service_code ||
       body.serviceCode ||
       body.procedureCode ||
       body.procedure_code ||
+      body.procedure ||
       firstProcedureCode ||
       firstItem?.service_code ||
       firstItem?.sbsCode;
@@ -2635,6 +2709,7 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       body.serviceCode ||
       body.procedureCode ||
       body.procedure_code ||
+      body.procedure ||
       firstProcedureCode ||
       firstItem?.internal_code ||
       firstItem?.internalCode ||
@@ -2776,6 +2851,25 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       n8nResponse = { success: false, claimId, submissionId: null, trackingUrl: null, status: 'failed' };
     }
 
+    if (isEnvEnabled(process.env.ENABLE_DIRECT_SBS_ON_FAILURE, false) && normalizeWorkflowStatus(n8nResponse?.status) === 'failed') {
+      try {
+        const directFallback = await triggerDirectSBS({ ...claimData, claimId });
+        if (normalizeWorkflowStatus(directFallback?.status) !== 'failed') {
+          n8nResponse = {
+            ...directFallback,
+            fallbackMode: 'direct-sbs'
+          };
+        } else {
+          n8nResponse = {
+            ...n8nResponse,
+            directFallback
+          };
+        }
+      } catch (fallbackError) {
+        console.warn('⚠️ direct SBS fallback on failed n8n response did not recover flow:', fallbackError.message);
+      }
+    }
+
     // Cleanup uploaded file after processing
     if (req.file) {
       setTimeout(async () => {
@@ -2790,7 +2884,9 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
 
     {
       const current = claimStore.get(claimId);
-      const successStatus = n8nResponse?.status || 'processing';
+      const successStatus = normalizeWorkflowStatus(n8nResponse?.status);
+      const isFailed = successStatus === 'failed';
+      const isSuccessful = isSuccessfulStatus(successStatus);
 
       claimStore.set(claimId, {
         ...current,
@@ -2800,18 +2896,25 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
         lastUpdate: new Date().toISOString(),
         stages: {
           received: 'completed',
-          validation: successStatus === 'failed' ? 'failed' : 'completed',
-          normalization: successStatus === 'failed' ? 'pending' : 'completed',
-          financialRules: successStatus === 'failed' ? 'pending' : 'completed',
-          signing: successStatus === 'failed' ? 'pending' : 'completed',
-          nphiesSubmission: successStatus === 'failed' ? 'failed' : (successStatus === 'completed' ? 'completed' : 'in_progress')
+          validation: isFailed ? 'failed' : 'completed',
+          normalization: isFailed ? 'pending' : 'completed',
+          financialRules: isFailed ? 'pending' : 'completed',
+          signing: isFailed ? 'pending' : 'completed',
+          nphiesSubmission: isFailed ? 'failed' : (isSuccessful ? 'completed' : 'in_progress')
         }
       });
+
+      n8nResponse = {
+        ...n8nResponse,
+        status: successStatus
+      };
     }
 
     res.json({
       success: true,
-      message: 'Claim submitted successfully',
+      message: n8nResponse?.status === 'failed'
+        ? 'Claim processed with downstream failure'
+        : 'Claim submitted successfully',
       claimId,
       submissionId: n8nResponse?.submissionId,
       trackingUrl: n8nResponse?.trackingUrl,
@@ -2858,6 +2961,7 @@ async function triggerN8nWorkflow(claimData) {
     // n8n webhook URL - Update this with your actual webhook URL
     const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL ||
       'https://n8n.brainsait.cloud/webhook/sbs-claim-submission';
+    const N8N_WEBHOOK_TIMEOUT_MS = Math.max(3000, Number(process.env.N8N_WEBHOOK_TIMEOUT_MS || 10000));
 
     console.log('🚀 Triggering n8n workflow...');
 
@@ -2867,7 +2971,7 @@ async function triggerN8nWorkflow(claimData) {
         'User-Agent': 'SBS-Landing-API/1.0',
         ...(process.env.SBS_API_KEY ? { 'X-API-Key': process.env.SBS_API_KEY } : {})
       },
-      timeout: 30000 // 30 second timeout
+      timeout: N8N_WEBHOOK_TIMEOUT_MS
     };
     const isHttpsWebhook = /^https:\/\//i.test(N8N_WEBHOOK_URL);
     const allowSelfSigned = process.env.N8N_ALLOW_SELF_SIGNED !== 'false';
@@ -2942,11 +3046,15 @@ async function triggerAutomationWorkflow(payload) {
 async function triggerDirectSBS(claimData) {
   try {
     console.log('🔄 Fallback: Calling SBS services directly...');
+    const nphiesBridgeTimeoutMs = Math.max(3000, Number(process.env.NPHIES_BRIDGE_TIMEOUT_MS || 12000));
 
     // Expect either a JSON body (direct API use) or multipart/form-data fields (web form).
     // Supported JSON input (recommended): { facility_id, internal_code, description, quantity, unit_price, patientId }
     const raw = claimData || {};
-    const facility_id = Number(raw.facility_id || 1);
+    const facility_id = parseFacilityId(
+      raw.facility_id || raw.facilityId || raw.facilityID || raw.facility,
+      DEFAULT_FACILITY_ID
+    );
     const firstProcedureCode = Array.isArray(raw.procedureCodes) && raw.procedureCodes.length
       ? raw.procedureCodes[0]
       : (Array.isArray(raw.procedure_codes) && raw.procedure_codes.length ? raw.procedure_codes[0] : undefined);
@@ -2958,6 +3066,7 @@ async function triggerDirectSBS(claimData) {
       raw.serviceCode ||
       raw.procedureCode ||
       raw.procedure_code ||
+      raw.procedure ||
       firstProcedureCode ||
       firstItem?.internal_code ||
       firstItem?.internalCode ||
@@ -2965,7 +3074,7 @@ async function triggerDirectSBS(claimData) {
       firstItem?.sbsCode;
     const description = raw.description || raw.service_desc || raw.serviceDesc || raw.patient?.name || 'Claim submission';
     const quantity = Number(raw.quantity || 1);
-    const unit_price = Number(raw.unit_price || raw.unitPrice || 0);
+    const unit_price = Number(raw.unit_price || raw.unitPrice || raw.amount || 0);
     const patientId = raw.patientId || raw.patient?.id || 'Patient/TEST';
 
     if (!internal_code) {
@@ -3031,19 +3140,39 @@ async function triggerDirectSBS(claimData) {
 
     const rulesResponse = await axios.post((process.env.FINANCIAL_RULES_URL || 'http://localhost:8002') + '/validate', claim);
 
-    // Step 3: Sign
-    const signResponse = await axios.post((process.env.SIGNER_URL || 'http://localhost:8001') + '/sign', {
-      facility_id,
-      payload: rulesResponse.data
-    });
+    // Step 3: Sign (or continue unsigned fallback when explicitly allowed)
+    let signature = '';
+    let signingMode = 'signed';
+    try {
+      const signResponse = await axios.post((process.env.SIGNER_URL || 'http://localhost:8001') + '/sign', {
+        facility_id,
+        payload: rulesResponse.data
+      });
+      signature = String(signResponse.data?.signature || '').trim();
+      if (!signature) {
+        throw new Error('Signer returned empty signature');
+      }
+    } catch (signError) {
+      if (!shouldAllowUnsignedSubmissions()) {
+        throw signError;
+      }
+      signingMode = 'unsigned_fallback';
+      console.warn(`⚠️ Signer unavailable; continuing with unsigned submission fallback: ${extractErrorMessage(signError, 'Signing failed')}`);
+    }
 
     // Step 4: Submit to NPHIES Bridge (will return rejected/error if NPHIES_API_KEY not set)
-    const nphiesResponse = await axios.post((process.env.NPHIES_BRIDGE_URL || 'http://localhost:8003') + '/submit-claim', {
-      facility_id,
-      fhir_payload: rulesResponse.data,
-      signature: signResponse.data?.signature,
-      resource_type: 'Claim'
-    });
+    const nphiesResponse = await axios.post(
+      (process.env.NPHIES_BRIDGE_URL || 'http://localhost:8003') + '/submit-claim',
+      {
+        facility_id,
+        fhir_payload: rulesResponse.data,
+        signature,
+        resource_type: 'Claim'
+      },
+      {
+        timeout: nphiesBridgeTimeoutMs
+      }
+    );
 
     return {
       success: true,
@@ -3051,6 +3180,7 @@ async function triggerDirectSBS(claimData) {
       submissionId: nphiesResponse.data?.transaction_uuid,
       status: nphiesResponse.data?.status || 'submitted',
       trackingUrl: null,
+      signingMode,
       normalization: {
         internal_code,
         sbs_mapped_code: sbsCode,
@@ -3090,6 +3220,8 @@ app.get('/api/claim-status/:claimId', async (req, res) => {
     const isComplete = isTerminalStatus(status);
     const isSuccess = isSuccessfulStatus(status);
 
+    const stagesObject = buildStagesObject(stages);
+
     res.json({
       success: true,
       claimId: record.claimId,
@@ -3097,7 +3229,8 @@ app.get('/api/claim-status/:claimId', async (req, res) => {
       statusLabel: statusLabel(status),
       isComplete,
       isSuccess,
-      stages: buildStagesObject(stages),
+      stages: stagesObject,
+      workflowStages: stagesObject,
       progress,
       timestamps: {
         created: record.createdAt,

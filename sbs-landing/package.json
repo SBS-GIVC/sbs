@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "start": "node server.cjs",
     "server": "node server.cjs",
+    "nphies:scan": "node scripts/nphies-portal-scan.mjs",
     "test": "echo \"No tests configured yet\" && exit 0"
   },
   "keywords": [],
@@ -37,6 +38,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^5.1.2",
     "autoprefixer": "^10.4.20",
+    "playwright": "^1.58.2",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.9.3",
