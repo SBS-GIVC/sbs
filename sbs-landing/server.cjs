@@ -1217,6 +1217,24 @@ app.use(express.static('public'));
 
 // Ensure SPA routes under /sbs/* work (serve the built app index)
 app.get('/sbs', (req, res) => res.redirect(301, '/sbs/'));
+// Backward-compatible workspace aliases (legacy links/bookmarks)
+app.get(['/claim-builder', '/eligibility', '/prior-auth', '/code-browser', '/ai-analytics', '/copilot'], (req, res) => {
+  const target = req.path === '/claim-builder' ? '/sbs/' : `/sbs${req.path}`;
+  const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+  res.redirect(301, `${target}${qs}`);
+});
+app.get(['/sbs/eligibility.html', '/sbs/prior-auth.html', '/sbs/code-browser.html', '/sbs/ai-analysis.html', '/sbs/ai-copilot.html'], (req, res) => {
+  const map = {
+    '/sbs/eligibility.html': '/sbs/eligibility',
+    '/sbs/prior-auth.html': '/sbs/prior-auth',
+    '/sbs/code-browser.html': '/sbs/code-browser',
+    '/sbs/ai-analysis.html': '/sbs/ai-analytics',
+    '/sbs/ai-copilot.html': '/sbs/copilot'
+  };
+  const target = map[req.path] || '/sbs/';
+  const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+  res.redirect(301, `${target}${qs}`);
+});
 app.get('/sbs/*', (req, res) => {
   const requested = String(req.path || '').replace(/^\/sbs\/?/, '');
   // Keep explicit asset misses as true 404 instead of returning the SPA shell.

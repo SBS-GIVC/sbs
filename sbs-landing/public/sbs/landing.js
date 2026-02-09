@@ -337,8 +337,9 @@ class SBSCommandCenter {
   // Routing
   // ---------------------------------------------------------------------------
   pathToWorkspace(pathname) {
-    const clean = (pathname || '/').replace(/\/+$/, '');
-    if (clean === '' || clean === '/') return 'claim-builder';
+    const cleanPath = (pathname || '/').replace(/\/+$/, '') || '/';
+    const clean = cleanPath.replace(/^\/sbs(?=\/|$)/, '') || '/';
+    if (clean === '/' || clean === '') return 'claim-builder';
 
     const map = {
       '/claim-builder': 'claim-builder',
@@ -353,10 +354,13 @@ class SBSCommandCenter {
 
   navigate(path) {
     if (!path.startsWith('/')) path = `/${path}`;
-    if (window.location.pathname !== path) {
-      history.pushState({}, '', path);
+    const targetPath = path.startsWith('/sbs/') || path === '/sbs'
+      ? path
+      : `/sbs${path === '/' ? '/' : path}`;
+    if (window.location.pathname !== targetPath) {
+      history.pushState({}, '', targetPath);
     }
-    this.activeWorkspace = this.pathToWorkspace(path);
+    this.activeWorkspace = this.pathToWorkspace(targetPath);
     this.render();
     this.syncPolling();
   }
@@ -969,11 +973,11 @@ class SBSCommandCenter {
   renderSidebar(t) {
     const items = [
       { key: 'claim-builder', path: '/', icon: 'claim', label: t.nav.claimBuilder, hint: t.nav.hintClaim },
-      { key: 'eligibility', path: '/eligibility', icon: 'shield', label: t.nav.eligibility, hint: t.nav.hintEligibility },
-      { key: 'prior-auth', path: '/prior-auth', icon: 'auth', label: t.nav.priorAuth, hint: t.nav.hintPriorAuth },
-      { key: 'code-browser', path: '/code-browser', icon: 'code', label: t.nav.codeBrowser, hint: t.nav.hintCode },
-      { key: 'ai-analytics', path: '/ai-analytics', icon: 'analytics', label: t.nav.aiAnalytics, hint: t.nav.hintAnalytics },
-      { key: 'copilot', path: '/copilot', icon: 'copilot', label: t.nav.copilot, hint: t.nav.hintCopilot }
+      { key: 'eligibility', path: '/sbs/eligibility', icon: 'shield', label: t.nav.eligibility, hint: t.nav.hintEligibility },
+      { key: 'prior-auth', path: '/sbs/prior-auth', icon: 'auth', label: t.nav.priorAuth, hint: t.nav.hintPriorAuth },
+      { key: 'code-browser', path: '/sbs/code-browser', icon: 'code', label: t.nav.codeBrowser, hint: t.nav.hintCode },
+      { key: 'ai-analytics', path: '/sbs/ai-analytics', icon: 'analytics', label: t.nav.aiAnalytics, hint: t.nav.hintAnalytics },
+      { key: 'copilot', path: '/sbs/copilot', icon: 'copilot', label: t.nav.copilot, hint: t.nav.hintCopilot }
     ];
 
     return `
