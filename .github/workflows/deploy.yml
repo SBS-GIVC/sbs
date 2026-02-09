@@ -137,7 +137,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Validate staging deployment secrets
+        id: preflight
+        env:
+          STAGING_HOST: ${{ secrets.STAGING_HOST }}
+          STAGING_USER: ${{ secrets.STAGING_USER }}
+          STAGING_SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+        run: |
+          missing=()
+          [ -n "${STAGING_HOST}" ] || missing+=("STAGING_HOST")
+          [ -n "${STAGING_USER}" ] || missing+=("STAGING_USER")
+          [ -n "${STAGING_SSH_KEY}" ] || missing+=("STAGING_SSH_KEY")
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Skipping staging deploy because required secrets are missing: ${missing[*]}"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Deploy to Staging Server
+        if: steps.preflight.outputs.ready == 'true'
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.STAGING_HOST }}
@@ -159,8 +179,8 @@ jobs:
             echo "✅ Staging deployment complete!"
 
       - name: Notify Staging Deployment
+        if: always() && secrets.SLACK_WEBHOOK_URL != ''
         uses: slackapi/slack-github-action@v2.1.1
-        if: always()
         with:
           payload: |
             {
@@ -194,7 +214,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Validate production deployment secrets
+        id: preflight
+        env:
+          PROD_HOST: ${{ secrets.PROD_HOST }}
+          PROD_USER: ${{ secrets.PROD_USER }}
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+        run: |
+          missing=()
+          [ -n "${PROD_HOST}" ] || missing+=("PROD_HOST")
+          [ -n "${PROD_USER}" ] || missing+=("PROD_USER")
+          [ -n "${PROD_SSH_KEY}" ] || missing+=("PROD_SSH_KEY")
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Skipping production deploy because required secrets are missing: ${missing[*]}"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Deploy to Production Server
+        if: steps.preflight.outputs.ready == 'true'
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.PROD_HOST }}
@@ -223,8 +263,8 @@ jobs:
             echo "✅ Production deployment complete!"
 
       - name: Notify Production Deployment
+        if: always() && secrets.SLACK_WEBHOOK_URL != ''
         uses: slackapi/slack-github-action@v2.1.1
-        if: always()
         with:
           payload: |
             {

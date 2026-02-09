@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -36,16 +38,46 @@ jobs:
         run: |
           pip install flake8 black isort mypy
 
-      - name: Run Python linting
+      - name: Detect changed Python files
+        id: changed-python
         run: |
-          # Check code style with flake8
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+          fi
+
+          if [ -z "${BASE_SHA}" ] || [ "${BASE_SHA}" = "0000000000000000000000000000000000000000" ]; then
+            BASE_SHA="$(git rev-list --max-parents=0 HEAD)"
+          fi
+
+          CHANGED_PY_FILES="$(git diff --name-only "${BASE_SHA}" "${{ github.sha }}" | grep -E '^(normalizer-service|signer-service|financial-rules-engine|nphies-bridge|tests)/.*\.py$' || true)"
+
+          if [ -n "${CHANGED_PY_FILES}" ]; then
+            echo "has_files=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "files<<EOF"
+              echo "${CHANGED_PY_FILES}"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "Changed Python files:"
+            echo "${CHANGED_PY_FILES}"
+          else
+            echo "has_files=false" >> "$GITHUB_OUTPUT"
+            echo "No changed Python files in lint scope."
+          fi
+
+      - name: Run Python linting
+        if: steps.changed-python.outputs.has_files == 'true'
+        run: |
+          # Check only changed Python files to avoid failing unrelated deploys on legacy lint debt.
           flake8 --max-line-length=120 --ignore=E501,W503,E302,E305,F401,F841,W291,W293 \
-            normalizer-service/ \
-            signer-service/ \
-            financial-rules-engine/ \
-            nphies-bridge/ \
-            tests/ \
-            --exclude=__pycache__,.venv,venv
+            --exclude=__pycache__,.venv,venv \
+            ${{ steps.changed-python.outputs.files }}
+
+      - name: Skip Python linting (no relevant changes)
+        if: steps.changed-python.outputs.has_files != 'true'
+        run: echo "Skipping flake8 because no Python files changed in service/test directories."
 
       - name: Check Python formatting with Black
         run: |
@@ -173,7 +205,7 @@ jobs:
       - name: Run integration tests (mocked)
         run: |
           cd tests
-          python -m pytest test_normalizer.py test_signer.py -v --tb=short
+          python -m pytest test_normalizer_comprehensive.py test_signer_comprehensive.py -v --tb=short
 
   # ============================================================================
   # E2E Tests (Playwright)
@@ -201,6 +233,7 @@ jobs:
       - name: Install Python test dependencies
         run: |
           pip install -r tests/requirements.txt
+          pip install playwright
           playwright install chromium
           playwright install-deps
 

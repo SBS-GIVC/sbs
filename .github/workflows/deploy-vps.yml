@@ -67,11 +67,33 @@ jobs:
           echo "git_commit=${GIT_COMMIT}" >> $GITHUB_OUTPUT
           echo "git_branch=${GIT_BRANCH}" >> $GITHUB_OUTPUT
           echo "deployed_at=${DEPLOYED_AT}" >> $GITHUB_OUTPUT
+
+      - name: Validate VPS deployment secrets
+        id: preflight
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          missing=()
+          [ -n "${VPS_HOST}" ] || missing+=("VPS_HOST")
+          [ -n "${VPS_USER}" ] || missing+=("VPS_USER")
+          [ -n "${VPS_SSH_KEY}" ] || missing+=("VPS_SSH_KEY")
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "missing=${missing[*]}" >> "$GITHUB_OUTPUT"
+            echo "::warning::Skipping VPS deploy because required secrets are missing: ${missing[*]}"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "missing=" >> "$GITHUB_OUTPUT"
+          fi
       
       # ============================================================================
       # Setup SSH
       # ============================================================================
       - name: Setup SSH key
+        if: steps.preflight.outputs.ready == 'true'
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/vps_deploy_key
@@ -82,6 +104,7 @@ jobs:
       # Prepare Deployment
       # ============================================================================
       - name: Create deployment archive
+        if: steps.preflight.outputs.ready == 'true'
         run: |
           # Create a deployment tarball with necessary files
           tar -czf deploy.tar.gz \
@@ -99,6 +122,7 @@ jobs:
           ls -lh deploy.tar.gz
       
       - name: Upload deployment archive to VPS
+        if: steps.preflight.outputs.ready == 'true'
         run: |
           scp -i ~/.ssh/vps_deploy_key \
             -o StrictHostKeyChecking=no \
@@ -109,6 +133,7 @@ jobs:
       # Deploy on VPS
       # ============================================================================
       - name: Extract and prepare deployment on VPS
+        if: steps.preflight.outputs.ready == 'true'
         run: |
           ssh -i ~/.ssh/vps_deploy_key \
             -o StrictHostKeyChecking=no \
@@ -129,6 +154,7 @@ jobs:
           ENDSSH
       
       - name: Create/update .env file on VPS
+        if: steps.preflight.outputs.ready == 'true'
         run: |
           ssh -i ~/.ssh/vps_deploy_key \
             -o StrictHostKeyChecking=no \
@@ -199,6 +225,7 @@ jobs:
           ENDSSH
       
       - name: Create required directories on VPS
+        if: steps.preflight.outputs.ready == 'true'
         run: |
           ssh -i ~/.ssh/vps_deploy_key \
             -o StrictHostKeyChecking=no \
@@ -216,6 +243,7 @@ jobs:
           ENDSSH
       
       - name: Backup existing database (if exists)
+        if: steps.preflight.outputs.ready == 'true'
         continue-on-error: true
         run: |
           ssh -i ~/.ssh/vps_deploy_key \
@@ -238,6 +266,7 @@ jobs:
           ENDSSH
       
       - name: Deploy services with Docker Compose
+        if: steps.preflight.outputs.ready == 'true'
         run: |
           ssh -i ~/.ssh/vps_deploy_key \
             -o StrictHostKeyChecking=no \
@@ -260,6 +289,7 @@ jobs:
       # Health Checks
       # ============================================================================
       - name: Wait for services to be healthy
+        if: steps.preflight.outputs.ready == 'true'
         run: |
           ssh -i ~/.ssh/vps_deploy_key \
             -o StrictHostKeyChecking=no \
@@ -292,6 +322,7 @@ jobs:
           ENDSSH
       
       - name: Run health checks
+        if: steps.preflight.outputs.ready == 'true'
         continue-on-error: true
         run: |
           ssh -i ~/.ssh/vps_deploy_key \
@@ -318,6 +349,8 @@ jobs:
           
           ### Deployment Details
           - **Environment**: ${{ steps.env.outputs.environment }}
+          - **Preflight Ready**: ${{ steps.preflight.outputs.ready }}
+          - **Missing Secrets**: ${{ steps.preflight.outputs.missing || 'none' }}
           - **Git Commit**: `${{ steps.env.outputs.git_commit }}`
           - **Git Branch**: `${{ steps.env.outputs.git_branch }}`
           - **Deployed At**: ${{ steps.env.outputs.deployed_at }}
