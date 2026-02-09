@@ -179,7 +179,8 @@ jobs:
             echo "✅ Staging deployment complete!"
 
       - name: Notify Staging Deployment
-        if: always() && secrets.SLACK_WEBHOOK_URL != ''
+        if: always()
+        continue-on-error: true
         uses: slackapi/slack-github-action@v2.1.1
         with:
           payload: |
@@ -263,7 +264,8 @@ jobs:
             echo "✅ Production deployment complete!"
 
       - name: Notify Production Deployment
-        if: always() && secrets.SLACK_WEBHOOK_URL != ''
+        if: always()
+        continue-on-error: true
         uses: slackapi/slack-github-action@v2.1.1
         with:
           payload: |

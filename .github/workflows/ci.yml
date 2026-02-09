@@ -135,7 +135,15 @@ jobs:
           cd ${{ matrix.service }}
           # Run tests if they exist, otherwise skip gracefully (not all services have tests yet)
           if find . -name "test_*.py" -o -name "*_test.py" | grep -q .; then
+            set +e
             python -m pytest --cov=. --cov-report=xml --cov-report=term-missing -v
+            TEST_EXIT=$?
+            set -e
+            if [ "${TEST_EXIT}" -eq 5 ]; then
+              echo "⚠️ No tests collected for ${{ matrix.service }} - skipping"
+              exit 0
+            fi
+            exit "${TEST_EXIT}"
           else
             echo "⚠️ No tests found for ${{ matrix.service }} - skipping"
           fi
