@@ -1418,6 +1418,35 @@ app.get('/api/sbs/codes', async (req, res) => {
   }
 });
 
+// Official SBS full catalog endpoint (single payload for browser-side caching/use).
+app.get('/api/sbs/codes/all', async (req, res) => {
+  try {
+    const catalog = await loadSbsCatalog();
+    if (!catalog.total) {
+      return res.status(503).json({
+        success: false,
+        error: 'SBS catalog not loaded'
+      });
+    }
+
+    return res.json({
+      success: true,
+      source: catalog.source,
+      version: catalog.version,
+      generated: catalog.generated || null,
+      filePath: catalog.filePath,
+      total: catalog.total,
+      codes: catalog.entries.map(toPublicSbsCode)
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve full SBS codes catalog',
+      message: error.message
+    });
+  }
+});
+
 app.get('/api/terminology/systems', async (req, res) => {
   try {
     const sbsCatalog = await loadSbsCatalog();

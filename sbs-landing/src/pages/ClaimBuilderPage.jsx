@@ -80,8 +80,8 @@ export function ClaimBuilderPage() {
         setShowSuggestions(true);
         if (results.aiInsights) setAiInsights(results.aiInsights);
       } catch (error) {
-        const localResults = aiAssistant.localSearch(query, null, 10);
-        setSbsSuggestions(localResults);
+        const fallback = await aiAssistant.smartSearch(query, { limit: 10, includeAI: false });
+        setSbsSuggestions(fallback.results);
         setShowSuggestions(true);
       } finally {
         setIsSearching(false);

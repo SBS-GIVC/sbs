@@ -296,8 +296,8 @@ class UnifiedTerminologyService {
 
     // Use the existing AI assistant service
     const { aiAssistant } = await import('./aiAssistantService');
-    const results = aiAssistant.localSearch(query, null, limit);
-    return results.map(code => ({
+    const fallback = await aiAssistant.smartSearch(query, { limit, includeAI: false });
+    return (fallback.results || []).map(code => ({
       code: code.code,
       display: code.desc,
       displayAr: code.descAr,

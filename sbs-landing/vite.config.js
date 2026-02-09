@@ -20,50 +20,11 @@ export default defineConfig(({ mode }) => {
           main: path.resolve(__dirname, 'index.html')
         },
         output: {
-          manualChunks: {
-            // Vendor chunks
-            'vendor-react': ['react', 'react-dom'],
-            'vendor-charts': ['recharts'],
-            
-            // Core UI components
-            'ui-core': [
-              './src/components/Sidebar.jsx',
-              './src/components/TopHeader.jsx',
-              './src/components/Toast.jsx',
-              './src/components/LoadingSpinner.jsx',
-            ],
-            
-            // AI features chunk
-            'ai-features': [
-              './src/components/AICopilot.jsx',
-              './src/components/SmartClaimAnalyzer.jsx',
-              './src/components/VoiceClinicalDocumentation.jsx',
-              './src/services/aiAssistantService.js',
-              './src/services/geminiService.js',
-            ],
-            
-            // NPHIES integration chunk
-            'nphies': [
-              './src/pages/EligibilityPage.jsx',
-              './src/pages/PriorAuthPage.jsx',
-              './src/pages/ClaimsQueuePage.jsx',
-              './src/services/nphiesService.js',
-            ],
-            
-            // Code management chunk
-            'code-management': [
-              './src/pages/SBSCodeBrowser.jsx',
-              './src/pages/UnifiedCodeBrowser.jsx',
-              './src/services/unifiedTerminologyService.js',
-            ],
-            
-            // Analytics chunk
-            'analytics': [
-              './src/pages/MappingsPage.jsx',
-              './src/pages/FacilityPerformanceReport.jsx',
-              './src/pages/FacilityUsagePage.jsx',
-              './src/pages/PredictiveAnalyticsPage.jsx',
-            ],
+          manualChunks(id) {
+            if (id.includes('node_modules/react')) return 'vendor-react';
+            if (id.includes('node_modules/recharts')) return 'vendor-charts';
+            if (id.includes('node_modules')) return 'vendor';
+            return undefined;
           }
         }
       }

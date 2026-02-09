@@ -5,11 +5,12 @@
  */
 
 import { callGemini } from './geminiService';
-import sbsCodesData from '../data/sbs_codes_full.json';
 
-// Build search index for efficient lookups
-const SBS_CODES = sbsCodesData.codes;
-const CODES_ARRAY = Object.values(SBS_CODES);
+// Load catalog data at runtime to keep the browser bundle lightweight.
+const API_BASE_URL =
+  (typeof window !== 'undefined' && (window.SBS_API_URL || window.location.origin)) || '';
+let SBS_CODES = {};
+let CODES_ARRAY = [];
 
 // Common medical abbreviations for better matching
 const MEDICAL_ABBREVIATIONS = {
@@ -39,6 +40,8 @@ class AIAssistantService {
   constructor() {
     this.cache = new Map();
     this.cacheTimeout = 1000 * 60 * 30; // 30 minutes
+    this.catalogPromise = null;
+    this.catalogFetchLimit = 200;
   }
 
   /**
@@ -66,11 +69,82 @@ class AIAssistantService {
     this.cache.set(key, { data, timestamp: Date.now() });
   }
 
+  async fetchCatalogPage(offset, limit) {
+    const url = `${API_BASE_URL}/api/sbs/codes?limit=${limit}&offset=${offset}`;
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!response.ok) {
+      throw new Error(`SBS catalog fetch failed (${response.status})`);
+    }
+    return response.json();
+  }
+
+  async fetchFullCatalog() {
+    const url = `${API_BASE_URL}/api/sbs/codes/all`;
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!response.ok) {
+      throw new Error(`SBS full catalog fetch failed (${response.status})`);
+    }
+    return response.json();
+  }
+
+  async ensureCatalogLoaded() {
+    if (CODES_ARRAY.length > 0) {
+      return;
+    }
+    if (this.catalogPromise) {
+      await this.catalogPromise;
+      return;
+    }
+
+    this.catalogPromise = (async () => {
+      const normalizeRows = (rows) =>
+        rows
+          .filter((row) => row?.code && row?.desc)
+          .map((row) => ({
+            code: row.code,
+            desc: row.desc,
+            descAr: row.descAr || null,
+            category: row.category || null,
+            chapter: row.chapter || null,
+            fee: Number(row.fee || 0)
+          }));
+
+      let all = [];
+      try {
+        const payload = await this.fetchFullCatalog();
+        all = normalizeRows(Array.isArray(payload.codes) ? payload.codes : []);
+      } catch {
+        // Backward compatible fallback for deployments without /api/sbs/codes/all.
+        let offset = 0;
+        let total = null;
+        while (true) {
+          const payload = await this.fetchCatalogPage(offset, this.catalogFetchLimit);
+          const rows = Array.isArray(payload.codes) ? payload.codes : [];
+          if (rows.length === 0) break;
+          all.push(...normalizeRows(rows));
+          total = Number(payload.total || 0);
+          offset += rows.length;
+          if (total > 0 && offset >= total) break;
+        }
+      }
+
+      CODES_ARRAY = all;
+      SBS_CODES = Object.fromEntries(all.map((entry) => [entry.code, entry]));
+    })();
+
+    try {
+      await this.catalogPromise;
+    } finally {
+      this.catalogPromise = null;
+    }
+  }
+
   /**
    * Smart search with fuzzy matching and AI enhancement
    */
   async smartSearch(query, options = {}) {
     const { limit = 20, category = null, includeAI = true } = options;
+    await this.ensureCatalogLoaded();
     
     // Expand abbreviations
     let expandedQuery = query.toLowerCase();
@@ -120,6 +194,7 @@ class AIAssistantService {
    * Local fuzzy search
    */
   localSearch(query, category = null, limit = 20) {
+    if (!CODES_ARRAY.length) return [];
     const queryLower = query.toLowerCase();
     const queryTerms = queryLower.split(/\s+/).filter(t => t.length > 2);
     
@@ -173,6 +248,7 @@ class AIAssistantService {
    * Get AI-powered suggestions
    */
   async getAISuggestions(query, existingResults = []) {
+    await this.ensureCatalogLoaded();
     const cacheKey = this.getCacheKey('suggestions', query);
     const cached = this.getFromCache(cacheKey);
     if (cached) return cached;
@@ -367,6 +443,7 @@ Return JSON:
    * AI-powered code mapping from internal hospital codes
    */
   async mapInternalCode(internalCode, description, context = {}) {
+    await this.ensureCatalogLoaded();
     const prompt = `You are a Saudi healthcare billing expert. Map this internal hospital code to the official SBS V3.1 code.
 
 Internal Code: ${internalCode}
@@ -455,6 +532,7 @@ Return JSON:
    * AI-powered prior authorization assistance
    */
   async assistPriorAuth(procedureCode, patientInfo, clinicalNotes) {
+    await this.ensureCatalogLoaded();
     const code = SBS_CODES[procedureCode];
     
     const prompt = `You are a Saudi healthcare prior authorization specialist. Help prepare a prior authorization request.

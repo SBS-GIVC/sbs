@@ -14,17 +14,37 @@ export function SBSCodeBrowser() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedCode, setSelectedCode] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [isCatalogLoading, setIsCatalogLoading] = useState(true);
   const [aiInsights, setAiInsights] = useState(null);
   const [displayLimit, setDisplayLimit] = useState(100);
   const scrollRef = useRef(null);
   const toast = useToast();
-  
-  const allCodes = useMemo(() => aiAssistant.getAllCodes(), []);
-  const categories = useMemo(() => ['all', ...aiAssistant.getCategories()], []);
-
-  const [searchResults, setSearchResults] = useState({ results: allCodes, source: 'local' });
+  const [allCodes, setAllCodes] = useState([]);
+  const [categories, setCategories] = useState(['all']);
+  const [searchResults, setSearchResults] = useState({ results: [], source: 'local' });
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setIsCatalogLoading(true);
+      try {
+        await aiAssistant.ensureCatalogLoaded();
+        if (cancelled) return;
+        const codes = aiAssistant.getAllCodes();
+        setAllCodes(codes);
+        setCategories(['all', ...aiAssistant.getCategories()]);
+        setSearchResults({ results: codes, source: 'local' });
+      } finally {
+        if (!cancelled) setIsCatalogLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isCatalogLoading) return;
     const timer = setTimeout(async () => {
       if (searchQuery.length >= 2) {
         setIsSearching(true);
@@ -48,7 +68,7 @@ export function SBSCodeBrowser() {
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, selectedCategory, allCodes]);
+  }, [searchQuery, selectedCategory, allCodes, isCatalogLoading]);
 
   useEffect(() => {
     setDisplayLimit(100);
@@ -113,6 +133,13 @@ export function SBSCodeBrowser() {
                  <span className="material-symbols-outlined text-blue-600">auto_awesome</span>
                  <p className="text-xs font-bold text-slate-600 dark:text-gray-300 italic">{aiInsights}</p>
               </div>
+           )}
+
+           {isCatalogLoading && (
+             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                <span className="material-symbols-outlined text-blue-600 animate-spin">progress_activity</span>
+                <p className="text-xs font-bold text-slate-500">Loading official SBS catalogue...</p>
+             </div>
            )}
         </header>
 
