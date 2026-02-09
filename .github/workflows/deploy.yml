@@ -310,11 +310,18 @@ jobs:
       - name: Check Production Health
         if: needs.deploy-production.result == 'success'
         run: |
+          URLS=(
+            "https://app.brainsait.cloud/health"
+            "https://api.brainsait.cloud/api/health"
+            "https://brainsait.cloud/api/health"
+          )
           for i in {1..5}; do
-            if curl -sf https://app.brainsait.cloud/health; then
-              echo "✅ Production is healthy"
-              exit 0
-            fi
+            for u in "${URLS[@]}"; do
+              if curl -sf "${u}" >/dev/null; then
+                echo "✅ Production is healthy via ${u}"
+                exit 0
+              fi
+            done
             sleep 10
           done
           echo "❌ Production health check failed"
