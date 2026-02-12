@@ -43,6 +43,15 @@ from .error_responses import (
     rate_limit_error,
     unauthorized_error
 )
+from .service_auth import (
+    verify_service_auth,
+    verify_api_key,
+    is_public_endpoint,
+    require_service_auth,
+    ServiceAuthMiddleware,
+    generate_api_key,
+    hash_api_key
+)
 
 __all__ = [
     # Rate limiting
@@ -81,4 +90,13 @@ __all__ = [
     "database_error",
     "rate_limit_error",
     "unauthorized_error",
+    
+    # Service authentication
+    "verify_service_auth",
+    "verify_api_key",
+    "is_public_endpoint",
+    "require_service_auth",
+    "ServiceAuthMiddleware",
+    "generate_api_key",
+    "hash_api_key",
 ]
