@@ -27,7 +27,14 @@ from psycopg2.extras import RealDictCursor
 
 # Add parent directory to path for shared module import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from shared import RateLimiter, setup_logging, format_database_error
+from shared import (
+    RateLimiter, 
+    setup_logging, 
+    format_database_error,
+    ErrorCodes,
+    raise_standard_http_exception,
+    create_standard_error
+)
 
 from copilot_routes import router as copilot_router
 

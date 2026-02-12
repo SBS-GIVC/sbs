@@ -33,6 +33,16 @@ from .validation import (
     sanitize_input,
     validate_claim_amount
 )
+from .error_responses import (
+    create_standard_error,
+    raise_standard_http_exception,
+    ErrorCodes,
+    not_found_error,
+    validation_error,
+    database_error,
+    rate_limit_error,
+    unauthorized_error
+)
 
 __all__ = [
     # Rate limiting
@@ -61,4 +71,14 @@ __all__ = [
     "validate_string_length",
     "sanitize_input",
     "validate_claim_amount",
+    
+    # Standardized error responses
+    "create_standard_error",
+    "raise_standard_http_exception",
+    "ErrorCodes",
+    "not_found_error",
+    "validation_error",
+    "database_error",
+    "rate_limit_error",
+    "unauthorized_error",
 ]
