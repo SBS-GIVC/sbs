@@ -22,7 +22,7 @@ NPHIES_BRIDGE_URL = "http://localhost:8003"
 def _is_service_up(url: str) -> bool:
     try:
         response = requests.get(url, timeout=1.5)
-        return response.status_code < 500
+        return response.status_code == 200
     except requests.RequestException:
         return False
 
