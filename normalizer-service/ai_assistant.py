@@ -8,8 +8,7 @@ import requests
 AI_API = os.getenv('GEMINI_API_KEY') or os.getenv('DEEPSEEK_API_KEY')
 AI_PROVIDER = os.getenv('AI_PROVIDER', 'gemini')  # 'gemini' or 'deepseek'
 
-# IMPORTANT: This helper will only call an external AI endpoint when AI_URL is explicitly set.
-# This avoids accidental calls to placeholder/example URLs.
+# Optional explicit override endpoint. When absent, provider-specific defaults are used.
 AI_URL = (os.getenv('AI_URL') or '').strip()
 
 # Feature flag: gate DeepSeek usage in staging/controlled environments
@@ -17,6 +16,17 @@ ENABLE_DEEPSEEK = os.getenv('ENABLE_DEEPSEEK', 'false').lower() in ('1', 'true',
 
 # Cache to store AI mapping results, keyed by (provider, internal_code)
 _ai_result_cache = {}
+
+
+def _resolve_ai_url(provider: str) -> str:
+    if AI_URL:
+        return AI_URL
+
+    if provider == 'deepseek':
+        return 'https://api.deepseek.com/v1/chat/completions'
+    if provider == 'gemini':
+        return 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent'
+    return ''
 
 
 def query_ai_for_mapping(internal_code: str, description: str = '') -> dict:
@@ -29,7 +39,8 @@ def query_ai_for_mapping(internal_code: str, description: str = '') -> dict:
     if AI_PROVIDER == 'deepseek' and not ENABLE_DEEPSEEK:
         return {}
 
-    if not AI_URL:
+    resolved_url = _resolve_ai_url(AI_PROVIDER)
+    if not resolved_url:
         return {}
 
     # Check cache first - avoid redundant API calls
@@ -47,7 +58,7 @@ def query_ai_for_mapping(internal_code: str, description: str = '') -> dict:
         'Content-Type': 'application/json',
     }
 
-    url = AI_URL
+    url = resolved_url
 
     # Select auth token based on AI_PROVIDER to avoid sending wrong key
     if AI_PROVIDER == 'deepseek':
