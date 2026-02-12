@@ -313,5 +313,401 @@ JOIN facilities f ON nt.facility_id = f.facility_id
 ORDER BY nt.submission_timestamp DESC;
 
 -- ============================================================================
+-- 11. Healthcare System - Patient, Provider, Payer Tables
+-- ============================================================================
+
+-- Users table (extend existing if exists, or create)
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(80) UNIQUE NOT NULL,
+    password_hash VARCHAR(200) NOT NULL,
+    email VARCHAR(120),
+    phone VARCHAR(20),
+    role VARCHAR(20) NOT NULL CHECK (role IN ('patient', 'provider', 'payer', 'admin', 'clinician', 'coder')),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Patients table
+CREATE TABLE IF NOT EXISTS patients (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(id) UNIQUE,
+    patient_uuid UUID DEFAULT gen_random_uuid() UNIQUE,
+    national_id VARCHAR(20),
+    date_of_birth DATE,
+    gender VARCHAR(10) CHECK (gender IN ('male', 'female', 'other')),
+    address TEXT,
+    insurance_policy_id VARCHAR(50),
+    insurance_payer_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Providers table (hospital/facility staff)
+CREATE TABLE IF NOT EXISTS providers (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(id) UNIQUE,
+    provider_uuid UUID DEFAULT gen_random_uuid() UNIQUE,
+    organization_name VARCHAR(100),
+    license_number VARCHAR(50) UNIQUE NOT NULL,
+    specialty VARCHAR(100),
+    facility_id INT REFERENCES facilities(facility_id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Payers table (insurance companies)
+CREATE TABLE IF NOT EXISTS payers (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES users(id) UNIQUE,
+    payer_uuid UUID DEFAULT gen_random_uuid() UNIQUE,
+    company_name VARCHAR(100) NOT NULL,
+    contact_email VARCHAR(120),
+    contact_phone VARCHAR(20),
+    nphies_payer_id VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Update patient table with payer FK
+ALTER TABLE patients ADD CONSTRAINT patients_payer_fk FOREIGN KEY (insurance_payer_id) REFERENCES payers(id);
+
+-- ============================================================================
+-- 12. Healthcare Service Management
+-- ============================================================================
+
+-- Services table (extend SBS catalogue with healthcare services)
+CREATE TABLE IF NOT EXISTS services (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(20) UNIQUE NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    description TEXT,
+    default_price DECIMAL(10,2),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ServiceRequest table (core healthcare request)
+CREATE TABLE IF NOT EXISTS service_request (
+    id SERIAL PRIMARY KEY,
+    patient_id INT NOT NULL REFERENCES patients(id),
+    provider_id INT NOT NULL REFERENCES providers(id),
+    payer_id INT REFERENCES payers(id),
+    service_id INT REFERENCES services(id),
+    facility_id INT REFERENCES facilities(facility_id),
+    request_type VARCHAR(30) NOT NULL CHECK (request_type IN ('prior_auth', 'claim', 'referral', 'eligibility')),
+    status VARCHAR(30) DEFAULT 'submitted' CHECK (status IN ('submitted', 'under_review', 'approved', 'denied', 'in_progress', 'completed', 'billed', 'paid', 'error')),
+    priority VARCHAR(20) DEFAULT 'normal' CHECK (priority IN ('normal', 'urgent', 'emergency')),
+    details JSONB,
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Foreign key to track parent NPHIES transaction
+    nphies_transaction_uuid UUID REFERENCES nphies_transactions(transaction_uuid)
+);
+
+-- Prior Authorization table
+CREATE TABLE IF NOT EXISTS prior_authorizations (
+    id SERIAL PRIMARY KEY,
+    request_id INT NOT NULL REFERENCES service_request(id) UNIQUE,
+    prior_auth_uuid UUID DEFAULT gen_random_uuid() UNIQUE,
+    authorization_number VARCHAR(100),
+    start_date DATE,
+    end_date DATE,
+    service_codes TEXT[],
+    diagnosis_codes TEXT[],
+    approved_amount DECIMAL(10,2),
+    approved_units INT,
+    decision VARCHAR(20) CHECK (decision IN ('approved', 'denied', 'pending', 'pending_info')),
+    decision_reason TEXT,
+    reviewed_at TIMESTAMP,
+    reviewed_by INT REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ServiceRequest attachments (documents, images, etc.)
+CREATE TABLE IF NOT EXISTS service_request_attachments (
+    id SERIAL PRIMARY KEY,
+    request_id INT NOT NULL REFERENCES service_request(id) ON DELETE CASCADE,
+    attachment_type VARCHAR(50) CHECK (attachment_type IN ('clinical_note', 'diagnostic_report', 'image', 'form', 'other')),
+    filename VARCHAR(255) NOT NULL,
+    file_path VARCHAR(500),
+    mime_type VARCHAR(100),
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    uploaded_by INT REFERENCES users(id)
+);
+
+-- ============================================================================
+-- 13. Claims Processing
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS claims (
+    id SERIAL PRIMARY KEY,
+    request_id INT NOT NULL REFERENCES service_request(id) UNIQUE,
+    claim_uuid UUID DEFAULT gen_random_uuid() UNIQUE,
+    claim_number VARCHAR(100) UNIQUE,
+    claim_type VARCHAR(30) CHECK (claim_type IN ('professional', 'institutional', 'pharmacy', 'dental')),
+    billed_amount DECIMAL(10,2),
+    paid_amount DECIMAL(10,2),
+    claim_status VARCHAR(30) DEFAULT 'submitted' CHECK (claim_status IN ('submitted', 'approved', 'denied', 'paid', 'partial', 'reversed')),
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    paid_at TIMESTAMP,
+    adjustment_code VARCHAR(50),
+    adjustment_reason TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Claim line items
+CREATE TABLE IF NOT EXISTS claim_line_items (
+    id SERIAL PRIMARY KEY,
+    claim_id INT NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
+    line_number INT NOT NULL,
+    service_code VARCHAR(20),
+    service_description TEXT,
+    quantity INT DEFAULT 1,
+    unit_price DECIMAL(10,2),
+    line_total DECIMAL(10,2),
+    diagnosis_code VARCHAR(20),
+    procedure_code VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(claim_id, line_number)
+);
+
+-- ============================================================================
+-- 14. Healthcare Workflow & Approvals
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS approvals (
+    id SERIAL PRIMARY KEY,
+    request_id INT NOT NULL REFERENCES service_request(id),
+    payer_id INT NOT NULL REFERENCES payers(id),
+    approved BOOLEAN NOT NULL,
+    comments TEXT,
+    reviewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reviewed_by INT REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Healthcare request status history
+CREATE TABLE IF NOT EXISTS request_status_history (
+    id SERIAL PRIMARY KEY,
+    request_id INT NOT NULL REFERENCES service_request(id) ON DELETE CASCADE,
+    old_status VARCHAR(30),
+    new_status VARCHAR(30),
+    changed_by INT REFERENCES users(id),
+    change_reason TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
+-- 15. Healthcare AI Features
+-- ============================================================================
+
+-- AI validation cache for healthcare claims
+CREATE TABLE IF NOT EXISTS ai_claim_validation_cache (
+    id SERIAL PRIMARY KEY,
+    request_id INT REFERENCES service_request(id),
+    validation_type VARCHAR(50),
+    input_hash VARCHAR(64) UNIQUE NOT NULL,
+    validation_result JSONB,
+    confidence_score FLOAT,
+    is_valid BOOLEAN,
+    ai_analysis TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Denial prevention analysis
+CREATE TABLE IF NOT EXISTS denial_prevention_analysis (
+    id SERIAL PRIMARY KEY,
+    request_id INT NOT NULL REFERENCES service_request(id),
+    denial_risk_score FLOAT CHECK (denial_risk_score BETWEEN 0 AND 1),
+    risk_factors JSONB,
+    recommended_actions JSONB,
+    analysis_summary TEXT,
+    analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    analyzed_by INT REFERENCES users(id)
+);
+
+-- ============================================================================
+-- 16. Healthcare Analytics & Reporting
+-- ============================================================================
+
+-- Healthcare analytics events
+CREATE TABLE IF NOT EXISTS healthcare_analytics_events (
+    id SERIAL PRIMARY KEY,
+    event_type VARCHAR(100) NOT NULL,
+    entity_type VARCHAR(100),
+    entity_id INT,
+    user_id INT REFERENCES users(id),
+    facility_id INT REFERENCES facilities(facility_id),
+    event_data JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Healthcare key performance indicators
+CREATE TABLE IF NOT EXISTS healthcare_kpis (
+    id SERIAL PRIMARY KEY,
+    kpi_name VARCHAR(100) NOT NULL,
+    kpi_value DECIMAL(15,2),
+    kpi_period DATE,
+    facility_id INT REFERENCES facilities(facility_id),
+    metrics JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
+-- Triggers for healthcare tables
+-- ============================================================================
+
+-- Update patients updated_at
+CREATE OR REPLACE FUNCTION update_healthcare_updated_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+CREATE TRIGGER update_patients_modtime BEFORE UPDATE ON patients FOR EACH ROW EXECUTE FUNCTION update_healthcare_updated_column();
+CREATE TRIGGER update_providers_modtime BEFORE UPDATE ON providers FOR EACH ROW EXECUTE FUNCTION update_healthcare_updated_column();
+CREATE TRIGGER update_payers_modtime BEFORE UPDATE ON payers FOR EACH ROW EXECUTE FUNCTION update_healthcare_updated_column();
+CREATE TRIGGER update_services_modtime BEFORE UPDATE ON services FOR EACH ROW EXECUTE FUNCTION update_healthcare_updated_column();
+CREATE TRIGGER update_servicerequest_modtime BEFORE UPDATE ON service_request FOR EACH ROW EXECUTE FUNCTION update_healthcare_updated_column();
+CREATE TRIGGER update_priorauth_modtime BEFORE UPDATE ON prior_authorizations FOR EACH ROW EXECUTE FUNCTION update_healthcare_updated_column();
+CREATE TRIGGER update_claims_modtime BEFORE UPDATE ON claims FOR EACH ROW EXECUTE FUNCTION update_healthcare_updated_column();
+
+-- Auto-update claim status from service_request status
+CREATE OR REPLACE FUNCTION update_claim_status_from_request()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE claims
+    SET claim_status = CASE
+        WHEN NEW.status = 'completed' THEN 'submitted'
+        WHEN NEW.status = 'paid' THEN 'paid'
+        WHEN NEW.status = 'denied' THEN 'denied'
+        ELSE claim_status
+    END
+    WHERE request_id = NEW.id;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- ============================================================================
+-- Sample Healthcare Data
+-- ============================================================================
+
+-- Sample Users
+INSERT INTO users (username, password_hash, email, phone, role, is_active) VALUES
+('patient_john', '$2b$12$example', 'john@email.com', '555-0101', 'patient', TRUE),
+('provider_smith', '$2b$12$example', 'smith@hospital.com', '555-0102', 'provider', TRUE),
+('payer_bluecross', '$2b$12$example', 'claims@bluecross.com', '555-0103', 'payer', TRUE),
+('admin_health', '$2b$12$example', 'admin@health.gov', '555-0104', 'admin', TRUE);
+
+-- Sample Payers
+INSERT INTO payers (user_id, company_name, contact_email, contact_phone, nphies_payer_id) VALUES
+(3, 'Blue Cross Insurance', 'claims@bluecross.com', '555-0103', 'NPHIES-BC-001');
+
+-- Sample Patients
+INSERT INTO patients (user_id, national_id, date_of_birth, gender, insurance_policy_id, insurance_payer_id) VALUES
+(1, '1234567890', '1985-05-20', 'male', 'POL123456789', 1);
+
+-- Sample Providers
+INSERT INTO providers (user_id, organization_name, license_number, specialty, facility_id) VALUES
+(2, 'Central Hospital', 'MED-LIC-001', 'Internal Medicine', 1);
+
+-- Sample Services
+INSERT INTO services (code, name, description, default_price) VALUES
+('99213', 'Office Visit (Level 3)', 'Standard office visit', 75.00),
+('93000', 'ECG (12-lead)', '12-lead electrocardiogram', 150.00),
+('73562', 'X-Ray Knee (2 views)', 'Knee X-ray with 2 views', 120.00);
+
+-- ============================================================================
+-- Healthcare Views
+-- ============================================================================
+
+-- View for patient requests
+CREATE VIEW v_patient_requests AS
+SELECT
+    sr.id as request_id,
+    sr.patient_id,
+    p.national_id as patient_national_id,
+    sr.provider_id,
+    prov.organization_name as provider_name,
+    sr.payer_id,
+    pay.company_name as payer_name,
+    sr.service_id,
+    s.name as service_name,
+    sr.request_type,
+    sr.status,
+    sr.submitted_at,
+    sr.details
+FROM service_request sr
+LEFT JOIN patients p ON sr.patient_id = p.id
+LEFT JOIN providers prov ON sr.provider_id = prov.id
+LEFT JOIN payers pay ON sr.payer_id = pay.id
+LEFT JOIN services s ON sr.service_id = s.id;
+
+-- View for provider dashboard
+CREATE VIEW v_provider_dashboard AS
+SELECT
+    pr.request_id,
+    pr.patient_national_id,
+    pr.provider_name,
+    pr.request_type,
+    pr.status,
+    pr.submitted_at,
+    pr.service_name,
+    c.claim_status,
+    pa.authorization_number,
+    pa.decision
+FROM v_patient_requests pr
+LEFT JOIN claims c ON pr.request_id = c.request_id
+LEFT JOIN prior_authorizations pa ON pr.request_id = pa.request_id;
+
+-- View for payer dashboard
+CREATE VIEW v_payer_dashboard AS
+SELECT
+    pr.request_id,
+    pr.patient_national_id,
+    pr.payer_name,
+    pr.request_type,
+    pr.status,
+    pr.submitted_at,
+    pr.service_name,
+    pa.decision,
+    pa.reviewed_at,
+    c.paid_amount,
+    c.claim_status
+FROM v_patient_requests pr
+LEFT JOIN prior_authorizations pa ON pr.request_id = pa.request_id
+LEFT JOIN claims c ON pr.request_id = c.request_id
+WHERE pr.payer_id IS NOT NULL;
+
+-- View for admin dashboard (all requests)
+CREATE VIEW v_admin_dashboard AS
+SELECT
+    pr.request_id,
+    pr.patient_national_id,
+    pr.provider_name,
+    pr.payer_name,
+    pr.request_type,
+    pr.status,
+    pr.submitted_at,
+    pr.service_name,
+    c.claim_status,
+    c.billed_amount,
+    c.paid_amount,
+    pa.decision,
+    pa.approved_amount
+FROM v_patient_requests pr
+LEFT JOIN claims c ON pr.request_id = c.request_id
+LEFT JOIN prior_authorizations pa ON pr.request_id = pa.request_id;
+
+-- ============================================================================
 -- End of Schema
 -- ============================================================================

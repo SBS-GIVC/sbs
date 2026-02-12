@@ -1,0 +1,367 @@
+# Healthcare Claims System Kubernetes Deployment
+# Deploys the integrated healthcare claims system with NPHIES bridge
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nphies-bridge
+  namespace: healthcare-system
+  labels:
+    app: nphies-bridge
+    version: v2.0.0
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nphies-bridge
+  template:
+    metadata:
+      labels:
+        app: nphies-bridge
+        version: v2.0.0
+    spec:
+      containers:
+      - name: nphies-bridge
+        image: registry.brainsait.com/nphies-bridge:2.0.0
+        ports:
+        - containerPort: 8003
+          name: http
+        env:
+        - name: DB_HOST
+          value: "postgres.postgres.svc.cluster.local"
+        - name: DB_NAME
+          value: "sbs_integration"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: password
+        - name: NPHIES_BASE_URL
+          value: "https://nphies.sa/api/v1"
+        - name: NPHIES_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: nphies-secrets
+              key: api_key
+        - name: ENABLE_MOCK_NPHIES
+          value: "false"
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8003
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8003
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nphies-bridge
+  namespace: healthcare-system
+spec:
+  selector:
+    app: nphies-bridge
+  ports:
+  - port: 8003
+    targetPort: 8003
+    protocol: TCP
+    name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nphies-bridge-config
+  namespace: healthcare-system
+data:
+  ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:3001,https://healthcare.brainsait.cloud"
+  NPHIES_TIMEOUT: "30"
+  NPHIES_MAX_RETRIES: "3"
+  NPHIES_TERMINOLOGY_STRICT: "false"
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nphies-bridge-hpa
+  namespace: healthcare-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nphies-bridge
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+---
+# Ingress for external access
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nphies-bridge-ingress
+  namespace: healthcare-system
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - healthcare.brainsait.cloud
+    secretName: healthcare-tls
+  rules:
+  - host: healthcare.brainsait.cloud
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nphies-bridge
+            port:
+              number: 8003
+---
+# PostgreSQL Database Deployment
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_DB
+          value: "sbs_integration"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: password
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 999
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: postgres
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+  type: ClusterIP
+---
+# Redis for caching and session management
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: healthcare-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+          name: redis
+        command: ["redis-server", "--appendonly", "yes"]
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+      volumes:
+      - name: redis-data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: healthcare-system
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+  type: ClusterIP
+---
+# Healthcare API Gateway
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: healthcare-gateway
+  namespace: healthcare-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: healthcare-gateway
+  template:
+    metadata:
+      labels:
+        app: healthcare-gateway
+    spec:
+      containers:
+      - name: healthcare-gateway
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+          name: http
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: nginx-gateway-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-gateway-config
+  namespace: healthcare-system
+data:
+  default.conf: |
+    upstream nphies_bridge {
+        server nphies-bridge:8003;
+    }
+
+    server {
+        listen 80;
+        server_name _;
+
+        location / {
+            proxy_pass http://nphies_bridge;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_read_timeout 300s;
+            proxy_connect_timeout 75s;
+        }
+
+        location /health {
+            proxy_pass http://nphies_bridge/health;
+        }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: healthcare-gateway
+  namespace: healthcare-system
+spec:
+  selector:
+    app: healthcare-gateway
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+  type: ClusterIP

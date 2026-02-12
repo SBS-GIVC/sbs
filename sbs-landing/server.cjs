@@ -157,7 +157,7 @@ function normalizeWorkflowStatus(rawStatus) {
   if (!value) return 'processing';
 
   if (['submitted_successfully', 'submitted-successfully', 'submission_success'].includes(value)) return 'submitted';
-  if (['accepted', 'success', 'ok'].includes(value)) return 'completed';
+  if (['accepted', 'success', 'ok', 'completed', 'complete'].includes(value)) return 'processing';
   if (['rejected', 'denied', 'invalid'].includes(value)) return 'rejected';
   if (['error', 'failed', 'failure', 'timeout'].includes(value)) return 'failed';
   if (['in_progress', 'in-progress', 'pending'].includes(value)) return 'processing';
@@ -3772,7 +3772,7 @@ async function triggerDirectSBS(claimData) {
       type: {
         coding: [{
           system: 'http://terminology.hl7.org/CodeSystem/claim-type',
-          code: 'institutional'
+          code: raw.claimType || 'institutional'
         }]
       },
       use: 'claim',

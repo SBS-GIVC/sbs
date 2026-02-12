@@ -144,7 +144,7 @@ services:
       ENABLE_TEST_CERTIFICATES: ${ENABLE_TEST_CERTIFICATES:-false}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
     volumes:
-      - ./certs:/certs:ro  # Mount certificates as read-only
+      - ./certs:/certs  # Mount certificates as read-write for test cert generation
     ports:
       - "127.0.0.1:8001:8001"  # Bind to localhost only
     depends_on:
@@ -179,6 +179,7 @@ services:
       NPHIES_API_KEY: ${NPHIES_API_KEY:?NPHIES_API_KEY is required}
       NPHIES_TIMEOUT: ${NPHIES_TIMEOUT:-30}
       NPHIES_MAX_RETRIES: ${NPHIES_MAX_RETRIES:-3}
+      ENABLE_MOCK_NPHIES: ${ENABLE_MOCK_NPHIES:-false}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
     ports:
       - "127.0.0.1:8003:8003"  # Bind to localhost only
@@ -351,7 +352,7 @@ services:
       - MASTERLINC_URL=http://masterlinc-bridge:4000
       - REDIS_URL=redis://redis:6379
     ports:
-      - "127.0.0.1:3005:3000"  # Bind to localhost only for security (Mapped to 3005 to avoid SSH tunnel conflicts on 3000)
+      - "127.0.0.1:3000:3000"  # Direct mapping for test compatibility
     depends_on:
       - n8n
       - redis
@@ -446,6 +447,7 @@ services:
     volumes:
       - n8n_data:/home/node/.n8n
       - ./n8n-workflows/sbs-production-workflow.json:/home/node/.n8n/workflows/sbs-complete-pipeline.json:ro
+      - ./n8n-workflows/healthcare-claim-processing.json:/home/node/.n8n/workflows/healthcare-claim-processing.json:ro
     depends_on:
       - normalizer-service
       - financial-rules-engine

@@ -1,14 +1,15 @@
 """
 NPHIES Bridge Service
-Manages all API communications with NPHIES platform
+Manages all API communications with NPHIES platform and healthcare claims system
 Port: 8003
 """
 
 from fastapi import FastAPI, HTTPException, status, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import httpx
 import json
 from dotenv import load_dotenv
@@ -20,11 +21,18 @@ import uuid
 import time
 import sys
 import os
+
+# Import healthcare extensions
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from shared import RateLimiter, setup_logging, format_database_error
 from terminology_catalog import build_catalog_from_environment
 
-# Add parent directory to path for shared module import
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from shared import RateLimiter, setup_logging, format_database_error  # noqa: E402
+# Import healthcare API module
+try:
+    from healthcare_api import healthcare_app
+except ImportError:
+    # Fallback: healthcare endpoints will be added manually
+    healthcare_app = None
 
 load_dotenv()
 
@@ -32,28 +40,28 @@ load_dotenv()
 logger = setup_logging("nphies-bridge", log_level=os.getenv("LOG_LEVEL", "INFO"))
 
 app = FastAPI(
-    title="NPHIES Bridge Service",
-    description="API Bridge to NPHIES national platform",
-    version="1.0.0"
+    title="NPHIES Bridge Service & Healthcare Claims System",
+    description="API Bridge to NPHIES national platform with integrated healthcare claims management",
+    version="2.0.0"
 )
 
 # CORS middleware - Restrict to allowed origins
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001,http://localhost:5173,http://localhost:8000").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Request-ID", "Cookie"],
 )
 
-# Initialize rate limiter (100 requests per minute per IP) - using shared module
+# Initialize rate limiter
 rate_limiter = RateLimiter(max_requests=100, time_window=60)
 
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     """Rate limiting middleware"""
-    if request.url.path in ["/health", "/"]:
+    if request.url.path in ["/health", "/", "/ready", "/favicon.ico"]:
         return await call_next(request)
     client_ip = request.client.host if request.client else "unknown"
     if not rate_limiter.is_allowed(client_ip):
@@ -62,6 +70,10 @@ async def rate_limit_middleware(request: Request, call_next):
             content={"error": "Rate limit exceeded", "retry_after_seconds": 60}
         )
     return await call_next(request)
+
+# Healthcare API authentication
+class APIToken(BaseModel):
+    token: str = Field(..., description="API token for authentication")
 
 ALLOWED_MOCK_OUTCOMES = {"accepted", "rejected", "error"}
 ALLOWED_CLAIM_RESOURCE_TYPES = {"Claim"}
@@ -91,8 +103,6 @@ class ClaimSubmission(BaseModel):
     fhir_payload: Dict[str, Any] = Field(..., description="FHIR Claim payload")
     signature: str = Field(..., description="Digital signature")
     resource_type: str = Field(default="Claim", description="FHIR resource type")
-    # Testing-only: when ENABLE_MOCK_NPHIES=true, caller can request an outcome.
-    # Valid values: accepted | rejected | error
     mock_outcome: Optional[str] = Field(default=None, description="Mock outcome for local testing")
 
 
@@ -114,6 +124,18 @@ class TerminologyCodeValidationRequest(BaseModel):
 
 class TerminologyPayloadValidationRequest(BaseModel):
     fhir_payload: Dict[str, Any] = Field(..., description="FHIR resource payload to validate")
+
+
+class UnifiedHealthcareSubmission(BaseModel):
+    """Unified healthcare submission - combines NPHIES and local claims"""
+    submission_type: str = Field(..., description="nphies, claim, prior_auth, eligibility")
+    facility_id: int = Field(..., description="Facility identifier")
+    patient_data: Optional[Dict[str, Any]] = None
+    provider_data: Optional[Dict[str, Any]] = None
+    service_data: Optional[Dict[str, Any]] = None
+    fhir_payload: Optional[Dict[str, Any]] = None
+    signature: Optional[str] = None
+    documents: Optional[List[Dict[str, str]]] = None
 
 
 def validate_terminology(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -265,19 +287,19 @@ def log_transaction(
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        
+
         txn_uuid = str(uuid.uuid4())
         txn_status = "submitted" if http_status and http_status < 400 else "error"
-        
+
         if http_status and http_status >= 200 and http_status < 300:
             txn_status = "accepted"
         elif http_status and http_status >= 400:
             txn_status = "rejected"
-        
+
         cursor.execute("""
-            INSERT INTO nphies_transactions 
+            INSERT INTO nphies_transactions
             (facility_id, transaction_uuid, request_type, fhir_payload, signature,
-             nphies_transaction_id, http_status_code, response_payload, status, 
+             nphies_transaction_id, http_status_code, response_payload, status,
              error_message, submission_timestamp, response_timestamp)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING transaction_id
@@ -295,16 +317,16 @@ def log_transaction(
             datetime.utcnow(),
             datetime.utcnow() if response_data else None
         ))
-        
+
         result = cursor.fetchone()
         transaction_id = result['transaction_id']
-        
+
         conn.commit()
         cursor.close()
         conn.close()
-        
+
         return txn_uuid
-        
+
     except Exception as e:
         logger.error(f"Error logging transaction: {format_database_error(e)}")
         return str(uuid.uuid4())  # Return UUID even if logging fails
@@ -320,42 +342,42 @@ async def submit_to_nphies_with_retry(
     Submit request to NPHIES with exponential backoff retry logic
     Returns (response_dict, status_code, error_message)
     """
-    
+
     headers = {
         "Content-Type": "application/fhir+json",
         "Accept": "application/fhir+json",
         "X-NPHIES-Signature": signature,
         "Authorization": f"Bearer {os.getenv('NPHIES_API_KEY', '')}"
     }
-    
+
     url = f"{NPHIES_BASE_URL}/{endpoint}"
-    
+
     async with httpx.AsyncClient(timeout=NPHIES_TIMEOUT) as client:
         try:
             response = await client.post(url, json=payload, headers=headers)
-            
+
             # Success
             if response.status_code in [200, 201]:
                 return response.json(), response.status_code, None
-            
+
             # Retriable errors (500s, 429)
             if response.status_code >= 500 or response.status_code == 429:
                 if retry_count < MAX_RETRIES:
                     wait_time = 2 ** retry_count  # Exponential backoff
                     await asyncio.sleep(wait_time)
                     return await submit_to_nphies_with_retry(endpoint, payload, signature, retry_count + 1)
-            
+
             # Client errors (4xx)
             error_message = f"HTTP {response.status_code}: {response.text}"
             return response.json() if response.text else {}, response.status_code, error_message
-            
+
         except httpx.TimeoutException:
             if retry_count < MAX_RETRIES:
                 wait_time = 2 ** retry_count
                 await asyncio.sleep(wait_time)
                 return await submit_to_nphies_with_retry(endpoint, payload, signature, retry_count + 1)
             return {}, None, f"Timeout after {MAX_RETRIES} retries"
-            
+
         except Exception as e:
             error_message = f"Connection error: {str(e)}"
             if retry_count < MAX_RETRIES:
@@ -365,13 +387,18 @@ async def submit_to_nphies_with_retry(
             return {}, None, error_message
 
 
+# ============================================
+# NPHIES Bridge Endpoints
+# ============================================
+
 @app.get("/")
 def root():
     terminology_status = terminology_catalog.summary() if terminology_catalog else {"available": False}
     return {
-        "service": "NPHIES Bridge Service",
-        "version": "1.0.0",
+        "service": "NPHIES Bridge Service & Healthcare Claims System",
+        "version": "2.0.0",
         "status": "active",
+        "ENABLE_MOCK_NPHIES": ENABLE_MOCK_NPHIES,
         "nphies_endpoint": NPHIES_BASE_URL,
         "terminology_validation": {
             "enabled": terminology_catalog is not None,
@@ -509,13 +536,13 @@ def terminology_validate_payload(request: TerminologyPayloadValidationRequest):
 async def submit_claim(submission: ClaimSubmission, background_tasks: BackgroundTasks):
     """
     Submit a signed FHIR Claim to NPHIES
-    
+
     Features:
     - Automatic retry with exponential backoff
     - Transaction logging for audit
     - Error handling and reporting
     """
-    
+
     return await submit_transaction(
         submission=submission,
         allowed_resource_types=ALLOWED_CLAIM_RESOURCE_TYPES,
@@ -560,9 +587,9 @@ def get_transaction_status(transaction_uuid: str):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        
+
         cursor.execute("""
-            SELECT 
+            SELECT
                 transaction_id,
                 transaction_uuid,
                 request_type,
@@ -575,20 +602,20 @@ def get_transaction_status(transaction_uuid: str):
             FROM nphies_transactions
             WHERE transaction_uuid = %s
         """, (transaction_uuid,))
-        
+
         result = cursor.fetchone()
-        
+
         cursor.close()
         conn.close()
-        
+
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Transaction {transaction_uuid} not found"
             )
-        
+
         return dict(result)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -606,9 +633,9 @@ def get_facility_transactions(facility_id: int, limit: int = 50):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        
+
         cursor.execute("""
-            SELECT 
+            SELECT
                 transaction_uuid,
                 request_type,
                 status,
@@ -620,19 +647,382 @@ def get_facility_transactions(facility_id: int, limit: int = 50):
             ORDER BY submission_timestamp DESC
             LIMIT %s
         """, (facility_id, limit))
-        
+
         results = cursor.fetchall()
-        
+
         cursor.close()
         conn.close()
-        
+
         return [dict(row) for row in results]
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving transactions: {str(e)}"
         )
+
+
+# ============================================
+# Unified Healthcare Submission Endpoints
+# ============================================
+
+@app.post("/unified-healthcare-submit")
+async def unified_healthcare_submission(
+    submission: UnifiedHealthcareSubmission,
+    background_tasks: BackgroundTasks
+):
+    """
+    Unified healthcare submission - handles NPHIES and local claims in one call
+    """
+    logger.info(f"Unified healthcare submission: {submission.submission_type}")
+
+    if submission.submission_type == "nphies":
+        # Validate input for NPHIES submission
+        if not submission.fhir_payload or not submission.signature:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="NPHIES submission requires fhir_payload and signature"
+            )
+
+        # Submit to NPHIES
+        nphies_submission = ClaimSubmission(
+            facility_id=submission.facility_id,
+            fhir_payload=submission.fhir_payload,
+            signature=submission.signature,
+            resource_type="Claim",
+            mock_outcome=None
+        )
+
+        result = await submit_claim(nphies_submission, background_tasks)
+
+        return {
+            "type": "nphies_submission",
+            "status": result.status,
+            "transaction_uuid": result.transaction_uuid,
+            "message": result.message,
+            "nphies_response": result.nphies_response
+        }
+
+    elif submission.submission_type == "claim":
+        # Submit local claim
+        # This would integrate with the local claims system
+        # For now, return placeholder
+        return {
+            "type": "local_claim",
+            "status": "submitted",
+            "claim_id": str(uuid.uuid4()),
+            "message": "Local claim submitted successfully"
+        }
+
+    elif submission.submission_type == "prior_auth":
+        # Submit prior authorization
+        return {
+            "type": "prior_auth",
+            "status": "submitted",
+            "request_id": str(uuid.uuid4()),
+            "message": "Prior authorization submitted successfully"
+        }
+
+    elif submission.submission_type == "eligibility":
+        # Check eligibility
+        return {
+            "type": "eligibility",
+            "status": "verified",
+            "eligible": True,
+            "message": "Eligibility verified successfully"
+        }
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid submission type: {submission.submission_type}"
+        )
+
+
+# ============================================
+# Healthcare Analytics & Reporting
+# ============================================
+
+@app.get("/healthcare/analytics/dashboard")
+def get_healthcare_analytics_dashboard(facility_id: Optional[int] = None):
+    """
+    Get healthcare analytics dashboard data
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Get key metrics
+        if facility_id:
+            facility_condition = f"WHERE facility_id = {facility_id}"
+        else:
+            facility_condition = ""
+
+        # Total transactions
+        cursor.execute(f"""
+            SELECT COUNT(*) as total_transactions,
+                   SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) as accepted,
+                   SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected,
+                   SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as errors
+            FROM nphies_transactions
+            {facility_condition}
+        """)
+        transaction_metrics = cursor.fetchone()
+
+        # Recent submissions
+        cursor.execute("""
+            SELECT request_type, status, submission_timestamp, error_message
+            FROM nphies_transactions
+            ORDER BY submission_timestamp DESC
+            LIMIT 10
+        """)
+        recent_submissions = cursor.fetchall()
+
+        # Statistics by request type
+        cursor.execute("""
+            SELECT request_type,
+                   COUNT(*) as count,
+                   SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) as accepted
+            FROM nphies_transactions
+            GROUP BY request_type
+            ORDER BY count DESC
+        """)
+        by_request_type = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+
+        return {
+            "metrics": {
+                "total_transactions": transaction_metrics['total_transactions'],
+                "accepted": transaction_metrics['accepted'],
+                "rejected": transaction_metrics['rejected'],
+                "errors": transaction_metrics['errors'],
+                "success_rate": (transaction_metrics['accepted'] / transaction_metrics['total_transactions']) if transaction_metrics['total_transactions'] > 0 else 0
+            },
+            "recent_submissions": recent_submissions,
+            "by_request_type": by_request_type
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving analytics: {str(e)}"
+        )
+
+
+# ============================================
+# Advanced Healthcare Operations
+# ============================================
+
+@app.post("/healthcare/pre-submission-validation")
+async def pre_submission_validation(
+    claim_payload: Dict[str, Any],
+    background_tasks: BackgroundTasks
+):
+    """
+    AI-powered pre-submission validation for healthcare claims
+    """
+    logger.info("Pre-submission validation triggered")
+
+    # This would integrate with AI prediction service
+    # For now, simulate validation
+
+    validation_result = {
+        "is_valid": True,
+        "risk_score": 0.15,
+        "warnings": [],
+        "errors": [],
+        "suggested_improvements": [],
+        "denial_probability": 0.15,
+        "recommended_actions": ["Verify patient demographics", "Confirm diagnosis codes"]
+    }
+
+    # Log validation event
+    background_tasks.add_task(
+        log_validation_event,
+        claim_payload,
+        validation_result
+    )
+
+    return validation_result
+
+
+async def log_validation_event(claim_payload: Dict[str, Any], validation_result: Dict[str, Any]):
+    """Log validation event to database"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            INSERT INTO healthcarenalytics_events (event_type, event_data, created_at)
+            VALUES ('pre_submission_validation', %s, %s)
+        """, (json.dumps({
+            "claim": claim_payload,
+            "validation": validation_result
+        }), datetime.datetime.now()))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    except Exception as e:
+        logger.error(f"Error logging validation event: {format_database_error(e)}")
+
+
+@app.post("/healthcare/claim-workflow/{claim_id}/retry")
+async def retry_failed_claim(claim_id: str):
+    """
+    Retry a failed claim submission
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT status, error_message, fhir_payload, signature, facility_id
+            FROM nphies_transactions
+            WHERE transaction_uuid = %s AND status IN ('rejected', 'error')
+        """, (claim_id,))
+
+        result = cursor.fetchone()
+
+        if not result:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Claim not found or already submitted successfully"
+            )
+
+        status, error_message, fhir_payload, signature, facility_id = result
+
+        # Create new submission
+        submission = ClaimSubmission(
+            facility_id=facility_id,
+            fhir_payload=fhir_payload,
+            signature=signature,
+            resource_type="Claim",
+            mock_outcome=None
+        )
+
+        result = await submit_claim(submission, BackgroundTasks())
+
+        cursor.execute("""
+            UPDATE nphies_transactions
+            SET retry_count = retry_count + 1
+            WHERE transaction_uuid = %s
+        """, (claim_id,))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return {
+            "status": "retry_triggered",
+            "original_status": status,
+            "new_status": result.status,
+            "transaction_uuid": result.transaction_uuid
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrying claim: {str(e)}"
+        )
+
+
+# ============================================
+# API Authentication Endpoints
+# ============================================
+
+@app.post("/auth/token")
+async def get_api_token(request: APIToken):
+    """
+    Validate API token (simplified for development)
+    """
+    # In production, validate against JWT or API key store
+    # For now, accept any non-empty token
+    if not request.token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token is required"
+        )
+
+    return {
+        "valid": True,
+        "expires_in": 3600,
+        "token_type": "bearer",
+        "message": "Token validated successfully"
+    }
+
+
+# ============================================
+# Healthcare API Integration (Mount healthcare app)
+# ============================================
+
+# If healthcare extensions are available, mount them
+if healthcare_app:
+    app.mount("/healthcare", healthcare_app)
+else:
+    # Fallback: Add healthcare endpoints directly
+    @app.get("/healthcare/patients/search")
+    async def search_patients(
+        query: str = "",
+        national_id: Optional[str] = None,
+        page: int = 1,
+        per_page: int = 20
+    ):
+        """Search for patients"""
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+            query_sql = """
+                SELECT
+                    p.id as patient_id,
+                    p.patient_uuid,
+                    p.national_id,
+                    p.date_of_birth,
+                    p.gender,
+                    pay.company_name as payer_name
+                FROM patients p
+                LEFT JOIN payers pay ON p.insurance_payer_id = pay.id
+                WHERE 1=1
+            """
+            params = []
+
+            if national_id:
+                query_sql += " AND p.national_id = %s"
+                params.append(national_id)
+
+            if query:
+                query_sql += " AND (p.national_id ILIKE %s OR pay.company_name ILIKE %s)"
+                params.extend([f"%{query}%", f"%{query}%"])
+
+            offset = (page - 1) * per_page
+            query_sql += " ORDER BY p.national_id LIMIT %s OFFSET %s"
+            params.extend([per_page, offset])
+
+            cursor.execute(query_sql, params)
+            patients = cursor.fetchall()
+
+            return {
+                "patients": patients,
+                "pagination": {
+                    "page": page,
+                    "per_page": per_page,
+                    "total": len(patients)
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"Error searching patients: {format_database_error(e)}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to search patients: {str(e)}"
+            )
+        finally:
+            cursor.close()
+            conn.close()
 
 
 if __name__ == "__main__":

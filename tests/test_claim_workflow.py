@@ -47,7 +47,11 @@ def sample_claim_data() -> Dict[str, str]:
         "memberId": f"MEM-{unique_id}",
         "payerId": "PAYER-001",
         "claimType": "professional",
-        "userEmail": f"test_{unique_id}@example.com"
+        "userEmail": f"test_{unique_id}@example.com",
+        "internal_code": "SBS-LAB-001",
+        "description": "Complete Blood Count",
+        "quantity": 1,
+        "unitPrice": 150.0
     }
 
 
@@ -61,7 +65,15 @@ def institutional_claim_data() -> Dict[str, str]:
         "memberId": f"INST-{unique_id}",
         "payerId": "PAYER-002",
         "claimType": "institutional",
-        "userEmail": f"hospital_{unique_id}@example.com"
+        "userEmail": f"hospital_{unique_id}@example.com",
+        "items": [
+            {
+                "service_code": "SBS-RAD-001",
+                "description": "Chest X-Ray",
+                "quantity": 1,
+                "unitPrice": 350.0
+            }
+        ]
     }
 
 
@@ -75,7 +87,11 @@ def pharmacy_claim_data() -> Dict[str, str]:
         "memberId": f"RX-{unique_id}",
         "payerId": "PAYER-003",
         "claimType": "pharmacy",
-        "userEmail": f"pharmacy_{unique_id}@example.com"
+        "userEmail": f"pharmacy_{unique_id}@example.com",
+        "internal_code": "SBS-LAB-001",
+        "description": "Generic Medication",
+        "quantity": 2,
+        "unitPrice": 45.0
     }
 
 
@@ -563,6 +579,7 @@ class TestFinancialRulesEngine:
         fhir_claim = {
             "resourceType": "Claim",
             "status": "active",
+            "facility_id": 1,
             "type": {
                 "coding": [{
                     "system": "http://terminology.hl7.org/CodeSystem/claim-type",
@@ -577,21 +594,20 @@ class TestFinancialRulesEngine:
                 "sequence": 1,
                 "productOrService": {
                     "coding": [{
-                        "system": "http://sbs.chi.gov.sa/CodeSystem",
+                        "system": "http://sbs.sa/coding/services",
                         "code": "SBS-LAB-001"
                     }]
                 },
                 "quantity": {"value": 1},
                 "unitPrice": {"value": 100, "currency": "SAR"}
-            }],
-            "extensions": {
-                "facility_id": 1
-            }
+            }]
         }
         response = requests.post(
             f"{FINANCIAL_RULES_URL}/validate",
             json=fhir_claim
         )
+        if response.status_code != 200:
+            print(f"Validation failure details: {response.text}")
         assert response.status_code == 200
         data = response.json()
         assert data["resourceType"] == "Claim"

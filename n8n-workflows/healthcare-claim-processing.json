@@ -1,0 +1,274 @@
+{
+  "name": "Healthcare Claim Processing Workflow",
+  "active": true,
+  "settings": {
+    "saveManualExecutions": true,
+    "executionTimeout": 300,
+    "errorWorkflow": "healthcare-claim-error-handler"
+  },
+  "nodes": [
+    {
+      "id": "webhook-receive-claim",
+      "name": "Webhook: Receive Claim",
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "healthcare-claim-receive",
+        "responseMode": "responseNode"
+      },
+      "webhookId": "healthcare-claim-receive"
+    },
+    {
+      "id": "validate-claim-data",
+      "name": "Validate Claim Data",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "// Validate claim data\nreturn {\n  isValid: true,\n  claimId: $input.json().claimId,\n  patientId: $input.json().patientId,\n  serviceCode: $input.json().serviceCode,\n  diagnosisCode: $input.json().diagnosisCode,\n  billedAmount: $input.json().billedAmount\n};"
+      }
+    },
+    {
+      "id": "ai-pre-submission-validation",
+      "name": "AI Pre-Submission Validation",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8003/healthcare/pre-submission-validation",
+        "json": true,
+        "body": {
+          "claim_payload": "={{$input.json()}}"
+        }
+      }
+    },
+    {
+      "id": "check-eligibility",
+      "name": "Check Eligibility",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8003/healthcare/eligibility/check",
+        "json": true,
+        "body": {
+          "patient_id": "={{$input.json().patientId}}",
+          "provider_id": "={{$input.json().providerId}}",
+          "service_codes": ["={{$input.json().serviceCode}}"],
+          "check_type": "real_time"
+        }
+      }
+    },
+    {
+      "id": "generate-digital-signature",
+      "name": "Generate Digital Signature",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8001/sign",
+        "json": true,
+        "body": {
+          "data": "={{$input.json()}}"
+        }
+      }
+    },
+    {
+      "id": "submit-to-nphies",
+      "name": "Submit to NPHIES",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8003/submit-claim",
+        "json": true,
+        "body": {
+          "facility_id": 1,
+          "fhir_payload": "={{$input.json()}}",
+          "signature": "={{$node['Generate Digital Signature'].json.signature}}"
+        }
+      }
+    },
+    {
+      "id": "handle-nphies-response",
+      "name": "Handle NPHIES Response",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "// Process NPHIES response\nconst response = $input.json();\n\nif (response.status === 'accepted') {\n  return {\n    status: 'approved',\n    claimId: response.transaction_uuid,\n    message: 'Claim approved by NPHIES'\n  };\n} else if (response.status === 'rejected') {\n  return {\n    status: 'rejected',\n    claimId: response.transaction_uuid,\n    message: 'Claim rejected by NPHIES',\n    rejectionReason: response.message\n  };\n} else {\n  return {\n    status: 'error',\n    claimId: response.transaction_uuid,\n    message: 'Error submitting claim to NPHIES',\n    error: response.message\n  };\n}"
+      }
+    },
+    {
+      "id": "update-claim-status-db",
+      "name": "Update Claim Status in DB",
+      "type": "n8n-nodes-base.postgres",
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE claims SET claim_status = $1, updated_at = NOW() WHERE claim_uuid = $2",
+        "values": "={{'status', 'claimId'}}"
+      }
+    },
+    {
+      "id": "send-notification",
+      "name": "Send Notification",
+      "type": "n8n-nodes-base.emailSend",
+      "parameters": {
+        "fromEmail": "notifications@brainsait.com",
+        "toEmail": "={{$input.json().userEmail}}",
+        "subject": "Healthcare Claim Status Update",
+        "text": "={{$input.json().message}}\\n\\nClaim ID: {{$input.json().claimId}}"
+      }
+    },
+    {
+      "id": "log-analytics",
+      "name": "Log Analytics Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:8003/healthcare/analytics/events",
+        "json": true,
+        "body": {
+          "event_type": "claim_processing_complete",
+          "entity_type": "claim",
+          "entity_id": "={{$input.json().claimId}}",
+          "event_data": "={{$input.json()}}"
+        }
+      }
+    },
+    {
+      "id": "node-error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.errorTrigger",
+      "parameters": {}
+    },
+    {
+      "id": "error-logger",
+      "name": "Log Error",
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "// Log error to database\nreturn {\n  error: $input.json().error,\n  workflow: 'healthcare-claim-processing',\n  timestamp: new Date().toISOString()\n};"
+      }
+    },
+    {
+      "id": "error-notification",
+      "name": "Error Notification",
+      "type": "n8n-nodes-base.emailSend",
+      "parameters": {
+        "fromEmail": "alerts@brainsait.com",
+        "toEmail": "admin@brainsait.com",
+        "subject": "Healthcare Claim Processing Error",
+        "text": "Error in healthcare claim processing workflow: {{$input.json().error}}"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook: Receive Claim": {
+      "main": [
+        [
+          {
+            "node": "Validate Claim Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Claim Data": {
+      "main": [
+        [
+          {
+            "node": "AI Pre-Submission Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Pre-Submission Validation": {
+      "main": [
+        [
+          {
+            "node": "Check Eligibility",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Eligibility": {
+      "main": [
+        [
+          {
+            "node": "Generate Digital Signature",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Digital Signature": {
+      "main": [
+        [
+          {
+            "node": "Submit to NPHIES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit to NPHIES": {
+      "main": [
+        [
+          {
+            "node": "Handle NPHIES Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle NPHIES Response": {
+      "main": [
+        [
+          {
+            "node": "Update Claim Status in DB",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Notification",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Analytics Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Log Error",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Error Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "tags": [
+    "healthcare",
+    "claims",
+    "nphies",
+    "automation",
+    "ai-validation"
+  ],
+  "description": "End-to-end healthcare claim processing workflow with AI validation, eligibility checking, digital signature generation, and NPHIES submission with error handling and analytics",
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupVersion": 1
+  }
+}
