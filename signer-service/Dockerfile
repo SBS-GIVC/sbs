@@ -8,10 +8,11 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY signer-service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY shared ./shared
+COPY signer-service/ ./
 
 # Create certificates directory
 RUN mkdir -p /certs

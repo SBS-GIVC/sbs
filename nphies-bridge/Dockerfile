@@ -7,10 +7,11 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY nphies-bridge/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY shared ./shared
+COPY nphies-bridge/ ./
 
 EXPOSE 8003
 

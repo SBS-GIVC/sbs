@@ -1,0 +1,194 @@
+{
+  "meta": {
+    "runId": "2026-02-12T04-30-28-542Z",
+    "headless": true,
+    "baseUrl": "http://localhost:3001/",
+    "apiBaseUrl": "http://127.0.0.1:3300",
+    "artifactsDir": "/Users/fadil369/sbs/output/playwright/sbs-landing-smoke/2026-02-12T04-30-28-542Z"
+  },
+  "views": [
+    {
+      "view": "dashboard",
+      "normalized": "dashboard",
+      "ok": true,
+      "durationMs": 1721
+    },
+    {
+      "view": "eligibility",
+      "normalized": "eligibility",
+      "ok": true,
+      "durationMs": 603
+    },
+    {
+      "view": "prior-auth",
+      "normalized": "prior-auth",
+      "ok": true,
+      "durationMs": 311
+    },
+    {
+      "view": "claim-builder",
+      "normalized": "claim-builder",
+      "ok": true,
+      "durationMs": 198
+    },
+    {
+      "view": "claims",
+      "normalized": "claims",
+      "ok": true,
+      "durationMs": 228
+    },
+    {
+      "view": "code-browser",
+      "normalized": "code-browser",
+      "ok": true,
+      "durationMs": 715
+    },
+    {
+      "view": "unified-browser",
+      "normalized": "unified-browser",
+      "ok": true,
+      "durationMs": 1175
+    },
+    {
+      "view": "mappings",
+      "normalized": "mappings",
+      "ok": true,
+      "durationMs": 183
+    },
+    {
+      "view": "mapping_rules",
+      "normalized": "mapping_rules",
+      "ok": true,
+      "durationMs": 112
+    },
+    {
+      "view": "ai-hub",
+      "normalized": "ai-hub",
+      "ok": true,
+      "durationMs": 152
+    },
+    {
+      "view": "ai-analytics",
+      "normalized": "ai-analytics",
+      "ok": true,
+      "durationMs": 116
+    },
+    {
+      "view": "predictive-analytics",
+      "normalized": "predictive-analytics",
+      "ok": true,
+      "durationMs": 114
+    },
+    {
+      "view": "iot-dashboard",
+      "normalized": "iot-dashboard",
+      "ok": true,
+      "durationMs": 122
+    },
+    {
+      "view": "developer",
+      "normalized": "developer",
+      "ok": true,
+      "durationMs": 110
+    },
+    {
+      "view": "settings",
+      "normalized": "settings",
+      "ok": true,
+      "durationMs": 118
+    },
+    {
+      "view": "facility_performance",
+      "normalized": "facility_performance",
+      "ok": true,
+      "durationMs": 172
+    },
+    {
+      "view": "facility_usage",
+      "normalized": "facility_usage",
+      "ok": true,
+      "durationMs": 183
+    }
+  ],
+  "browser": {
+    "consoleErrors": [],
+    "pageErrors": [],
+    "requestFailures": [],
+    "apiFailures": []
+  },
+  "apiSmoke": {
+    "ok": true,
+    "skipped": false,
+    "checks": [
+      {
+        "name": "health",
+        "url": "http://127.0.0.1:3300/health",
+        "status": 200,
+        "ok": true,
+        "durationMs": 4
+      },
+      {
+        "name": "services_status",
+        "url": "http://127.0.0.1:3300/api/services/status",
+        "status": 200,
+        "ok": true,
+        "durationMs": 10028
+      },
+      {
+        "name": "claims_list",
+        "url": "http://127.0.0.1:3300/api/claims",
+        "status": 200,
+        "ok": true,
+        "durationMs": 2
+      }
+    ]
+  },
+  "n8n": {
+    "workflowFiles": {
+      "ok": true,
+      "results": [
+        {
+          "file": "iot-event-processing.json",
+          "name": "IoT Event Processing Pipeline",
+          "ok": true,
+          "nodeCount": 7,
+          "webhookNodes": [
+            {
+              "name": "Webhook: IoT Events",
+              "path": "iot-events"
+            }
+          ]
+        },
+        {
+          "file": "sbs-integration-v5-fixed.json",
+          "name": "SBS Integration - Full Workflow (v5 Fixed)",
+          "ok": true,
+          "nodeCount": 7,
+          "webhookNodes": [
+            {
+              "name": "Webhook: HIS Claim",
+              "path": "sbs-claim-submission"
+            }
+          ]
+        },
+        {
+          "file": "sbs-production-workflow.json",
+          "name": "SBS Integration - Full Workflow (v5 Fixed)",
+          "ok": true,
+          "nodeCount": 7,
+          "webhookNodes": [
+            {
+              "name": "Webhook: HIS Claim",
+              "path": "sbs-claim-submission"
+            }
+          ]
+        }
+      ],
+      "skipped": false
+    },
+    "webhookCheck": {
+      "ok": true,
+      "skipped": true
+    }
+  }
+}

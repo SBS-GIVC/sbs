@@ -18,6 +18,22 @@ COMPLIANCELINC_URL = "http://localhost:4003"
 SBS_LANDING_URL = "http://localhost:3000"
 
 
+
+def _service_available(url: str) -> bool:
+    try:
+        response = httpx.get(url, timeout=1.5)
+        return response.status_code < 500
+    except Exception:
+        return False
+
+
+if not _service_available(f"{MASTERLINC_URL}/health"):
+    pytest.skip(
+        "Skipping MasterLinc integration suite: bridge is unavailable at localhost:4000",
+        allow_module_level=True,
+    )
+
+
 class TestMasterLincIntegration:
     """Test MasterLinc Bridge integration"""
     

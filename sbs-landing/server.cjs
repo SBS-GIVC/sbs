@@ -8,6 +8,7 @@ const cors = require('cors');
 const multer = require('multer');
 const axios = require('axios');
 const https = require('https');
+const { spawnSync } = require('child_process');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
@@ -15,6 +16,17 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 require('dotenv').config();
+const {
+  DEFAULT_AI_POLICY,
+  assessPreSubmitDenial,
+  buildReAdjudicationAutopilotDraft,
+  composePriorAuthNarrative,
+  extractEvidenceFromContent,
+  fingerprintPayload,
+  predictWorkflowSlaRouting,
+  recommendFacilityOptimization,
+  summarizeEvaluationKpis
+} = require('./ai/capability_engine.cjs');
 
 const app = express();
 // We run behind Traefik in VPS deployments; trust first proxy hop for IP/rate-limit correctness.
@@ -23,9 +35,12 @@ app.use(compression()); // Compress all responses
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 const PORT = process.env.PORT || 3000;
+const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || '/tmp/sbs-uploads');
 
 // In-memory claim tracking (minimal; replace with DB later)
 const claimStore = new Map();
+const aiTelemetryStore = [];
+const AI_TELEMETRY_LIMIT = Math.max(250, Number(process.env.AI_TELEMETRY_LIMIT || 4000));
 const CLAIM_STAGE_ORDER = [
   'received',
   'validation',
@@ -36,6 +51,37 @@ const CLAIM_STAGE_ORDER = [
 ];
 const SUCCESS_STATUSES = new Set(['completed', 'approved', 'submitted']);
 const TERMINAL_STATUSES = new Set(['completed', 'approved', 'rejected', 'failed']);
+
+function recordAiTelemetryEvent(eventType, payload = {}, context = {}) {
+  const event = {
+    id: `AIE-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+    timestamp: new Date().toISOString(),
+    eventType: String(eventType || 'unknown'),
+    capability: String(context.capability || eventType || 'unknown'),
+    modelVersion: String(context.modelVersion || 'v1'),
+    payloadFingerprint: fingerprintPayload(payload),
+    outcome: context.outcome || null,
+    metadata: context.metadata || {}
+  };
+  aiTelemetryStore.push(event);
+  if (aiTelemetryStore.length > AI_TELEMETRY_LIMIT) {
+    aiTelemetryStore.splice(0, aiTelemetryStore.length - AI_TELEMETRY_LIMIT);
+  }
+  return event;
+}
+
+function getAiPolicy() {
+  const lowRiskThreshold = Math.max(20, Math.min(80, Number(process.env.AI_DENIAL_LOW_THRESHOLD || DEFAULT_AI_POLICY.lowRiskThreshold)));
+  const reviewThreshold = Math.max(lowRiskThreshold, Math.min(95, Number(process.env.AI_DENIAL_REVIEW_THRESHOLD || DEFAULT_AI_POLICY.reviewThreshold)));
+  const blockThreshold = Math.max(reviewThreshold, Math.min(99, Number(process.env.AI_DENIAL_BLOCK_THRESHOLD || DEFAULT_AI_POLICY.blockThreshold)));
+  const requireHumanApprovalAtOrAbove = Math.max(reviewThreshold, Math.min(99, Number(process.env.AI_REQUIRE_HUMAN_AT_OR_ABOVE || DEFAULT_AI_POLICY.requireHumanApprovalAtOrAbove)));
+  return {
+    lowRiskThreshold,
+    reviewThreshold,
+    blockThreshold,
+    requireHumanApprovalAtOrAbove
+  };
+}
 
 function isValidClaimId(claimId) {
   return /^(CLM|CLAIM)-[A-Za-z0-9-]{3,}$/.test(String(claimId || ''));
@@ -112,10 +158,60 @@ function normalizeWorkflowStatus(rawStatus) {
 
   if (['submitted_successfully', 'submitted-successfully', 'submission_success'].includes(value)) return 'submitted';
   if (['accepted', 'success', 'ok'].includes(value)) return 'completed';
-  if (['error', 'failed', 'failure', 'rejected', 'denied'].includes(value)) return 'failed';
+  if (['rejected', 'denied', 'invalid'].includes(value)) return 'rejected';
+  if (['error', 'failed', 'failure', 'timeout'].includes(value)) return 'failed';
   if (['in_progress', 'in-progress', 'pending'].includes(value)) return 'processing';
 
   return value;
+}
+
+function normalizeNphiesBridgeStatus(rawStatus, httpStatus = null) {
+  const value = String(rawStatus || '').trim().toLowerCase();
+  const parsedHttpStatus = Number(httpStatus);
+
+  if (['accepted', 'submitted_successfully', 'submitted', 'processed', 'ok', 'success'].includes(value)) {
+    return 'accepted';
+  }
+  if (['rejected', 'denied', 'invalid'].includes(value)) {
+    return 'rejected';
+  }
+  if (['error', 'failed', 'failure', 'timeout'].includes(value)) {
+    return 'error';
+  }
+  if (Number.isFinite(parsedHttpStatus)) {
+    if (parsedHttpStatus >= 200 && parsedHttpStatus < 300) return 'accepted';
+    if (parsedHttpStatus >= 400 && parsedHttpStatus < 500) return 'rejected';
+    if (parsedHttpStatus >= 500) return 'error';
+  }
+  return value || 'submitted';
+}
+
+function buildReAdjudicationPayloadFromRecord(record, message, reasonCode, resourceType) {
+  const claimReference = record?.submissionId || record?.claimId;
+  const patientReference = record?.patientId ? `Patient/${record.patientId}` : undefined;
+  const now = new Date().toISOString();
+
+  if (resourceType === 'CommunicationRequest') {
+    return {
+      resourceType: 'CommunicationRequest',
+      status: 'active',
+      authoredOn: now,
+      ...(patientReference ? { subject: { reference: patientReference } } : {}),
+      ...(claimReference ? { about: [{ reference: `Claim/${claimReference}` }] } : {}),
+      reasonCode: [{ text: reasonCode }],
+      payload: [{ contentString: message }]
+    };
+  }
+
+  return {
+    resourceType: 'Communication',
+    status: 'completed',
+    sent: now,
+    ...(patientReference ? { subject: { reference: patientReference } } : {}),
+    ...(claimReference ? { about: [{ reference: `Claim/${claimReference}` }] } : {}),
+    reasonCode: [{ text: reasonCode }],
+    payload: [{ contentString: message }]
+  };
 }
 
 function isEnvEnabled(value, defaultValue = false) {
@@ -294,6 +390,117 @@ const DEFAULT_FACILITY_ID = parseFacilityId(
   process.env.DEFAULT_FACILITY_ID || process.env.PROVIDER_CHI_ID || 1,
   1
 );
+
+function parseMaybeJson(raw, fallback = null) {
+  if (raw == null || raw === '') return fallback;
+  if (typeof raw === 'object') return raw;
+  try {
+    return JSON.parse(String(raw));
+  } catch {
+    return fallback;
+  }
+}
+
+function hasSystemCommand(command) {
+  const result = spawnSync('which', [command], { encoding: 'utf8', timeout: 2000 });
+  return result.status === 0;
+}
+
+async function safeDeleteFile(filePath) {
+  try {
+    await fs.unlink(filePath);
+  } catch {
+    // ignore cleanup errors
+  }
+}
+
+async function extractEvidenceTextFromUploadedFile(file) {
+  if (!file?.path) {
+    return {
+      extractedText: '',
+      sourceType: 'text',
+      parser: 'none',
+      confidence: 0.2,
+      warnings: ['No file uploaded.']
+    };
+  }
+
+  const resolvedPath = path.resolve(file.path);
+  if (!resolvedPath.startsWith(UPLOAD_DIR + path.sep)) {
+    throw new Error('Invalid file path for evidence extraction');
+  }
+
+  const mimeType = String(file.mimetype || '').toLowerCase();
+  const fileName = String(file.originalname || file.filename || '').toLowerCase();
+  const warnings = [];
+
+  if (
+    mimeType.includes('json') ||
+    mimeType.includes('xml') ||
+    mimeType.startsWith('text/') ||
+    fileName.endsWith('.txt') ||
+    fileName.endsWith('.csv') ||
+    fileName.endsWith('.json') ||
+    fileName.endsWith('.xml')
+  ) {
+    const extractedText = await fs.readFile(resolvedPath, 'utf8');
+    return {
+      extractedText,
+      sourceType: mimeType.includes('json') ? 'json' : (mimeType.includes('xml') ? 'xml' : 'text'),
+      parser: 'native',
+      confidence: 0.9,
+      warnings
+    };
+  }
+
+  if ((mimeType.includes('pdf') || fileName.endsWith('.pdf')) && hasSystemCommand('pdftotext')) {
+    const result = spawnSync('pdftotext', [resolvedPath, '-'], {
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024,
+      timeout: 20000
+    });
+    if (result.status === 0 && result.stdout?.trim()) {
+      return {
+        extractedText: result.stdout,
+        sourceType: 'pdf',
+        parser: 'pdftotext',
+        confidence: 0.76,
+        warnings
+      };
+    }
+    warnings.push(`PDF extraction returned no text (${result.stderr || 'unknown parser error'}).`);
+  } else if (mimeType.includes('pdf') || fileName.endsWith('.pdf')) {
+    warnings.push('pdftotext is unavailable; PDF extraction fell back to metadata only.');
+  }
+
+  if ((mimeType.startsWith('image/') || /\.(png|jpg|jpeg|tif|tiff|bmp)$/i.test(fileName)) && hasSystemCommand('tesseract')) {
+    const result = spawnSync('tesseract', [resolvedPath, 'stdout'], {
+      encoding: 'utf8',
+      maxBuffer: 10 * 1024 * 1024,
+      timeout: 30000
+    });
+    if (result.status === 0 && result.stdout?.trim()) {
+      return {
+        extractedText: result.stdout,
+        sourceType: 'image_ocr',
+        parser: 'tesseract',
+        confidence: 0.68,
+        warnings
+      };
+    }
+    warnings.push(`OCR extraction returned no text (${result.stderr || 'unknown OCR error'}).`);
+  } else if (mimeType.startsWith('image/') || /\.(png|jpg|jpeg|tif|tiff|bmp)$/i.test(fileName)) {
+    warnings.push('tesseract is unavailable; image OCR extraction was skipped.');
+  }
+
+  return {
+    extractedText: '',
+    sourceType: 'text',
+    parser: 'fallback',
+    confidence: 0.3,
+    warnings: [...warnings, 'No extractable textual content detected for this file type.']
+  };
+}
 
 function toPublicSbsCode(entry) {
   return {
@@ -1308,9 +1515,8 @@ app.get('/tracking.html', (req, res) => {
 // File upload configuration
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
-    const uploadDir = '/tmp/sbs-uploads';
-    await fs.mkdir(uploadDir, { recursive: true });
-    cb(null, uploadDir);
+    await fs.mkdir(UPLOAD_DIR, { recursive: true });
+    cb(null, UPLOAD_DIR);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -2530,6 +2736,247 @@ app.post('/api/ai/analyze', (req, res) => {
   });
 });
 
+app.post('/api/ai/pre-submit-denial-copilot', (req, res) => {
+  const body = req.body || {};
+  const claimData = body.claim_data || body.claimData || body;
+  const policy = getAiPolicy();
+  const assessment = assessPreSubmitDenial({
+    ...claimData,
+    evidenceConfidence: claimData?.evidence_confidence ?? claimData?.evidenceConfidence ?? body?.evidence_confidence ?? body?.evidenceConfidence,
+    priorRejections: claimData?.prior_rejections ?? claimData?.priorRejections
+  }, policy);
+
+  recordAiTelemetryEvent('pre_submit_denial_check', assessment, {
+    capability: 'pre_submit_denial_prevention_copilot',
+    modelVersion: assessment.version,
+    outcome: assessment.decision?.recommendedAction,
+    metadata: {
+      riskScore: assessment.risk?.score
+    }
+  });
+
+  return res.json({
+    success: true,
+    policy,
+    assessment
+  });
+});
+
+app.post('/api/ai/evidence/extract', upload.single('evidenceFile'), async (req, res) => {
+  try {
+    const body = req.body || {};
+    const parsedLabResults = parseMaybeJson(body.labResults || body.lab_results, body.labResults || body.lab_results || []);
+
+    let extractedText = String(body.evidenceText || body.evidence_text || '').trim();
+    let sourceType = extractedText ? 'text' : 'text';
+    let parser = 'provided';
+    let parserConfidence = extractedText ? 0.86 : 0.2;
+    let parserWarnings = [];
+
+    if (req.file) {
+      const fileExtraction = await extractEvidenceTextFromUploadedFile(req.file);
+      extractedText = extractedText || fileExtraction.extractedText;
+      sourceType = fileExtraction.sourceType || sourceType;
+      parser = fileExtraction.parser || parser;
+      parserConfidence = fileExtraction.confidence ?? parserConfidence;
+      parserWarnings = fileExtraction.warnings || [];
+      await safeDeleteFile(req.file.path);
+    }
+
+    const extraction = extractEvidenceFromContent({
+      evidenceText: extractedText,
+      sourceType,
+      sourceName: req.file?.originalname || body.sourceName || body.source_name || '',
+      labResults: parsedLabResults
+    });
+
+    const mergedConfidence = Math.max(0, Math.min(1, (extraction.confidence?.score || 0) * 0.75 + parserConfidence * 0.25));
+    extraction.confidence.score = Number(mergedConfidence.toFixed(3));
+    extraction.warnings = Array.from(new Set([...(extraction.warnings || []), ...parserWarnings]));
+    extraction.parser = {
+      type: parser,
+      sourceType
+    };
+
+    recordAiTelemetryEvent('evidence_extraction', extraction, {
+      capability: 'multimodal_evidence_extractor',
+      modelVersion: extraction.version,
+      outcome: extraction.supportingInfo?.length ? 'success' : 'empty',
+      metadata: {
+        supportingInfoCount: extraction.supportingInfo?.length || 0,
+        sourceType
+      }
+    });
+
+    return res.json({
+      success: true,
+      extraction
+    });
+  } catch (error) {
+    if (req.file?.path) await safeDeleteFile(req.file.path);
+    return res.status(500).json({
+      success: false,
+      error: 'Evidence extraction failed',
+      message: extractErrorMessage(error, 'Unable to extract evidence')
+    });
+  }
+});
+
+app.post('/api/ai/prior-auth/compose', (req, res) => {
+  const body = req.body || {};
+  const composition = composePriorAuthNarrative(body);
+
+  recordAiTelemetryEvent('prior_auth_composition', composition, {
+    capability: 'smart_prior_auth_composer',
+    modelVersion: composition.version,
+    outcome: composition.readinessScore >= 70 ? 'ready' : 'incomplete',
+    metadata: {
+      readinessScore: composition.readinessScore
+    }
+  });
+
+  return res.json({
+    success: true,
+    composition
+  });
+});
+
+app.post('/api/ai/workflow/orchestrate', (req, res) => {
+  const body = req.body || {};
+  const prediction = predictWorkflowSlaRouting(body);
+
+  recordAiTelemetryEvent('workflow_orchestration_prediction', prediction, {
+    capability: 'workflow_ai_orchestrator',
+    modelVersion: prediction.version,
+    outcome: prediction.decision?.route,
+    metadata: {
+      breachProbability: prediction.sla?.breachProbability
+    }
+  });
+
+  return res.json({
+    success: true,
+    prediction
+  });
+});
+
+app.post('/api/ai/facility-optimization', (req, res) => {
+  const body = req.body || {};
+  const facilityId = Number(body.facility_id || body.facilityId || 1);
+  const claims = Array.from(claimStore.values()).filter((claim) => Number(claim.facilityId || 1) === facilityId);
+  const optimization = recommendFacilityOptimization({
+    facilityId,
+    claims
+  });
+
+  recordAiTelemetryEvent('facility_optimization', optimization, {
+    capability: 'facility_optimization_engine',
+    modelVersion: optimization.version,
+    outcome: optimization.recommendations?.length || 0,
+    metadata: {
+      facilityId,
+      claimCount: claims.length
+    }
+  });
+
+  return res.json({
+    success: true,
+    optimization
+  });
+});
+
+app.get('/api/ai/eval/summary', (req, res) => {
+  const days = Math.max(1, Math.min(365, Number(req.query?.days || 90)));
+  const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
+
+  const claims = Array.from(claimStore.values()).filter((claim) => {
+    const ts = new Date(claim.createdAt || 0).getTime();
+    return Number.isFinite(ts) && ts >= cutoff;
+  });
+  const telemetryEvents = aiTelemetryStore.filter((event) => {
+    const ts = new Date(event.timestamp || 0).getTime();
+    return Number.isFinite(ts) && ts >= cutoff;
+  });
+
+  const evaluation = summarizeEvaluationKpis({
+    claims,
+    telemetryEvents
+  });
+
+  return res.json({
+    success: true,
+    windowDays: days,
+    evaluation
+  });
+});
+
+app.get('/api/ai/telemetry/events', (req, res) => {
+  const limit = Math.max(1, Math.min(1000, Number(req.query?.limit || 100)));
+  const events = aiTelemetryStore.slice(-limit).reverse();
+  return res.json({
+    success: true,
+    count: events.length,
+    events
+  });
+});
+
+app.post('/api/ai/approvals/decision', (req, res) => {
+  const body = req.body || {};
+  const claimId = String(body.claimId || body.claim_id || '').trim();
+  const capability = String(body.capability || 'unknown').trim();
+  const approved = Boolean(body.approved);
+  const reason = String(body.reason || '').trim();
+  const overrides = body.overrides && typeof body.overrides === 'object' ? body.overrides : {};
+
+  if (!claimId) {
+    return res.status(400).json({
+      success: false,
+      error: 'claimId is required'
+    });
+  }
+
+  const record = claimStore.get(claimId);
+  if (!record) {
+    return res.status(404).json({
+      success: false,
+      error: 'Claim not found'
+    });
+  }
+
+  const approvalEvent = {
+    capability,
+    approved,
+    reason: reason || null,
+    overrides,
+    timestamp: new Date().toISOString()
+  };
+
+  const ai = record.ai || {};
+  const approvals = Array.isArray(ai.approvals) ? ai.approvals : [];
+  record.ai = {
+    ...ai,
+    approvals: [...approvals, approvalEvent]
+  };
+  record.lastUpdate = new Date().toISOString();
+  claimStore.set(claimId, record);
+
+  recordAiTelemetryEvent('human_approval_decision', approvalEvent, {
+    capability: 'human_in_the_loop_controls',
+    modelVersion: 'v1',
+    outcome: approved ? 'approved' : 'rejected',
+    metadata: {
+      claimId,
+      capability
+    }
+  });
+
+  return res.json({
+    success: true,
+    claimId,
+    approvalEvent
+  });
+});
+
 app.get('/api/ai/facility-analytics', (req, res) => {
   const facilityId = Number(req.query?.facility_id || 1);
   const days = Math.max(1, Math.min(365, Number(req.query?.days || 30)));
@@ -2707,6 +3154,32 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
     const firstProcedureCode = Array.isArray(body.procedureCodes) && body.procedureCodes.length
       ? body.procedureCodes[0]
       : (Array.isArray(body.procedure_codes) && body.procedure_codes.length ? body.procedure_codes[0] : undefined);
+    const diagnosisCodes = Array.from(new Set(
+      [
+        ...(Array.isArray(body.diagnosisCodes) ? body.diagnosisCodes : []),
+        ...(Array.isArray(body.diagnosis_codes) ? body.diagnosis_codes : []),
+        body.diagnosisCode,
+        body.diagnosis_code
+      ]
+        .filter(Boolean)
+        .map((code) => String(code).trim().toUpperCase())
+    ));
+    const procedureCodes = Array.from(new Set(
+      [
+        ...(Array.isArray(body.procedureCodes) ? body.procedureCodes : []),
+        ...(Array.isArray(body.procedure_codes) ? body.procedure_codes : []),
+        body.procedureCode,
+        body.procedure_code,
+        body.service_code,
+        body.serviceCode,
+        firstProcedureCode,
+        ...(Array.isArray(body.items)
+          ? body.items.map((item) => item?.service_code || item?.serviceCode || item?.sbsCode || item?.code)
+          : [])
+      ]
+        .filter(Boolean)
+        .map((code) => String(code).trim())
+    ));
 
     const patientName = body.patientName || body.patient?.name;
     const patientId = body.patientId || body.patient?.id || body.patient_id;
@@ -2746,6 +3219,20 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
     const description = body.description || body.service_desc || body.serviceDesc || service_desc;
     const quantity = body.quantity || firstItem?.quantity;
     const unit_price = body.unit_price || body.unitPrice || firstItem?.unitPrice;
+    const totalAmount = Math.max(
+      0,
+      Number(
+        body.total_amount ||
+        body.totalAmount ||
+        (Array.isArray(body.items)
+          ? body.items.reduce((sum, item) => {
+            const qty = Number(item?.quantity || 1);
+            const price = Number(item?.unit_price || item?.unitPrice || item?.price || 0);
+            return sum + (qty * price);
+          }, 0)
+          : (Number(quantity || 1) * Number(unit_price || 0)))
+      ) || 0
+    );
 
     // Validate required fields
     const requiredFields = ['patientName', 'patientId', 'claimType', 'userEmail'];
@@ -2795,6 +3282,9 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       service_code,
       service_desc,
       items: body.items,
+      diagnosis_codes: diagnosisCodes,
+      procedure_codes: procedureCodes,
+      total_amount: totalAmount,
 
       // Optional: direct SBS processing inputs (used when n8n is unavailable)
       facility_id,
@@ -2810,6 +3300,9 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       // Claim Details
       claimType: normalizedClaimType,
       submissionDate: new Date().toISOString(),
+      diagnosisCodes,
+      procedureCodes,
+      totalAmount,
       
       // Note: Credentials are now handled server-side for security
       
@@ -2841,6 +3334,89 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       }
     }
 
+    const aiPolicy = getAiPolicy();
+    const preSubmitAssessment = assessPreSubmitDenial({
+      claimType: normalizedClaimType,
+      memberId: memberId || patientId,
+      patientId,
+      diagnosisCodes,
+      procedureCodes,
+      totalAmount,
+      mappingConfidence: Number(body.mappingConfidence || body.mapping_confidence || 0.65),
+      priorRejections: Number(body.priorRejections || body.prior_rejections || 0),
+      evidenceConfidence: Number(body.evidenceConfidence || body.evidence_confidence || (req.file ? 0.58 : 0.45)),
+      attachmentCount: req.file ? 1 : 0
+    }, aiPolicy);
+    recordAiTelemetryEvent('pre_submit_denial_check', preSubmitAssessment, {
+      capability: 'pre_submit_denial_prevention_copilot',
+      modelVersion: preSubmitAssessment.version,
+      outcome: preSubmitAssessment.decision.recommendedAction,
+      metadata: {
+        riskScore: preSubmitAssessment.risk?.score,
+        claimType: normalizedClaimType
+      }
+    });
+
+    const enforceHumanApprovalGate = isEnvEnabled(process.env.AI_HUMAN_APPROVAL_GATE, false);
+    if (enforceHumanApprovalGate && preSubmitAssessment.decision.requiresHumanApproval) {
+      if (req.file) await safeDeleteFile(req.file.path);
+      return res.status(409).json({
+        success: false,
+        error: 'Human approval required before claim submission',
+        ai: {
+          policy: aiPolicy,
+          preSubmit: preSubmitAssessment
+        }
+      });
+    }
+
+    const autoBlockEnabled = isEnvEnabled(process.env.AI_DENIAL_AUTOBLOCK, false);
+    if (autoBlockEnabled && preSubmitAssessment.decision.recommendedAction === 'block') {
+      if (req.file) await safeDeleteFile(req.file.path);
+      return res.status(422).json({
+        success: false,
+        error: 'Claim blocked by pre-submit denial prevention copilot',
+        ai: {
+          policy: aiPolicy,
+          preSubmit: preSubmitAssessment
+        }
+      });
+    }
+
+    const orchestratorDecision = predictWorkflowSlaRouting({
+      currentStage: 'validation',
+      stageDurations: { validation: 0 },
+      serviceHealth: {
+        n8n: String(process.env.N8N_HEALTH_HINT || 'healthy'),
+        normalizer: 'healthy',
+        signer: 'healthy',
+        nphies: 'healthy'
+      },
+      n8nQueueDepth: Number(body.n8nQueueDepth || body.n8n_queue_depth || 0),
+      claimComplexity: Math.max(0, Math.min(1, ((procedureCodes.length + diagnosisCodes.length) / 12) + (totalAmount > 15000 ? 0.18 : 0)))
+    });
+    recordAiTelemetryEvent('workflow_orchestration_prediction', orchestratorDecision, {
+      capability: 'workflow_ai_orchestrator',
+      modelVersion: orchestratorDecision.version,
+      outcome: orchestratorDecision.decision?.route,
+      metadata: {
+        breachProbability: orchestratorDecision.sla?.breachProbability
+      }
+    });
+
+    const orchestratorActive = isEnvEnabled(process.env.AI_ORCHESTRATOR_ACTIVE, false);
+    const preferredExecutionPath =
+      orchestratorActive && orchestratorDecision.decision?.route === 'direct_sbs_primary'
+        ? 'direct-sbs'
+        : 'n8n';
+    claimData.ai = {
+      policy: aiPolicy,
+      preSubmitAssessment,
+      orchestratorDecision,
+      preferredExecutionPath
+    };
+    claimData.preferredExecutionPath = preferredExecutionPath;
+
     console.log('📋 Claim submission received:', {
       patientId,
       claimType: normalizedClaimType,
@@ -2859,8 +3435,17 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       patientName,
       claimType: normalizedClaimType,
       facilityId: facility_id,
+      diagnosisCodes,
+      procedureCodes,
+      totalAmount,
       createdAt: new Date().toISOString(),
       lastUpdate: new Date().toISOString(),
+      ai: {
+        preSubmit: claimData.ai?.preSubmitAssessment || null,
+        policy: claimData.ai?.policy || aiPolicy,
+        orchestrator: claimData.ai?.orchestratorDecision || null,
+        preferredExecutionPath
+      },
       stages: {
         received: 'completed',
         validation: 'in_progress',
@@ -2871,16 +3456,35 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       }
     });
 
-    // Trigger n8n workflow (non-fatal if unavailable in dev/test)
-    let n8nResponse;
-    try {
-      n8nResponse = await triggerN8nWorkflow({ ...claimData, claimId });
-    } catch (e) {
-      console.warn('⚠️ n8n trigger failed, continuing with local tracking only:', e.message);
-      n8nResponse = { success: false, claimId, submissionId: null, trackingUrl: null, status: 'failed' };
+    // Trigger orchestration workflow
+    let n8nResponse = null;
+    if (preferredExecutionPath === 'direct-sbs') {
+      try {
+        n8nResponse = await triggerDirectSBS({ ...claimData, claimId });
+        n8nResponse = {
+          ...n8nResponse,
+          fallbackMode: 'direct-sbs-primary',
+          orchestratorRoute: preferredExecutionPath
+        };
+      } catch (directPrimaryError) {
+        console.warn('⚠️ direct SBS primary route failed, falling back to n8n:', directPrimaryError.message);
+      }
     }
 
-    if (isEnvEnabled(process.env.ENABLE_DIRECT_SBS_ON_FAILURE, false) && normalizeWorkflowStatus(n8nResponse?.status) === 'failed') {
+    if (!n8nResponse) {
+      try {
+        n8nResponse = await triggerN8nWorkflow({ ...claimData, claimId });
+      } catch (e) {
+        console.warn('⚠️ n8n trigger failed, continuing with local tracking only:', e.message);
+        n8nResponse = { success: false, claimId, submissionId: null, trackingUrl: null, status: 'failed' };
+      }
+    }
+
+    if (
+      preferredExecutionPath !== 'direct-sbs' &&
+      isEnvEnabled(process.env.ENABLE_DIRECT_SBS_ON_FAILURE, false) &&
+      normalizeWorkflowStatus(n8nResponse?.status) === 'failed'
+    ) {
       try {
         const directFallback = await triggerDirectSBS({ ...claimData, claimId });
         if (normalizeWorkflowStatus(directFallback?.status) !== 'failed') {
@@ -2915,7 +3519,9 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
       const current = claimStore.get(claimId);
       const successStatus = normalizeWorkflowStatus(n8nResponse?.status);
       const isFailed = successStatus === 'failed';
+      const isRejected = successStatus === 'rejected';
       const isSuccessful = isSuccessfulStatus(successStatus);
+      const aiCurrent = current?.ai || {};
 
       claimStore.set(claimId, {
         ...current,
@@ -2923,13 +3529,19 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
         trackingUrl: n8nResponse?.trackingUrl || current?.trackingUrl,
         status: successStatus,
         lastUpdate: new Date().toISOString(),
+        ai: {
+          ...aiCurrent,
+          preferredExecutionPath,
+          orchestratorRouteUsed: n8nResponse?.fallbackMode || preferredExecutionPath,
+          finalStatus: successStatus
+        },
         stages: {
           received: 'completed',
           validation: isFailed ? 'failed' : 'completed',
           normalization: isFailed ? 'pending' : 'completed',
           financialRules: isFailed ? 'pending' : 'completed',
           signing: isFailed ? 'pending' : 'completed',
-          nphiesSubmission: isFailed ? 'failed' : (isSuccessful ? 'completed' : 'in_progress')
+          nphiesSubmission: (isFailed || isRejected) ? 'failed' : (isSuccessful ? 'completed' : 'in_progress')
         }
       });
 
@@ -2937,17 +3549,37 @@ app.post('/api/submit-claim', upload.single('claimFile'), async (req, res) => {
         ...n8nResponse,
         status: successStatus
       };
+
+      recordAiTelemetryEvent('claim_submission_outcome', {
+        claimId,
+        status: successStatus,
+        submissionId: n8nResponse?.submissionId || null,
+        routeUsed: n8nResponse?.fallbackMode || preferredExecutionPath
+      }, {
+        capability: 'workflow_ai_orchestrator',
+        modelVersion: 'v1',
+        outcome: successStatus,
+        metadata: {
+          routeUsed: n8nResponse?.fallbackMode || preferredExecutionPath
+        }
+      });
     }
 
     res.json({
       success: true,
-      message: n8nResponse?.status === 'failed'
+      message: ['failed', 'rejected'].includes(String(n8nResponse?.status || '').toLowerCase())
         ? 'Claim processed with downstream failure'
         : 'Claim submitted successfully',
       claimId,
       submissionId: n8nResponse?.submissionId,
       trackingUrl: n8nResponse?.trackingUrl,
       status: n8nResponse?.status || 'processing',
+      ai: {
+        policy: aiPolicy,
+        preSubmit: preSubmitAssessment,
+        orchestrator: orchestratorDecision,
+        routeUsed: n8nResponse?.fallbackMode || preferredExecutionPath
+      },
       data: {
         patientId,
         claimType: normalizedClaimType,
@@ -3265,7 +3897,9 @@ app.get('/api/claim-status/:claimId', async (req, res) => {
         created: record.createdAt,
         lastUpdate: record.lastUpdate || new Date().toISOString()
       },
-      timeline: buildTimeline(stages)
+      ai: record.ai || null,
+      timeline: buildTimeline(stages),
+      reAdjudication: Array.isArray(record.reAdjudication) ? record.reAdjudication : []
     });
 
   } catch (error) {
@@ -3327,6 +3961,250 @@ app.get('/api/claims', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message
+    });
+  }
+});
+
+app.post('/api/claims/:claimId/re-adjudication/autopilot', async (req, res) => {
+  try {
+    const { claimId } = req.params;
+    if (!isValidClaimId(claimId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid claim ID format'
+      });
+    }
+
+    const record = claimStore.get(claimId);
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        error: 'Claim not found'
+      });
+    }
+
+    const body = req.body || {};
+    const evidenceExtraction = body.evidenceExtraction || extractEvidenceFromContent({
+      evidenceText: String(body.evidenceText || body.evidence_text || '').trim(),
+      sourceType: 'text',
+      sourceName: 'autopilot-inline',
+      labResults: parseMaybeJson(body.labResults || body.lab_results, [])
+    });
+
+    const rejectionReasons = Array.isArray(body.rejectionReasons)
+      ? body.rejectionReasons
+      : (Array.isArray(record.errors)
+        ? record.errors.map((item) => item?.error).filter(Boolean)
+        : []);
+
+    const draft = buildReAdjudicationAutopilotDraft({
+      claimId,
+      rejectionReasons,
+      evidenceExtraction,
+      notes: body.notes || body.additional_notes || '',
+      reasonCode: body.reasonCode || body.reason_code || 're-adjudication',
+      resourceType: body.resourceType || body.resource_type || 'CommunicationRequest'
+    });
+
+    recordAiTelemetryEvent('re_adjudication_autopilot_draft', draft, {
+      capability: 're_adjudication_autopilot',
+      modelVersion: draft.version,
+      outcome: 'drafted',
+      metadata: {
+        claimId,
+        evidenceDeltaCount: draft.evidenceDeltas?.length || 0
+      }
+    });
+
+    const shouldAutoSubmit = Boolean(body.autoSubmit || body.auto_submit || body.approve);
+    if (!shouldAutoSubmit) {
+      return res.json({
+        success: true,
+        claimId,
+        draft,
+        oneClickEndpoint: `/api/claims/${claimId}/re-adjudication`
+      });
+    }
+
+    const submissionResponse = await axios.post(
+      `http://127.0.0.1:${PORT}/api/claims/${encodeURIComponent(claimId)}/re-adjudication`,
+      {
+        reasonCode: draft.reasonCode,
+        communicationPayload: draft.recommendedPayload,
+        signature: body.signature || null
+      },
+      {
+        timeout: 70000,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+
+    return res.json({
+      success: true,
+      claimId,
+      draft,
+      submission: submissionResponse.data
+    });
+  } catch (error) {
+    if (error?.response) {
+      return res.status(error.response.status).json(error.response.data);
+    }
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to generate re-adjudication autopilot draft',
+      message: extractErrorMessage(error, 'Unable to generate autopilot draft')
+    });
+  }
+});
+
+app.post('/api/claims/:claimId/re-adjudication', async (req, res) => {
+  try {
+    const { claimId } = req.params;
+
+    if (!isValidClaimId(claimId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid claim ID format'
+      });
+    }
+
+    const record = claimStore.get(claimId);
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        error: 'Claim not found'
+      });
+    }
+
+    const allowedResourceTypes = ['Communication', 'CommunicationRequest'];
+    const {
+      message,
+      reasonCode = 're-adjudication',
+      resourceType = 'Communication',
+      communicationPayload,
+      signature
+    } = req.body || {};
+
+    let payload = communicationPayload;
+    if (!payload) {
+      if (!String(message || '').trim()) {
+        return res.status(400).json({
+          success: false,
+          error: 'message is required when communicationPayload is not provided'
+        });
+      }
+      if (!allowedResourceTypes.includes(resourceType)) {
+        return res.status(400).json({
+          success: false,
+          error: `resourceType must be one of: ${allowedResourceTypes.join(', ')}`
+        });
+      }
+      payload = buildReAdjudicationPayloadFromRecord(
+        record,
+        String(message).trim(),
+        String(reasonCode || 're-adjudication').trim() || 're-adjudication',
+        resourceType
+      );
+    }
+
+    if (!allowedResourceTypes.includes(payload.resourceType)) {
+      return res.status(400).json({
+        success: false,
+        error: `communicationPayload.resourceType must be one of: ${allowedResourceTypes.join(', ')}`
+      });
+    }
+
+    const facility_id = parseFacilityId(record.facilityId, DEFAULT_FACILITY_ID);
+    let resolvedSignature = String(signature || '').trim();
+
+    if (!resolvedSignature) {
+      const signResponse = await requestWithServiceFallback(
+        SIGNER_BASE_URLS,
+        '/sign',
+        {
+          method: 'POST',
+          data: {
+            facility_id,
+            payload
+          },
+          timeout: 30000
+        }
+      );
+      resolvedSignature = String(signResponse.data?.signature || '').trim();
+    }
+
+    if (!resolvedSignature) {
+      return res.status(502).json({
+        success: false,
+        error: 'Unable to produce a digital signature for re-adjudication communication'
+      });
+    }
+
+    const bridgeResponse = await requestWithServiceFallback(
+      NPHIES_BASE_URLS,
+      '/submit-communication',
+      {
+        method: 'POST',
+        data: {
+          facility_id,
+          fhir_payload: payload,
+          signature: resolvedSignature,
+          resource_type: payload.resourceType
+        },
+        timeout: 60000
+      }
+    );
+
+    const normalizedStatus = normalizeNphiesBridgeStatus(
+      bridgeResponse.data?.status,
+      bridgeResponse.data?.http_status
+    );
+    const event = {
+      submittedAt: new Date().toISOString(),
+      reasonCode: String(reasonCode || 're-adjudication'),
+      resourceType: payload.resourceType,
+      bridgeStatus: bridgeResponse.data?.status || null,
+      normalizedStatus,
+      transactionUuid: bridgeResponse.data?.transaction_uuid || null
+    };
+
+    const current = claimStore.get(claimId) || record;
+    claimStore.set(claimId, {
+      ...current,
+      reAdjudication: [...(Array.isArray(current.reAdjudication) ? current.reAdjudication : []), event],
+      ai: {
+        ...(current.ai || {}),
+        reAdjudicationLastEvent: event
+      },
+      lastUpdate: new Date().toISOString()
+    });
+
+    recordAiTelemetryEvent('re_adjudication_submitted', {
+      claimId,
+      event,
+      status: normalizedStatus
+    }, {
+      capability: 're_adjudication_autopilot',
+      modelVersion: 'v1',
+      outcome: normalizedStatus,
+      metadata: {
+        transactionUuid: event.transactionUuid
+      }
+    });
+
+    return res.json({
+      success: true,
+      claimId,
+      status: normalizedStatus,
+      communication: event,
+      bridge: bridgeResponse.data
+    });
+  } catch (error) {
+    const statusCode = error?.response?.status || 500;
+    return res.status(statusCode).json({
+      success: false,
+      error: 'Failed to submit re-adjudication communication',
+      message: extractErrorMessage(error, 'Re-adjudication submission failed')
     });
   }
 });

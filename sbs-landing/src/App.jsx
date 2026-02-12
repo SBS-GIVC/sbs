@@ -201,7 +201,7 @@ export default function App() {
           />
         )}
 
-        <main className="flex-1 overflow-hidden relative flex flex-col">
+        <main data-testid={`view-${normalizedView}`} className="flex-1 overflow-hidden relative flex flex-col">
           <Suspense fallback={<PageLoader lang={lang} />}>
             {normalizedView === 'dashboard' && <DashboardPage />}
             {normalizedView === 'mappings' && <MappingsPage />}

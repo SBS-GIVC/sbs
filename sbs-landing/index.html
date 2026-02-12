@@ -30,13 +30,21 @@
         const host = window.location.hostname;
         if (window.SBS_API_URL) return;
 
+        const envApiUrl = '%VITE_API_URL%';
+        if (envApiUrl && envApiUrl !== '%VITE_API_URL%') {
+          window.SBS_API_URL = envApiUrl.replace(/\/+$/, '');
+          return;
+        }
+
         if (host === 'sbs.brainsait.cloud' || host === 'brainsait.cloud' || host === 'www.brainsait.cloud') {
           window.SBS_API_URL = 'https://api.brainsait.cloud';
           return;
         }
 
         if (host === 'localhost' || host === '127.0.0.1') {
-          window.SBS_API_URL = 'http://localhost:3000';
+          // In local dev, use same-origin so Vite /api proxy (if configured)
+          // stays authoritative and avoids hardcoded backend ports.
+          window.SBS_API_URL = window.location.origin;
           return;
         }
 

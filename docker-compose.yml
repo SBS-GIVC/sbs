@@ -57,8 +57,8 @@ services:
   # Normalizer Service (AI-Powered)
   normalizer-service:
     build:
-      context: ./normalizer-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./normalizer-service/Dockerfile
     container_name: sbs-normalizer
     environment:
       DB_HOST: postgres
@@ -92,8 +92,8 @@ services:
   # Financial Rules Engine
   financial-rules-engine:
     build:
-      context: ./financial-rules-engine
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./financial-rules-engine/Dockerfile
     container_name: sbs-financial-rules
     environment:
       DB_HOST: postgres
@@ -126,8 +126,8 @@ services:
   # Signer Service
   signer-service:
     build:
-      context: ./signer-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./signer-service/Dockerfile
     container_name: sbs-signer
     environment:
       DB_HOST: postgres
@@ -166,8 +166,8 @@ services:
   # NPHIES Bridge
   nphies-bridge:
     build:
-      context: ./nphies-bridge
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./nphies-bridge/Dockerfile
     container_name: sbs-nphies-bridge
     environment:
       DB_HOST: postgres
@@ -206,8 +206,8 @@ services:
   # MasterLinc Bridge (BrainSAIT Linc Agent Coordinator)
   masterlinc-bridge:
     build:
-      context: ./services/masterlinc-bridge
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/masterlinc-bridge/Dockerfile
     container_name: sbs-masterlinc-bridge
     environment:
       REDIS_URL: redis://redis:6379
@@ -241,8 +241,8 @@ services:
   # ClaimLinc Agent (Revenue Cycle Management)
   claimlinc-agent:
     build:
-      context: ./services/agents/claimlinc
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/agents/claimlinc/Dockerfile
     container_name: sbs-claimlinc-agent
     environment:
       NORMALIZER_URL: http://normalizer-service:8000
@@ -276,8 +276,8 @@ services:
   # AuthLinc Agent (Eligibility and Pre-Authorization)
   authlinc-agent:
     build:
-      context: ./services/agents/authlinc
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/agents/authlinc/Dockerfile
     container_name: sbs-authlinc-agent
     environment:
       NPHIES_BRIDGE_URL: http://nphies-bridge:8003
@@ -307,8 +307,8 @@ services:
   # ComplianceLinc Agent (Audit and Compliance)
   compliancelinc-agent:
     build:
-      context: ./services/agents/compliancelinc
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/agents/compliancelinc/Dockerfile
     container_name: sbs-compliancelinc-agent
     environment:
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
@@ -375,6 +375,7 @@ services:
       - "traefik.http.routers.sbs.tls=true"
       - "traefik.http.routers.sbs.tls.certresolver=mytlschallenge"
       - "traefik.http.services.sbs.loadbalancer.server.port=3000"
+      - "traefik.docker.network=sbs-network"
     security_opt:
       - no-new-privileges:true
 
@@ -478,12 +479,43 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # Traefik ingress (public HTTPS for brainsait.cloud)
+  traefik:
+    image: traefik:v2.11
+    container_name: sbs-traefik
+    command:
+      - "--api.dashboard=${TRAEFIK_DASHBOARD:-false}"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.constraints=Label(`com.docker.compose.project`,`hostinger`)"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--certificatesresolvers.mytlschallenge.acme.httpchallenge=true"
+      - "--certificatesresolvers.mytlschallenge.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.mytlschallenge.acme.email=${ACME_EMAIL:-ops@brainsait.cloud}"
+      - "--certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "${TRAEFIK_BIND_IP:-0.0.0.0}:80:80"
+      - "${TRAEFIK_BIND_IP:-0.0.0.0}:443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    restart: unless-stopped
+    networks:
+      - sbs-network
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   postgres_data:
     driver: local
   redis_data:
     driver: local
   n8n_data:
+    driver: local
+  traefik_letsencrypt:
     driver: local
 
 networks:

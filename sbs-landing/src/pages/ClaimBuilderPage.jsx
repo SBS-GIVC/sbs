@@ -80,9 +80,15 @@ export function ClaimBuilderPage() {
         setShowSuggestions(true);
         if (results.aiInsights) setAiInsights(results.aiInsights);
       } catch (error) {
-        const fallback = await aiAssistant.smartSearch(query, { limit: 10, includeAI: false });
-        setSbsSuggestions(fallback.results);
-        setShowSuggestions(true);
+        try {
+          const fallback = await aiAssistant.smartSearch(query, { limit: 10, includeAI: false });
+          setSbsSuggestions(fallback.results);
+          setShowSuggestions(true);
+        } catch {
+          setSbsSuggestions([]);
+          setShowSuggestions(false);
+          toast.warning('SBS code search is temporarily unavailable');
+        }
       } finally {
         setIsSearching(false);
       }

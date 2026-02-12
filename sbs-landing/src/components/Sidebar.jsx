@@ -60,32 +60,37 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose, lang = '
               icon="dashboard" 
               label={copy.nav.items.dashboard} 
               active={currentView === 'dashboard'} 
-              onClick={() => navigate('dashboard')} 
+              onClick={() => navigate('dashboard')}
+              testId="nav-dashboard"
             />
             <SidebarItem 
               icon="verified_user" 
               label={copy.nav.items.eligibility} 
               active={currentView === 'eligibility'} 
-              onClick={() => navigate('eligibility')} 
+              onClick={() => navigate('eligibility')}
+              testId="nav-eligibility"
             />
             <SidebarItem 
               icon="approval" 
               label={copy.nav.items.priorAuth} 
               active={currentView === 'prior-auth'} 
-              onClick={() => navigate('prior-auth')} 
+              onClick={() => navigate('prior-auth')}
+              testId="nav-prior-auth"
             />
             <SidebarItem 
               icon="add_box" 
               label={copy.nav.items.claimBuilder} 
               active={currentView === 'claim-builder'} 
-              onClick={() => navigate('claim-builder')} 
+              onClick={() => navigate('claim-builder')}
+              testId="nav-claim-builder"
               badge="NEW"
             />
             <SidebarItem 
               icon="queue" 
               label={copy.nav.items.claims} 
               active={currentView === 'claims'} 
-              onClick={() => navigate('claims')} 
+              onClick={() => navigate('claims')}
+              testId="nav-claims"
               badge="12"
             />
           </SidebarSection>
@@ -95,25 +100,29 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose, lang = '
               icon="database" 
               label={copy.nav.items.codeBrowser} 
               active={currentView === 'code-browser'} 
-              onClick={() => navigate('code-browser')} 
+              onClick={() => navigate('code-browser')}
+              testId="nav-code-browser"
             />
             <SidebarItem 
               icon="terminal" 
               label={copy.nav.items.unifiedBrowser} 
               active={currentView === 'unified-browser'} 
-              onClick={() => navigate('unified-browser')} 
+              onClick={() => navigate('unified-browser')}
+              testId="nav-unified-browser"
             />
             <SidebarItem 
               icon="sync_alt" 
               label={copy.nav.items.mappings} 
               active={currentView === 'mappings'} 
-              onClick={() => navigate('mappings')} 
+              onClick={() => navigate('mappings')}
+              testId="nav-mappings"
             />
             <SidebarItem 
               icon="settings_suggest" 
               label={copy.nav.items.rulesEngine} 
               active={currentView === 'mapping_rules'} 
-              onClick={() => navigate('mapping_rules')} 
+              onClick={() => navigate('mapping_rules')}
+              testId="nav-mapping_rules"
             />
           </SidebarSection>
 
@@ -122,20 +131,23 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose, lang = '
               icon="hub" 
               label={copy.nav.items.aiHub} 
               active={currentView === 'ai-hub' || currentView === 'ai_hub' || currentView === 'ai-copilot'} 
-              onClick={() => navigate('ai-hub')} 
+              onClick={() => navigate('ai-hub')}
+              testId="nav-ai-hub"
               glow
             />
             <SidebarItem 
               icon="trending_up" 
               label={copy.nav.items.analyticsHub} 
               active={currentView === 'ai-analytics'} 
-              onClick={() => navigate('ai-analytics')} 
+              onClick={() => navigate('ai-analytics')}
+              testId="nav-ai-analytics"
             />
             <SidebarItem 
               icon="monitoring" 
               label={copy.nav.items.predictiveAnalytics} 
               active={currentView === 'predictive-analytics'} 
-              onClick={() => navigate('predictive-analytics')} 
+              onClick={() => navigate('predictive-analytics')}
+              testId="nav-predictive-analytics"
             />
           </SidebarSection>
 
@@ -144,19 +156,22 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose, lang = '
               icon="sensors" 
               label={copy.nav.items.iotDashboard} 
               active={currentView === 'iot-dashboard' || currentView === 'iot_dashboard'} 
-              onClick={() => navigate('iot-dashboard')} 
+              onClick={() => navigate('iot-dashboard')}
+              testId="nav-iot-dashboard"
             />
             <SidebarItem 
               icon="api" 
               label={copy.nav.items.developerPortal} 
               active={currentView === 'developer'} 
-              onClick={() => navigate('developer')} 
+              onClick={() => navigate('developer')}
+              testId="nav-developer"
             />
             <SidebarItem 
               icon="settings" 
               label={copy.nav.items.settings} 
               active={currentView === 'settings'} 
-              onClick={() => navigate('settings')} 
+              onClick={() => navigate('settings')}
+              testId="nav-settings"
             />
           </SidebarSection>
         </div>
@@ -191,10 +206,11 @@ export function Sidebar({ currentView, setCurrentView, isOpen, onClose, lang = '
   );
 }
 
-function SidebarItem({ icon, label, active, onClick, badge, glow }) {
+function SidebarItem({ icon, label, active, onClick, badge, glow, testId }) {
   return (
     <button
       onClick={onClick}
+      data-testid={testId}
       className={`
         w-full group flex items-center justify-between px-3 py-2.5 rounded-xl
         transition-all duration-300 relative overflow-hidden

@@ -1,0 +1,17 @@
+{
+  "runId": "2026-02-12T04-30-28-171Z",
+  "generatedAt": "2026-02-12T04:31:36.993Z",
+  "smokeExitCode": 0,
+  "sourceReport": "/Users/fadil369/sbs/output/playwright/sbs-landing-smoke/2026-02-12T04-30-28-542Z/report.json",
+  "outcome": {
+    "overallPassed": true,
+    "failedViews": 0,
+    "consoleErrors": 0,
+    "pageErrors": 0,
+    "requestFailures": 0,
+    "apiFailures": 0,
+    "workflowValidationOk": true,
+    "apiSmokeOk": true
+  },
+  "regressionCases": []
+}

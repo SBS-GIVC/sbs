@@ -6,6 +6,8 @@ A small gateway service that provides a stable internal endpoint for the Normali
 
 - `POST /chat`
 - `GET /health`
+- `GET /v1/registry`
+- `POST /v1/capabilities/:capability`
 
 ## Why this exists
 
@@ -30,6 +32,26 @@ Set:
 - `CLOUDFLARE_API_TOKEN=<token>`
 
 The gateway calls `${CLOUDFLARE_AI_GATEWAY_URL}/chat/completions`.
+
+## Versioned capability routing
+
+The gateway now supports versioned capability endpoints for rollout control:
+
+- `POST /v1/capabilities/pre_submit_denial_prevention_copilot`
+- `POST /v1/capabilities/re_adjudication_autopilot`
+- `POST /v1/capabilities/multimodal_evidence_extractor`
+- `POST /v1/capabilities/smart_prior_auth_composer`
+- `POST /v1/capabilities/workflow_ai_orchestrator`
+- `POST /v1/capabilities/facility_optimization_engine`
+
+Use env override to route provider/model by capability:
+
+```bash
+export AI_CAPABILITY_ROUTES_JSON='{
+  "pre_submit_denial_prevention_copilot": {"provider":"deepseek","model":"deepseek-chat"},
+  "workflow_ai_orchestrator": {"provider":"deepseek","model":"deepseek-chat"}
+}'
+```
 
 ## Wiring
 

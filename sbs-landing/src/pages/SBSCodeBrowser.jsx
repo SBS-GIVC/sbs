@@ -34,6 +34,13 @@ export function SBSCodeBrowser() {
         setAllCodes(codes);
         setCategories(['all', ...aiAssistant.getCategories()]);
         setSearchResults({ results: codes, source: 'local' });
+      } catch (error) {
+        if (cancelled) return;
+        console.warn('SBS catalog failed to load, continuing with empty state:', error);
+        setAllCodes([]);
+        setCategories(['all']);
+        setSearchResults({ results: [], source: 'unavailable' });
+        toast.warning('SBS catalogue is temporarily unavailable');
       } finally {
         if (!cancelled) setIsCatalogLoading(false);
       }

@@ -20,6 +20,7 @@ import uuid
 import time
 import sys
 import os
+from terminology_catalog import build_catalog_from_environment
 
 # Add parent directory to path for shared module import
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -63,12 +64,16 @@ async def rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 ALLOWED_MOCK_OUTCOMES = {"accepted", "rejected", "error"}
+ALLOWED_CLAIM_RESOURCE_TYPES = {"Claim"}
+ALLOWED_COMMUNICATION_RESOURCE_TYPES = {"Communication", "CommunicationRequest"}
 
 # NPHIES API Configuration
 NPHIES_BASE_URL = os.getenv("NPHIES_BASE_URL", "https://nphies.sa/api/v1")
 NPHIES_TIMEOUT = int(os.getenv("NPHIES_TIMEOUT", "30"))
 MAX_RETRIES = int(os.getenv("NPHIES_MAX_RETRIES", "3"))
 ENABLE_MOCK_NPHIES = os.getenv("ENABLE_MOCK_NPHIES", "false").lower() in ("1", "true", "yes", "on")
+STRICT_TERMINOLOGY_VALIDATION = os.getenv("NPHIES_TERMINOLOGY_STRICT", "false").lower() in ("1", "true", "yes", "on")
+terminology_catalog = build_catalog_from_environment()
 
 
 def get_db_connection():
@@ -97,7 +102,150 @@ class SubmissionResponse(BaseModel):
     status: str
     nphies_response: Optional[Dict[str, Any]] = None
     http_status: Optional[int] = None
+    terminology_validation: Optional[Dict[str, Any]] = None
     message: str
+
+
+class TerminologyCodeValidationRequest(BaseModel):
+    system: str = Field(..., description="CodeSystem URL")
+    code: str = Field(..., description="Code value")
+    value_set: Optional[str] = Field(default=None, description="Optional ValueSet URL for system compatibility check")
+
+
+class TerminologyPayloadValidationRequest(BaseModel):
+    fhir_payload: Dict[str, Any] = Field(..., description="FHIR resource payload to validate")
+
+
+def validate_terminology(payload: Dict[str, Any]) -> Dict[str, Any]:
+    if terminology_catalog is None:
+        return {
+            "enabled": False,
+            "available": False,
+            "is_valid": True,
+            "summary": {"error_count": 0, "warning_count": 0},
+            "errors": [],
+            "warnings": [],
+            "load_error": "NPHIES terminology validation is disabled by configuration.",
+        }
+
+    summary = terminology_catalog.summary()
+    if not summary.get("available"):
+        return {
+            "enabled": True,
+            "available": False,
+            "is_valid": True,
+            "summary": {"error_count": 0, "warning_count": 0},
+            "errors": [],
+            "warnings": [],
+            "load_error": summary.get("load_error"),
+        }
+
+    report = terminology_catalog.validate_payload_codings(payload)
+    report["enabled"] = True
+    report["load_error"] = None
+
+    if STRICT_TERMINOLOGY_VALIDATION and report["summary"]["error_count"] > 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error": "NPHIES terminology validation failed",
+                "strict_mode": True,
+                "validation": report,
+            },
+        )
+
+    return report
+
+
+def validate_payload_resource_type(payload: Dict[str, Any], allowed_types: set[str]) -> str:
+    resource_type = payload.get("resourceType")
+    if resource_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid FHIR payload: resourceType must be one of {sorted(allowed_types)}",
+        )
+    return resource_type
+
+
+def normalize_submission_status(http_status: Optional[int], response_data: Optional[Dict[str, Any]]) -> str:
+    normalized_raw = str((response_data or {}).get("status") or "").strip().lower()
+    if normalized_raw in {"accepted", "submitted", "submitted_successfully", "processed", "ok", "success"}:
+        return "accepted"
+    if normalized_raw in {"rejected", "denied", "invalid"}:
+        return "rejected"
+    if normalized_raw in {"error", "failed", "failure", "timeout"}:
+        return "error"
+
+    if http_status is not None:
+        if 200 <= http_status < 300:
+            return "accepted"
+        if 400 <= http_status < 500:
+            return "rejected"
+    return "error"
+
+
+def build_mock_submission_outcome(desired_outcome: str) -> tuple[int, Dict[str, Any], Optional[str]]:
+    if desired_outcome == "rejected":
+        return 400, {"id": f"MOCK-{uuid.uuid4().hex[:8]}", "status": "rejected"}, "Mock rejection"
+    if desired_outcome == "error":
+        return 503, {"status": "error"}, "Mock upstream error"
+    return 200, {"id": f"MOCK-{uuid.uuid4().hex[:8]}", "status": "accepted"}, None
+
+
+async def submit_transaction(
+    submission: ClaimSubmission,
+    allowed_resource_types: set[str],
+    success_message: str,
+    request_type: Optional[str] = None,
+    endpoint: Optional[str] = None,
+) -> SubmissionResponse:
+    resource_type = validate_payload_resource_type(submission.fhir_payload, allowed_resource_types)
+    target_endpoint = endpoint or resource_type
+    log_request_type = request_type or resource_type
+    terminology_validation = validate_terminology(submission.fhir_payload)
+
+    if ENABLE_MOCK_NPHIES:
+        desired = (submission.mock_outcome or "accepted").lower()
+        if desired not in ALLOWED_MOCK_OUTCOMES:
+            desired = "accepted"
+        http_status, response_data, error_msg = build_mock_submission_outcome(desired)
+    else:
+        response_data, http_status, error_msg = await submit_to_nphies_with_retry(
+            endpoint=target_endpoint,
+            payload=submission.fhir_payload,
+            signature=submission.signature,
+        )
+
+    nphies_txn_id = response_data.get("id") if isinstance(response_data, dict) else None
+    normalized_status = normalize_submission_status(http_status, response_data)
+
+    txn_uuid = log_transaction(
+        facility_id=submission.facility_id,
+        request_type=log_request_type,
+        fhir_payload=submission.fhir_payload,
+        signature=submission.signature,
+        response_data=response_data,
+        http_status=http_status,
+        nphies_txn_id=nphies_txn_id,
+        error_msg=error_msg,
+    )
+
+    if normalized_status == "accepted":
+        message = success_message
+    elif normalized_status == "rejected":
+        message = error_msg or f"{log_request_type} rejected by NPHIES"
+    else:
+        message = error_msg or f"Error submitting {log_request_type} to NPHIES"
+
+    return SubmissionResponse(
+        transaction_id=nphies_txn_id or "N/A",
+        transaction_uuid=txn_uuid,
+        status=normalized_status,
+        nphies_response=response_data,
+        http_status=http_status,
+        terminology_validation=terminology_validation,
+        message=message,
+    )
 
 
 def log_transaction(
@@ -219,11 +367,17 @@ async def submit_to_nphies_with_retry(
 
 @app.get("/")
 def root():
+    terminology_status = terminology_catalog.summary() if terminology_catalog else {"available": False}
     return {
         "service": "NPHIES Bridge Service",
         "version": "1.0.0",
         "status": "active",
-        "nphies_endpoint": NPHIES_BASE_URL
+        "nphies_endpoint": NPHIES_BASE_URL,
+        "terminology_validation": {
+            "enabled": terminology_catalog is not None,
+            "strict_mode": STRICT_TERMINOLOGY_VALIDATION,
+            "available": terminology_status.get("available", False),
+        },
     }
 
 
@@ -233,10 +387,17 @@ def health_check():
     try:
         conn = get_db_connection()
         conn.close()
+        terminology_status = terminology_catalog.summary() if terminology_catalog else {"available": False}
         return {
             "status": "healthy",
             "database": "connected",
-            "nphies_endpoint": NPHIES_BASE_URL
+            "nphies_endpoint": NPHIES_BASE_URL,
+            "terminology_validation": {
+                "enabled": terminology_catalog is not None,
+                "strict_mode": STRICT_TERMINOLOGY_VALIDATION,
+                "available": terminology_status.get("available", False),
+                "load_error": terminology_status.get("load_error"),
+            },
         }
     except Exception as e:
         raise HTTPException(
@@ -251,16 +412,97 @@ def ready_check():
     try:
         conn = get_db_connection()
         conn.close()
+        terminology_status = terminology_catalog.summary() if terminology_catalog else {"available": False}
         return {
             "status": "ready",
             "database": "connected",
-            "nphies_endpoint": NPHIES_BASE_URL
+            "nphies_endpoint": NPHIES_BASE_URL,
+            "terminology_validation": {
+                "enabled": terminology_catalog is not None,
+                "strict_mode": STRICT_TERMINOLOGY_VALIDATION,
+                "available": terminology_status.get("available", False),
+                "load_error": terminology_status.get("load_error"),
+            },
         }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Database connection failed: {str(e)}"
         )
+
+
+@app.get("/terminology/summary")
+def terminology_summary():
+    if terminology_catalog is None:
+        return {
+            "enabled": False,
+            "available": False,
+            "load_error": "NPHIES terminology validation is disabled by configuration.",
+        }
+    return {"enabled": True, **terminology_catalog.summary()}
+
+
+@app.get("/terminology/codesystems")
+def terminology_codesystems(limit: int = 250):
+    if terminology_catalog is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="NPHIES terminology catalog is disabled.",
+        )
+    systems = terminology_catalog.list_code_systems()
+    bounded_limit = max(1, min(limit, 1000))
+    return {"count": len(systems), "items": systems[:bounded_limit]}
+
+
+@app.get("/terminology/codes")
+def terminology_codes(system: str, q: str = "", limit: int = 50):
+    if terminology_catalog is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="NPHIES terminology catalog is disabled.",
+        )
+    bounded_limit = max(1, min(limit, 500))
+    return {
+        "system": system,
+        "query": q,
+        "items": terminology_catalog.search_codes(system=system, query=q, limit=bounded_limit),
+    }
+
+
+@app.get("/terminology/lookup")
+def terminology_lookup(system: str, code: str):
+    if terminology_catalog is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="NPHIES terminology catalog is disabled.",
+        )
+    match = terminology_catalog.lookup(system=system, code=code)
+    if not match:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Code '{code}' was not found in code system '{system}'.",
+        )
+    return match
+
+
+@app.post("/terminology/validate-code")
+def terminology_validate_code(request: TerminologyCodeValidationRequest):
+    if terminology_catalog is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="NPHIES terminology catalog is disabled.",
+        )
+    validation = terminology_catalog.validate_code(
+        system=request.system,
+        code=request.code,
+        value_set=request.value_set or "",
+    )
+    return validation
+
+
+@app.post("/terminology/validate-payload")
+def terminology_validate_payload(request: TerminologyPayloadValidationRequest):
+    return validate_terminology(request.fhir_payload)
 
 
 @app.post("/submit-claim", response_model=SubmissionResponse)
@@ -274,93 +516,12 @@ async def submit_claim(submission: ClaimSubmission, background_tasks: Background
     - Error handling and reporting
     """
     
-    # Validate payload structure
-    if submission.fhir_payload.get('resourceType') != 'Claim':
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid FHIR payload: resourceType must be 'Claim'"
-        )
-
-    # Local/dev testing mode: avoid external NPHIES dependency.
-    if ENABLE_MOCK_NPHIES:
-        desired = (submission.mock_outcome or "accepted").lower()
-        if desired not in ALLOWED_MOCK_OUTCOMES:
-            desired = "accepted"
-
-        if desired == "rejected":
-            http_status = 400
-            response_data = {"id": f"MOCK-{uuid.uuid4().hex[:8]}", "status": "rejected"}
-            error_msg = "Mock rejection"
-        elif desired == "error":
-            http_status = 503
-            response_data = {"status": "error"}
-            error_msg = "Mock upstream error"
-        else:
-            http_status = 200
-            response_data = {"id": f"MOCK-{uuid.uuid4().hex[:8]}", "status": "accepted"}
-            error_msg = None
-
-        txn_uuid = log_transaction(
-            facility_id=submission.facility_id,
-            request_type=submission.resource_type,
-            fhir_payload=submission.fhir_payload,
-            signature=submission.signature,
-            response_data=response_data,
-            http_status=http_status,
-            nphies_txn_id=response_data.get("id"),
-            error_msg=error_msg,
-        )
-
-        return SubmissionResponse(
-            transaction_id=response_data.get("id") or "N/A",
-            transaction_uuid=txn_uuid,
-            status=response_data.get("status") or "error",
-            nphies_response=response_data,
-            http_status=http_status,
-            message=f"Mock NPHIES response ({response_data.get('status')})",
-        )
-    # Submit to NPHIES
-    response_data, http_status, error_msg = await submit_to_nphies_with_retry(
-        endpoint="Claim",
-        payload=submission.fhir_payload,
-        signature=submission.signature
-    )
-    
-    # Extract NPHIES transaction ID if available
-    nphies_txn_id = None
-    if response_data and 'id' in response_data:
-        nphies_txn_id = response_data['id']
-    
-    # Log transaction
-    txn_uuid = log_transaction(
-        facility_id=submission.facility_id,
+    return await submit_transaction(
+        submission=submission,
+        allowed_resource_types=ALLOWED_CLAIM_RESOURCE_TYPES,
+        success_message="Claim submitted successfully to NPHIES",
         request_type="Claim",
-        fhir_payload=submission.fhir_payload,
-        signature=submission.signature,
-        response_data=response_data,
-        http_status=http_status,
-        nphies_txn_id=nphies_txn_id,
-        error_msg=error_msg
-    )
-    
-    # Determine status
-    if http_status and 200 <= http_status < 300:
-        status_msg = "submitted_successfully"
-        message = "Claim submitted successfully to NPHIES"
-    elif http_status and 400 <= http_status < 500:
-        status_msg = "rejected"
-        message = f"Claim rejected by NPHIES: {error_msg}"
-    else:
-        status_msg = "error"
-        message = f"Error submitting claim: {error_msg or 'Unknown error'}"
-    
-    return SubmissionResponse(
-        transaction_id=nphies_txn_id or "N/A",
-        transaction_uuid=txn_uuid,
-        status=status_msg,
-        nphies_response=response_data,
-        http_status=http_status,
-        message=message
+        endpoint="Claim",
     )
 
 
@@ -369,33 +530,25 @@ async def submit_preauth(submission: ClaimSubmission):
     """
     Submit a pre-authorization request to NPHIES
     """
-    
-    response_data, http_status, error_msg = await submit_to_nphies_with_retry(
-        endpoint="Claim/$submit",
-        payload=submission.fhir_payload,
-        signature=submission.signature
-    )
-    
-    nphies_txn_id = response_data.get('id') if response_data else None
-    
-    txn_uuid = log_transaction(
-        facility_id=submission.facility_id,
+    return await submit_transaction(
+        submission=submission,
+        allowed_resource_types=ALLOWED_CLAIM_RESOURCE_TYPES,
+        success_message="Pre-authorization submitted",
         request_type="PreAuth",
-        fhir_payload=submission.fhir_payload,
-        signature=submission.signature,
-        response_data=response_data,
-        http_status=http_status,
-        nphies_txn_id=nphies_txn_id,
-        error_msg=error_msg
+        endpoint="Claim/$submit",
     )
-    
-    return SubmissionResponse(
-        transaction_id=nphies_txn_id or "N/A",
-        transaction_uuid=txn_uuid,
-        status="submitted" if http_status and http_status < 400 else "error",
-        nphies_response=response_data,
-        http_status=http_status,
-        message="Pre-authorization submitted" if http_status and http_status < 400 else error_msg
+
+
+@app.post("/submit-communication", response_model=SubmissionResponse)
+async def submit_communication(submission: ClaimSubmission):
+    """
+    Submit Communication or CommunicationRequest resources for
+    re-adjudication/supporting-information exchanges.
+    """
+    return await submit_transaction(
+        submission=submission,
+        allowed_resource_types=ALLOWED_COMMUNICATION_RESOURCE_TYPES,
+        success_message="Communication submitted to NPHIES",
     )
 
 

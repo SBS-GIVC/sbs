@@ -110,22 +110,32 @@ class AIAssistantService {
           }));
 
       let all = [];
+      let loadError = null;
       try {
         const payload = await this.fetchFullCatalog();
         all = normalizeRows(Array.isArray(payload.codes) ? payload.codes : []);
-      } catch {
+      } catch (error) {
+        loadError = error;
         // Backward compatible fallback for deployments without /api/sbs/codes/all.
         let offset = 0;
         let total = null;
-        while (true) {
-          const payload = await this.fetchCatalogPage(offset, this.catalogFetchLimit);
-          const rows = Array.isArray(payload.codes) ? payload.codes : [];
-          if (rows.length === 0) break;
-          all.push(...normalizeRows(rows));
-          total = Number(payload.total || 0);
-          offset += rows.length;
-          if (total > 0 && offset >= total) break;
+        try {
+          while (true) {
+            const payload = await this.fetchCatalogPage(offset, this.catalogFetchLimit);
+            const rows = Array.isArray(payload.codes) ? payload.codes : [];
+            if (rows.length === 0) break;
+            all.push(...normalizeRows(rows));
+            total = Number(payload.total || 0);
+            offset += rows.length;
+            if (total > 0 && offset >= total) break;
+          }
+        } catch (paginationError) {
+          loadError = paginationError;
         }
+      }
+
+      if (all.length === 0 && loadError) {
+        console.warn('SBS catalog load unavailable, continuing with empty catalog:', loadError.message || loadError);
       }
 
       CODES_ARRAY = all;
@@ -144,7 +154,17 @@ class AIAssistantService {
    */
   async smartSearch(query, options = {}) {
     const { limit = 20, category = null, includeAI = true } = options;
-    await this.ensureCatalogLoaded();
+    try {
+      await this.ensureCatalogLoaded();
+    } catch (error) {
+      console.warn('SBS catalog unavailable during smart search:', error);
+      return {
+        results: [],
+        source: 'unavailable',
+        query: query.toLowerCase(),
+        aiInsights: null
+      };
+    }
     
     // Expand abbreviations
     let expandedQuery = query.toLowerCase();
@@ -248,7 +268,11 @@ class AIAssistantService {
    * Get AI-powered suggestions
    */
   async getAISuggestions(query, existingResults = []) {
-    await this.ensureCatalogLoaded();
+    try {
+      await this.ensureCatalogLoaded();
+    } catch {
+      return { suggestions: [], insights: null };
+    }
     const cacheKey = this.getCacheKey('suggestions', query);
     const cached = this.getFromCache(cacheKey);
     if (cached) return cached;
@@ -443,7 +467,16 @@ Return JSON:
    * AI-powered code mapping from internal hospital codes
    */
   async mapInternalCode(internalCode, description, context = {}) {
-    await this.ensureCatalogLoaded();
+    try {
+      await this.ensureCatalogLoaded();
+    } catch {
+      return {
+        sbsCode: null,
+        confidence: 0,
+        rationale: 'SBS catalogue is unavailable in this environment',
+        verified: false
+      };
+    }
     const prompt = `You are a Saudi healthcare billing expert. Map this internal hospital code to the official SBS V3.1 code.
 
 Internal Code: ${internalCode}
@@ -532,7 +565,18 @@ Return JSON:
    * AI-powered prior authorization assistance
    */
   async assistPriorAuth(procedureCode, patientInfo, clinicalNotes) {
-    await this.ensureCatalogLoaded();
+    try {
+      await this.ensureCatalogLoaded();
+    } catch {
+      return {
+        justification: 'SBS catalogue unavailable; please provide manual prior-auth rationale.',
+        supportingPoints: ['Medical necessity', 'Clinical history'],
+        requiredDocuments: ['Clinical notes', 'Supporting diagnostics'],
+        estimatedApprovalTime: '48-72 hours',
+        approvalLikelihood: 'medium',
+        tips: ['Retry when catalog service is available']
+      };
+    }
     const code = SBS_CODES[procedureCode];
     
     const prompt = `You are a Saudi healthcare prior authorization specialist. Help prepare a prior authorization request.

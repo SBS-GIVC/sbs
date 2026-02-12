@@ -8,14 +8,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install
-COPY requirements.txt .
+COPY services/masterlinc-bridge/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy shared middleware
-COPY ../../shared /app/shared
+COPY shared /app/shared
 
 # Copy application
-COPY . .
+COPY services/masterlinc-bridge/ .
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app

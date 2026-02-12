@@ -1,0 +1,72 @@
+{
+  "runId": "2026-02-12T04-25-43-233Z",
+  "generatedAt": "2026-02-12T04:27:04.233Z",
+  "smokeExitCode": 1,
+  "sourceReport": "/Users/fadil369/sbs/output/playwright/sbs-landing-smoke/2026-02-12T04-25-43-620Z/report.json",
+  "outcome": {
+    "overallPassed": false,
+    "failedViews": 0,
+    "consoleErrors": 8,
+    "pageErrors": 2,
+    "requestFailures": 0,
+    "apiFailures": 6,
+    "workflowValidationOk": true,
+    "apiSmokeOk": true
+  },
+  "regressionCases": [
+    {
+      "id": "REG-API-4193",
+      "title": "API failure regression: GET http://localhost:3001/api/claims?limit=50&page=1",
+      "priority": "P1",
+      "source": "playwright_api_failure",
+      "testIdea": "Replay GET http://localhost:3001/api/claims?limit=50&page=1 in API smoke and assert status < 400.",
+      "expected": "API endpoint should return success class status.",
+      "observed": "HTTP 404"
+    },
+    {
+      "id": "REG-API-4193",
+      "title": "API failure regression: GET http://localhost:3001/api/claims?limit=50&page=1",
+      "priority": "P1",
+      "source": "playwright_api_failure",
+      "testIdea": "Replay GET http://localhost:3001/api/claims?limit=50&page=1 in API smoke and assert status < 400.",
+      "expected": "API endpoint should return success class status.",
+      "observed": "HTTP 404"
+    },
+    {
+      "id": "REG-API-3491",
+      "title": "API failure regression: GET http://localhost:3000/api/sbs/codes/all",
+      "priority": "P1",
+      "source": "playwright_api_failure",
+      "testIdea": "Replay GET http://localhost:3000/api/sbs/codes/all in API smoke and assert status < 400.",
+      "expected": "API endpoint should return success class status.",
+      "observed": "HTTP 404"
+    },
+    {
+      "id": "REG-API-4738",
+      "title": "API failure regression: GET http://localhost:3000/api/sbs/codes?limit=200&offset=0",
+      "priority": "P1",
+      "source": "playwright_api_failure",
+      "testIdea": "Replay GET http://localhost:3000/api/sbs/codes?limit=200&offset=0 in API smoke and assert status < 400.",
+      "expected": "API endpoint should return success class status.",
+      "observed": "HTTP 404"
+    },
+    {
+      "id": "REG-API-6302",
+      "title": "API failure regression: GET http://localhost:3000/api/ai/facility-analytics?facility_id=1&days=30",
+      "priority": "P1",
+      "source": "playwright_api_failure",
+      "testIdea": "Replay GET http://localhost:3000/api/ai/facility-analytics?facility_id=1&days=30 in API smoke and assert status < 400.",
+      "expected": "API endpoint should return success class status.",
+      "observed": "HTTP 404"
+    },
+    {
+      "id": "REG-API-6302",
+      "title": "API failure regression: GET http://localhost:3000/api/ai/facility-analytics?facility_id=1&days=30",
+      "priority": "P1",
+      "source": "playwright_api_failure",
+      "testIdea": "Replay GET http://localhost:3000/api/ai/facility-analytics?facility_id=1&days=30 in API smoke and assert status < 400.",
+      "expected": "API endpoint should return success class status.",
+      "observed": "HTTP 404"
+    }
+  ]
+}

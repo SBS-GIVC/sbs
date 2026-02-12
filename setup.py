@@ -17,4 +17,5 @@ setup(
     author="BrainSAIT",
     description="NPHIES Bridge for Saudi healthcare integration",
     python_requires=">=3.8",
+    entry_points={"console_scripts": ["afham=afham_cli:main"]},
 )

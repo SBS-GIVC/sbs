@@ -5,6 +5,11 @@ import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { SectionHeader } from '../components/ui/SectionHeader';
 
+const API_BASE_URL =
+  (typeof window !== 'undefined' && typeof window.SBS_API_URL === 'string' && window.SBS_API_URL.trim())
+    ? window.SBS_API_URL.replace(/\/+$/, '')
+    : '';
+
 /**
  * Premium Claims Queue Page
  * Optimized for GIVC-SBS Ultra-Premium Design System
@@ -23,7 +28,7 @@ export function ClaimsQueuePage() {
     const loadClaims = async () => {
       setLoading(true);
       try {
-        const res = await fetch('/api/claims?limit=50&page=1');
+        const res = await fetch(`${API_BASE_URL}/api/claims?limit=50&page=1`);
         const data = await res.json().catch(() => ({}));
         if (!res.ok || data.success === false) {
           throw new Error(data.error || `HTTP ${res.status}`);

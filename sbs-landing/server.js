@@ -543,6 +543,58 @@ function computeClaimAnalysis(claim) {
   };
 }
 
+function normalizeNphiesSubmissionStatus(response = {}) {
+  const rawStatus = String(response?.status || '').trim().toLowerCase();
+  const httpStatus = Number(response?.http_status);
+
+  if (['accepted', 'submitted_successfully', 'submitted', 'processed', 'ok', 'success'].includes(rawStatus)) {
+    return 'accepted';
+  }
+  if (['rejected', 'denied', 'invalid'].includes(rawStatus)) {
+    return 'rejected';
+  }
+  if (['error', 'failed', 'failure', 'timeout'].includes(rawStatus)) {
+    return 'error';
+  }
+  if (Number.isFinite(httpStatus)) {
+    if (httpStatus >= 200 && httpStatus < 300) return 'accepted';
+    if (httpStatus >= 400 && httpStatus < 500) return 'rejected';
+    if (httpStatus >= 500) return 'error';
+  }
+  return rawStatus || 'submitted';
+}
+
+function buildReAdjudicationPayload(claim, { message, reasonCode, resourceType }) {
+  const claimReference =
+    claim?.nphiesResponse?.transaction_id ||
+    claim?.nphiesResponse?.transaction_uuid ||
+    claim?.claimId;
+  const patientReference = claim?.data?.patient?.id ? `Patient/${claim.data.patient.id}` : undefined;
+  const now = new Date().toISOString();
+
+  if (resourceType === 'CommunicationRequest') {
+    return {
+      resourceType: 'CommunicationRequest',
+      status: 'active',
+      authoredOn: now,
+      ...(patientReference ? { subject: { reference: patientReference } } : {}),
+      ...(claimReference ? { about: [{ reference: `Claim/${claimReference}` }] } : {}),
+      reasonCode: [{ text: reasonCode }],
+      payload: [{ contentString: message }]
+    };
+  }
+
+  return {
+    resourceType: 'Communication',
+    status: 'completed',
+    sent: now,
+    ...(patientReference ? { subject: { reference: patientReference } } : {}),
+    ...(claimReference ? { about: [{ reference: `Claim/${claimReference}` }] } : {}),
+    reasonCode: [{ text: reasonCode }],
+    payload: [{ contentString: message }]
+  };
+}
+
 app.get('/api/claims/:claimId/analyzer', (req, res) => {
   const { claimId } = req.params;
 
@@ -1143,18 +1195,23 @@ async function processDirectSBS(claim, claimData) {
       transactionId: nphiesResponse.data.transaction_uuid
     });
 
-    if (nphiesResponse.data.status === 'accepted') {
+    const normalizedNphiesStatus = normalizeNphiesSubmissionStatus(nphiesResponse.data);
+
+    if (normalizedNphiesStatus === 'accepted') {
       claim.setStatus(WORKFLOW_STAGES.ACCEPTED);
-    } else if (nphiesResponse.data.status === 'rejected') {
+    } else if (normalizedNphiesStatus === 'rejected') {
       claim.setStatus(WORKFLOW_STAGES.REJECTED);
-    } else if (nphiesResponse.data.status === 'error') {
+    } else if (normalizedNphiesStatus === 'error') {
       // Bridge returned a syntactic response but indicates upstream failure.
       claim.setStatus(WORKFLOW_STAGES.ERROR);
     } else {
       claim.setStatus(WORKFLOW_STAGES.SUBMITTED);
     }
 
-    claim.setNphiesResponse(nphiesResponse.data);
+    claim.setNphiesResponse({
+      ...nphiesResponse.data,
+      normalized_status: normalizedNphiesStatus
+    });
     saveClaim(claim);
 
     return {
@@ -1272,6 +1329,7 @@ app.get('/api/claim-status/:claimId', async (req, res) => {
       errors: claim.errors,
       timeline: claim.timeline,
       nphiesResponse: claim.nphiesResponse,
+      reAdjudication: claim.reAdjudication || [],
       processingTimeMs: claim.processingTimeMs,
       timestamps: {
         created: claim.createdAt,
@@ -1289,6 +1347,125 @@ app.get('/api/claim-status/:claimId', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message
+    });
+  }
+});
+
+app.post('/api/claims/:claimId/re-adjudication', async (req, res) => {
+  try {
+    const { claimId } = req.params;
+    if (!claimId || !claimIdRegex.test(claimId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid claim ID format'
+      });
+    }
+
+    const claim = getClaim(claimId);
+    if (!claim) {
+      return res.status(404).json({
+        success: false,
+        error: 'Claim not found'
+      });
+    }
+
+    const {
+      message,
+      reasonCode = 're-adjudication',
+      resourceType = 'Communication',
+      communicationPayload,
+      signature
+    } = req.body || {};
+
+    const allowedResourceTypes = ['Communication', 'CommunicationRequest'];
+    let payload = communicationPayload;
+    if (!payload) {
+      if (!String(message || '').trim()) {
+        return res.status(400).json({
+          success: false,
+          error: 'message is required when communicationPayload is not provided'
+        });
+      }
+      if (!allowedResourceTypes.includes(resourceType)) {
+        return res.status(400).json({
+          success: false,
+          error: `resourceType must be one of: ${allowedResourceTypes.join(', ')}`
+        });
+      }
+      payload = buildReAdjudicationPayload(claim, {
+        message: String(message).trim(),
+        reasonCode: String(reasonCode).trim() || 're-adjudication',
+        resourceType
+      });
+    }
+
+    if (!allowedResourceTypes.includes(payload.resourceType)) {
+      return res.status(400).json({
+        success: false,
+        error: `communicationPayload.resourceType must be one of: ${allowedResourceTypes.join(', ')}`
+      });
+    }
+
+    let resolvedSignature = String(signature || '').trim();
+    if (!resolvedSignature) {
+      const signResponse = await axios.post(`${SBS_SIGNER_URL}/sign`, {
+        payload,
+        facility_id: 1
+      }, { timeout: 30000 });
+      resolvedSignature = String(signResponse.data?.signature || '').trim();
+    }
+
+    if (!resolvedSignature) {
+      return res.status(502).json({
+        success: false,
+        error: 'Unable to produce a digital signature for re-adjudication communication'
+      });
+    }
+
+    const bridgeResponse = await axios.post(
+      `${SBS_NPHIES_BRIDGE_URL}/submit-communication`,
+      {
+        facility_id: 1,
+        fhir_payload: payload,
+        signature: resolvedSignature,
+        resource_type: payload.resourceType
+      },
+      { timeout: 60000 }
+    );
+
+    const normalizedStatus = normalizeNphiesSubmissionStatus(bridgeResponse.data);
+    const event = {
+      submittedAt: new Date().toISOString(),
+      reasonCode: String(reasonCode || 're-adjudication'),
+      resourceType: payload.resourceType,
+      bridgeStatus: bridgeResponse.data?.status || null,
+      normalizedStatus,
+      transactionUuid: bridgeResponse.data?.transaction_uuid || null
+    };
+
+    claim.reAdjudication = [...(claim.reAdjudication || []), event];
+    claim.timeline.push({
+      event: 're_adjudication_submitted',
+      message: `Re-adjudication ${payload.resourceType} submitted`,
+      status: normalizedStatus,
+      timestamp: new Date().toISOString()
+    });
+    claim.updatedAt = new Date().toISOString();
+    saveClaim(claim);
+
+    return res.json({
+      success: true,
+      claimId,
+      status: normalizedStatus,
+      communication: event,
+      bridge: bridgeResponse.data
+    });
+  } catch (error) {
+    const status = error.response?.status || 500;
+    return res.status(status).json({
+      success: false,
+      error: 'Failed to submit re-adjudication communication',
+      message: error.response?.data || error.message
     });
   }
 });

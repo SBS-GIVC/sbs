@@ -11,6 +11,8 @@
     "start": "node server.cjs",
     "server": "node server.cjs",
     "nphies:scan": "node scripts/nphies-portal-scan.mjs",
+    "smoke:e2e": "node scripts/smoke-e2e.mjs",
+    "qa:agent": "node scripts/continuous-qa-agent.mjs",
     "test": "echo \"No tests configured yet\" && exit 0"
   },
   "keywords": [],
