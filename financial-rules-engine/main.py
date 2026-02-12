@@ -26,6 +26,42 @@ load_dotenv()
 # Setup structured logging
 logger = setup_logging("financial-rules-engine", log_level=os.getenv("LOG_LEVEL", "INFO"))
 
+# Database connection pool
+from psycopg2 import pool as pg_pool
+from contextlib import contextmanager
+
+db_pool = None
+
+def init_db_pool():
+    """Initialize database connection pool"""
+    global db_pool
+    try:
+        db_pool = pg_pool.ThreadedConnectionPool(
+            minconn=1,
+            maxconn=20,
+            host=os.getenv("DB_HOST", "localhost"),
+            database=os.getenv("DB_NAME", "sbs_integration"),
+            user=os.getenv("DB_USER", "postgres"),
+            password=os.getenv("DB_PASSWORD"),
+            port=os.getenv("DB_PORT", "5432")
+        )
+        logger.info("Database connection pool initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize connection pool: {str(e)}")
+        db_pool = None
+
+@contextmanager
+def get_db_connection_pooled():
+    """Get database connection from pool"""
+    if not db_pool:
+        init_db_pool()
+    conn = db_pool.getconn() if db_pool else None
+    try:
+        yield conn
+    finally:
+        if conn and db_pool:
+            db_pool.putconn(conn)
+
 app = FastAPI(
     title="SBS Financial Rules Engine",
     description="Apply CHI business rules to healthcare claims",
@@ -60,6 +96,7 @@ async def rate_limit_middleware(request: Request, call_next):
 
 
 def get_db_connection():
+    """Get database connection (legacy - use get_db_connection_pooled for new code)"""
     return psycopg2.connect(
         host=os.getenv("DB_HOST", "localhost"),
         database=os.getenv("DB_NAME", "sbs_integration"),
@@ -383,6 +420,18 @@ async def validate_claim(request: Request):
         }
     )
 
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize resources on startup"""
+    init_db_pool()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup resources on shutdown"""
+    if db_pool:
+        db_pool.closeall()
+        logger.info("Database connection pool closed")
 
 if __name__ == "__main__":
     import uvicorn

@@ -380,3 +380,98 @@ def shutdown_event():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+# ============================================
+# Normalization Endpoint
+# ============================================
+
+class NormalizeRequest(BaseModel):
+    facility_id: int = Field(..., description="Facility ID")
+    internal_code: str = Field(..., description="Internal facility code")
+    description: Optional[str] = Field(None, description="Code description (optional)")
+
+class NormalizeResponse(BaseModel):
+    sbs_code: str = Field(..., description="Normalized SBS code")
+    sbs_description: str = Field(..., description="SBS code description")
+    confidence: float = Field(..., description="Confidence score (0-1)")
+    source: str = Field(..., description="Source: 'database' or 'ai'")
+    cached: bool = Field(default=False, description="Was result cached?")
+
+@app.post("/normalize", response_model=NormalizeResponse)
+async def normalize_code(request: NormalizeRequest):
+    """
+    Normalize internal facility code to SBS standard code
+    
+    Process:
+    1. Check cache (if available)
+    2. Lookup in database mapping table
+    3. Fall back to AI normalization if not found
+    """
+    metrics["requests_total"] += 1
+    request_id = str(uuid.uuid4())
+    
+    logger.info(
+        f"Normalize request received",
+        extra={
+            "request_id": request_id,
+            "facility_id": request.facility_id,
+            "internal_code": request.internal_code
+        }
+    )
+    
+    try:
+        # Try database lookup first
+        db_result = lookup_code_in_database(request.facility_id, request.internal_code)
+        
+        if db_result:
+            metrics["requests_success"] += 1
+            metrics["cache_hits"] += 1
+            logger.info(
+                f"Code found in database",
+                extra={"request_id": request_id, "sbs_code": db_result.get('sbs_code')}
+            )
+            return NormalizeResponse(
+                sbs_code=db_result['sbs_code'],
+                sbs_description=db_result.get('sbs_description', ''),
+                confidence=1.0,
+                source="database",
+                cached=True
+            )
+        
+        # Database lookup failed - use AI fallback
+        metrics["cache_misses"] += 1
+        metrics["ai_calls"] += 1
+        
+        logger.info(
+            f"Code not found in database, using AI",
+            extra={"request_id": request_id}
+        )
+        
+        # AI normalization (placeholder - integrate with actual AI service)
+        # For now, return a mock response
+        ai_code = f"SBS-PENDING-{request.internal_code[:5]}"
+        
+        metrics["requests_success"] += 1
+        
+        return NormalizeResponse(
+            sbs_code=ai_code,
+            sbs_description=f"AI-suggested mapping for {request.internal_code}",
+            confidence=0.75,
+            source="ai",
+            cached=False
+        )
+        
+    except Exception as e:
+        metrics["requests_failed"] += 1
+        logger.error(
+            f"Normalization error: {str(e)}",
+            extra={"request_id": request_id}
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "Normalization failed",
+                "error_code": "NORMALIZER_PROCESSING_ERROR",
+                "error_id": request_id
+            }
+        )
