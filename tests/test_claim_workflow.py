@@ -17,6 +17,22 @@ FINANCIAL_RULES_URL = "http://localhost:8002"
 NPHIES_BRIDGE_URL = "http://localhost:8003"
 
 
+
+
+def _is_service_up(url: str) -> bool:
+    try:
+        response = requests.get(url, timeout=1.5)
+        return response.status_code == 200
+    except requests.RequestException:
+        return False
+
+
+if not _is_service_up(f"{LANDING_API_URL}/health"):
+    pytest.skip(
+        "Skipping claim workflow integration suite: landing API is unavailable at localhost:3000",
+        allow_module_level=True,
+    )
+
 # ============================================================================
 # FIXTURES
 # ============================================================================

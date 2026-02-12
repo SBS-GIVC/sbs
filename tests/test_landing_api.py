@@ -11,6 +11,22 @@ import io
 BASE_URL = "http://localhost:3000"
 
 
+
+def _is_base_url_available() -> bool:
+    try:
+        response = requests.get(f"{BASE_URL}/health", timeout=1.5)
+        return response.status_code == 200
+    except requests.RequestException:
+        return False
+
+
+if not _is_base_url_available():
+    pytest.skip(
+        "Skipping landing API integration suite: service is unavailable at localhost:3000",
+        allow_module_level=True,
+    )
+
+
 class TestHealthAndMetrics:
     """Test health and metrics endpoints"""
 

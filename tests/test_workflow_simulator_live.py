@@ -16,9 +16,30 @@ import sys
 import os
 from pathlib import Path
 
+import pytest
+import requests
+
+
+def _service_available(url: str) -> bool:
+    try:
+        return requests.get(url, timeout=1.5).status_code == 200
+    except requests.RequestException:
+        return False
+
 
 def test_workflow_simulator_accepted():
     env = os.environ.copy()
+
+    required_health_endpoints = [
+        f"{env.get('SBS_NORMALIZER_URL', 'http://localhost:8000')}/health",
+        f"{env.get('SBS_FINANCIAL_RULES_URL', 'http://localhost:8002')}/health",
+        f"{env.get('SBS_SIGNER_URL', 'http://localhost:8001')}/health",
+        f"{env.get('SBS_NPHIES_BRIDGE_URL', 'http://localhost:8003')}/health",
+    ]
+    unavailable = [url for url in required_health_endpoints if not _service_available(url)]
+    if unavailable:
+        pytest.skip(f"Skipping live simulator test; required services unavailable: {', '.join(unavailable)}")
+
     repo_root = Path(__file__).resolve().parents[1]
     simulator_path = repo_root / "tests" / "workflow_simulator.py"
     # Make output deterministic: use mock accepted outcome

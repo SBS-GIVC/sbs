@@ -6,6 +6,8 @@ Uses Playwright for browser automation
 import pytest
 import os
 import re
+
+pytest.importorskip("playwright.sync_api")
 from playwright.sync_api import Page, expect, sync_playwright
 from faker import Faker
 
