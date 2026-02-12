@@ -15,7 +15,7 @@ BASE_URL = "http://localhost:3000"
 def _is_base_url_available() -> bool:
     try:
         response = requests.get(f"{BASE_URL}/health", timeout=1.5)
-        return response.status_code < 500
+        return response.status_code == 200
     except requests.RequestException:
         return False
 

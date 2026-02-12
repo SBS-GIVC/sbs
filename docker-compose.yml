@@ -331,6 +331,55 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  # HealthcareLinc Agent (Unified Healthcare Workflow Management)
+  healthcarelinc-agent:
+    build:
+      context: .
+      dockerfile: ./services/agents/healthcarelinc/Dockerfile
+    container_name: sbs-healthcarelinc-agent
+    environment:
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      DB_PORT: 5432
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-in-production}
+      MASTERLINC_URL: http://masterlinc-bridge:4000
+      NPHIES_BRIDGE_URL: http://nphies-bridge:8003
+      AUTHLINC_URL: http://authlinc-agent:4002
+      CLAIMLINC_URL: http://claimlinc-agent:4001
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+    ports:
+      - "127.0.0.1:4004:4004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      masterlinc-bridge:
+        condition: service_started
+      nphies-bridge:
+        condition: service_started
+      authlinc-agent:
+        condition: service_started
+      claimlinc-agent:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          memory: 256M
+    networks:
+      - sbs-network
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
   # SBS Landing API
   sbs-landing:
     build:

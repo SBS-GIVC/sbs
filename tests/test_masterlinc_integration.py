@@ -22,8 +22,8 @@ SBS_LANDING_URL = "http://localhost:3000"
 def _service_available(url: str) -> bool:
     try:
         response = httpx.get(url, timeout=1.5)
-        return response.status_code < 500
-    except Exception:
+        return response.status_code == 200
+    except httpx.RequestError:
         return False
 
 
