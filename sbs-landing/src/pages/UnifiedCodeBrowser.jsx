@@ -4,12 +4,15 @@ import { useToast } from '../components/Toast';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { Button } from '../components/ui/Button';
+import { i18n } from '../utils/i18n';
 
 /**
  * Premium Unified Code Browser
  * Multi-System Clinical Registry Explorer
  */
-export function UnifiedCodeBrowser() {
+export function UnifiedCodeBrowser({ lang = 'en', isRTL = false }) {
+  const copy = i18n[lang] || i18n.en;
+  const t = copy.pages?.unifiedBrowser || i18n.en.pages.unifiedBrowser;
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSystems, setSelectedSystems] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -62,8 +65,8 @@ export function UnifiedCodeBrowser() {
   const copyCode = (code, system) => {
     navigator.clipboard
       .writeText(`${system}|${code}`)
-      .then(() => toast.success(`${system} code synchronized`))
-      .catch(() => toast.error('Clipboard access denied by browser'));
+      .then(() => toast.success(t.toast.codeCopied.replace('{system}', system)))
+      .catch(() => toast.error(t.toast.clipboardDenied));
   };
 
   const getRegistryLink = (code) => {
@@ -87,28 +90,30 @@ export function UnifiedCodeBrowser() {
           <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-8">
              <div className="space-y-4">
                 <SectionHeader 
-                  title="Unified Registry" 
-                  subtitle={`Autonomous search across ${allSystems.length} global healthcare systems.`}
-                  badge="Network Node"
+                  title={t.header.title}
+                  subtitle={t.header.subtitleTemplate.replace('{count}', allSystems.length.toLocaleString(lang === 'ar' ? 'ar-SA' : undefined))}
+                  badge={t.header.badge}
                 />
              </div>
              <div className="flex items-center gap-3">
-                <div className="px-4 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-[10px] font-black uppercase tracking-widest">FHIR R4 Native</div>
-                <div className="px-4 py-2 rounded-2xl bg-blue-600/10 border border-blue-600/20 text-blue-600 text-[10px] font-black uppercase tracking-widest">AI Enhanced</div>
+                <div className="px-4 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-[10px] font-black uppercase tracking-widest">{t.header.tags.fhir}</div>
+                <div className="px-4 py-2 rounded-2xl bg-blue-600/10 border border-blue-600/20 text-blue-600 text-[10px] font-black uppercase tracking-widest">{t.header.tags.ai}</div>
              </div>
           </div>
 
           <div className="relative z-10 space-y-6">
              <div className="relative group">
-                <span className="absolute left-6 top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-500">search</span>
+                <span className={`absolute ${isRTL ? 'right-6' : 'left-6'} top-1/2 -translate-y-1/2 material-symbols-outlined text-slate-500`}>search</span>
                 <input
                   type="text" 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Query across clinical ontologies (e.g. 'cardiology', 'glucose', 'I10')..."
-                  className="w-full h-16 sm:h-20 bg-white border border-slate-200 rounded-[24px] sm:rounded-[32px] pl-14 sm:pl-16 pr-16 sm:pr-20 text-base sm:text-lg font-bold text-slate-900 placeholder:text-slate-500 focus:outline-none focus:border-blue-600/30 focus:ring-4 focus:ring-blue-600/10 transition-all shadow-sm"
+                  placeholder={t.search.placeholder}
+                  aria-label={t.search.label}
+                  data-testid="unifiedbrowser-search"
+                  className={`w-full h-16 sm:h-20 bg-white border border-slate-200 rounded-[24px] sm:rounded-[32px] ${isRTL ? 'pr-14 sm:pr-16 pl-16 sm:pl-20 text-right' : 'pl-14 sm:pl-16 pr-16 sm:pr-20 text-left'} text-base sm:text-lg font-bold text-slate-900 placeholder:text-slate-500 focus:outline-none focus:border-blue-600/30 focus:ring-4 focus:ring-blue-600/10 transition-all shadow-sm`}
                 />
-                {isSearching && <div className="absolute right-8 top-1/2 -translate-y-1/2 size-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>}
+                {isSearching && <div className={`absolute ${isRTL ? 'left-8' : 'right-8'} top-1/2 -translate-y-1/2 size-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin`}></div>}
              </div>
 
              <div className="flex flex-wrap gap-2">
@@ -116,6 +121,7 @@ export function UnifiedCodeBrowser() {
                    <button 
                      key={s.id}
                      onClick={() => toggleSystem(s.id)}
+                     data-testid={`unifiedbrowser-system-${s.id}`}
                      className={`px-3 sm:px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center gap-2 ${
                        selectedSystems.includes(s.id) 
                          ? 'border-current shadow-lg shadow-current/20' 
@@ -136,7 +142,7 @@ export function UnifiedCodeBrowser() {
              <div className="max-w-[1200px] mx-auto space-y-6">
                 {searchQuery.length < 2 ? (
                    <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-premium-in">
-                      {allSystems.map(s => <SystemPill key={s.id} system={s} />)}
+                      {allSystems.map(s => <SystemPill key={s.id} system={s} t={t} lang={lang} />)}
                    </section>
                 ) : results.results.length > 0 ? (
                    <div className="space-y-4 stagger-children">
@@ -146,44 +152,50 @@ export function UnifiedCodeBrowser() {
                            code={c} 
                            selected={selectedCode?.code === c.code}
                            onClick={() => handleCodeSelect(c)}
+                           t={t}
                          />
                       ))}
                    </div>
                 ) : (
                    <div className="flex flex-col items-center justify-center py-40 opacity-40">
                       <span className="material-symbols-outlined text-[80px] font-black">manage_search</span>
-                      <p className="text-sm font-black uppercase tracking-widest mt-6">Registry Query Null</p>
+                      <p className="text-sm font-black uppercase tracking-widest mt-6">{t.empty}</p>
                    </div>
                 )}
              </div>
           </div>
 
           {selectedCode && (
-             <aside className="w-[480px] bg-white dark:bg-slate-950 border-l border-slate-100 dark:border-slate-800 overflow-y-auto animate-premium-in shadow-2xl relative">
+             <aside data-testid="unifiedbrowser-detail" className="w-[480px] bg-white dark:bg-slate-950 border-l border-slate-100 dark:border-slate-800 overflow-y-auto animate-premium-in shadow-2xl relative">
                 <div className="p-12 space-y-12">
                    <div className="flex justify-between items-start">
                       <div className="space-y-2">
                          <div className="inline-flex px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest bg-blue-600/10 text-blue-600 border border-blue-600/20">{selectedCode.systemName}</div>
                          <h2 className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">{selectedCode.code}</h2>
                       </div>
-                      <button onClick={() => setSelectedCode(null)} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 text-slate-400">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCode(null)}
+                        aria-label={t.detail.close}
+                        className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900 text-slate-400"
+                      >
                          <span className="material-symbols-outlined">close</span>
                       </button>
                    </div>
 
                    <div className="space-y-6">
                       <div className="space-y-2">
-                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Semantics</p>
+                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t.detail.semantics}</p>
                          <p className="text-base font-bold text-slate-800 dark:text-gray-100 leading-relaxed italic">"{selectedCode.display}"</p>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
-                         <InfoByte label="Status" value="Active" color="emerald" />
-                         <InfoByte label="Auth Req" value="Manual" color="amber" />
+                         <InfoByte label={t.detail.statusLabel} value={t.detail.statusActive} color="emerald" />
+                         <InfoByte label={t.detail.authReqLabel} value={t.detail.authReqManual} color="amber" />
                       </div>
                    </div>
 
                    <Card>
-                      <CardHeader title="System Bridging" subtitle="Cross-system neural mappings." icon="lan" />
+                      <CardHeader title={t.detail.bridgingTitle} subtitle={t.detail.bridgingSubtitle} icon="lan" />
                       <CardBody className="p-0">
                          {loadingMappings ? (
                             <div className="p-10 text-center"><div className="size-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div></div>
@@ -195,7 +207,9 @@ export function UnifiedCodeBrowser() {
                                         <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{m.system}</p>
                                         <p className="text-sm font-black text-blue-600 font-mono tracking-tight">{m.code}</p>
                                      </div>
-                                     <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">{Math.round(m.confidence * 100)}% Match</span>
+                                     <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                       {Math.round(m.confidence * 100)}% {t.detail.match}
+                                     </span>
                                   </div>
                                ))}
                             </div>
@@ -207,6 +221,7 @@ export function UnifiedCodeBrowser() {
                       <Button
                         className="w-full py-6 shadow-2xl shadow-blue-600/20"
                         icon="add_reaction"
+                        data-testid="unifiedbrowser-add-context"
                         onClick={() => {
                           const payload = {
                             source: 'unified-browser',
@@ -215,12 +230,13 @@ export function UnifiedCodeBrowser() {
                             code: selectedCode.code,
                             description: selectedCode.display
                           };
-                          window.localStorage.setItem('sbs_claim_context_code', JSON.stringify(payload));
-                          toast.success('Code context added and claim builder opened');
+                          try { window.sessionStorage.setItem('sbs_claim_context_code', JSON.stringify(payload)); } catch {}
+                          try { window.dispatchEvent(new CustomEvent('sbs:claim-context', { detail: payload })); } catch {}
+                          toast.success(t.toast.contextAdded);
                           window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: 'claim-builder' } }));
                         }}
                       >
-                        Add to Claim Context
+                        {t.actions.addContext}
                       </Button>
                       <Button
                         variant="secondary"
@@ -229,10 +245,10 @@ export function UnifiedCodeBrowser() {
                         onClick={() => {
                           const url = getRegistryLink(selectedCode);
                           window.open(url, '_blank', 'noopener,noreferrer');
-                          toast.info('Opened registry reference in a new tab');
+                          toast.info(t.toast.openedReference);
                         }}
                       >
-                        Registry Deep-Link
+                        {t.actions.deepLink}
                       </Button>
                    </div>
                 </div>
@@ -243,7 +259,7 @@ export function UnifiedCodeBrowser() {
   );
 }
 
-function SystemPill({ system }) {
+function SystemPill({ system, t, lang = 'en' }) {
   return (
     <Card className="hover:scale-[1.02] transition-transform">
        <CardBody className="p-8 space-y-4">
@@ -252,20 +268,25 @@ function SystemPill({ system }) {
           </div>
           <div>
              <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tight">{system.name}</h4>
-             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{system.count.toLocaleString()} Codes</p>
+             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+               {system.count.toLocaleString(lang === 'ar' ? 'ar-SA' : undefined)} {t.systems.codes}
+             </p>
           </div>
        </CardBody>
     </Card>
   );
 }
 
-function UnifiedResultCard({ code, selected, onClick }) {
+function UnifiedResultCard({ code, selected, onClick, t }) {
   return (
-    <div 
+    <button
+      type="button"
       onClick={onClick}
+      data-testid={`unifiedbrowser-result-${code.system}-${code.code}`}
       className={`p-6 rounded-[28px] border-2 transition-all cursor-pointer flex items-center gap-6 ${
         selected ? 'border-blue-600 bg-blue-600/5 shadow-2xl shadow-blue-600/10' : 'bg-white dark:bg-slate-950 border-slate-100 dark:border-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
       }`}
+      aria-label={t.result.ariaLabelTemplate.replace('{system}', code.systemName).replace('{code}', code.code)}
     >
        <div className="size-14 rounded-2xl flex items-center justify-center text-2xl shrink-0" style={{ backgroundColor: `${code.systemColor}15`, color: code.systemColor }}>
           <span className="material-symbols-outlined">api</span>
@@ -278,7 +299,7 @@ function UnifiedResultCard({ code, selected, onClick }) {
           <p className="text-sm font-bold text-slate-800 dark:text-gray-200 line-clamp-1 italic">"{code.display}"</p>
        </div>
        <span className="material-symbols-outlined text-slate-300 group-hover:text-blue-600">chevron_right</span>
-    </div>
+    </button>
   );
 }
 

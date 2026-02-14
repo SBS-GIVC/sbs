@@ -37,17 +37,19 @@ export function Button({
       onClick={onClick}
       disabled={disabled || loading}
       className={`
-        btn-premium inline-flex items-center justify-center gap-2 
+        btn-premium relative isolate overflow-hidden inline-flex items-center justify-center gap-2 
         ${sizes[size] || sizes.md} font-bold tracking-tight
         disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white
+        dark:focus-visible:ring-offset-slate-900
         ${variants[variant]}
         ${className}
       `}
     >
       {loading ? (
-        <span className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
+        <span aria-hidden="true" className="material-symbols-outlined animate-spin text-[18px]">progress_activity</span>
       ) : icon && (
-        <span className="material-symbols-outlined text-[18px]">{icon}</span>
+        <span aria-hidden="true" className="material-symbols-outlined text-[18px]">{icon}</span>
       )}
       <span>{children}</span>
     </button>

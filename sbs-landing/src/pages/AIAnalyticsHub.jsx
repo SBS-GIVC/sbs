@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { i18n } from '../utils/i18n';
 import {
   predictClaim,
   optimizeCost,
@@ -16,7 +17,9 @@ import { Input } from '../components/ui/Input';
  * Premium AI Analytics Hub
  * Powered by GIVC-SBS Intelligence
  */
-export function AIAnalyticsHub() {
+export function AIAnalyticsHub({ lang = 'en', isRTL = false }) {
+  const copy = i18n[lang] || i18n.en;
+  const t = copy.pages?.aiAnalytics || i18n.en.pages.aiAnalytics;
   const [activeTab, setActiveTab] = useState('predict');
   const [claimData, setClaimData] = useState({
     facility_id: 1,
@@ -80,25 +83,25 @@ export function AIAnalyticsHub() {
   const updateClaimData = (field, value) => setClaimData(prev => ({ ...prev, [field]: value }));
 
   return (
-    <div className="flex-1 overflow-y-auto bg-grid scrollbar-hide">
+    <div className="flex-1">
       <main className="max-w-[1500px] mx-auto p-6 sm:p-12 space-y-12 stagger-children">
         
         {/* Header */}
         <section className="animate-premium-in">
            <SectionHeader 
-             title="Neural Analytics Hub" 
-             subtitle="Autonomous claim profiling, risk assessment, and financial optimization engine."
-             badge="Inference V4"
+             title={t.header.title}
+             subtitle={t.header.subtitle}
+             badge={t.header.badge}
            />
         </section>
 
         {/* Global Stats Overview */}
         {facilityAnalytics && (
           <section className="grid grid-cols-2 lg:grid-cols-4 gap-6 animate-premium-in" style={{ animationDelay: '100ms' }}>
-             <AnalyticsKpi label="Registry Volume" value={facilityAnalytics.total_claims || 0} unit="Claims" color="blue" />
-             <AnalyticsKpi label="Sync Success" value={((facilityAnalytics.approved_claims / facilityAnalytics.total_claims) * 100 || 0).toFixed(1)} unit="%" color="emerald" />
-             <AnalyticsKpi label="Total Flux" value={facilityAnalytics.total_amount?.toFixed(0) || 0} unit="SAR" color="indigo" />
-             <AnalyticsKpi label="Avg Latency" value="1.2" unit="s" color="rose" />
+             <AnalyticsKpi label={t.kpis.registryVolume} value={facilityAnalytics.total_claims || 0} unit={t.kpis.units.claims} color="blue" />
+             <AnalyticsKpi label={t.kpis.syncSuccess} value={((facilityAnalytics.approved_claims / facilityAnalytics.total_claims) * 100 || 0).toFixed(1)} unit="%" color="emerald" />
+             <AnalyticsKpi label={t.kpis.totalFlux} value={facilityAnalytics.total_amount?.toFixed(0) || 0} unit="SAR" color="indigo" />
+             <AnalyticsKpi label={t.kpis.avgLatency} value="1.2" unit={t.kpis.units.seconds} color="rose" />
           </section>
         )}
 
@@ -107,35 +110,42 @@ export function AIAnalyticsHub() {
            {/* Left: Configuration Form */}
            <div className="lg:col-span-5 space-y-8 animate-premium-in" style={{ animationDelay: '200ms' }}>
               <Card>
-                 <CardHeader title="Input Manifest" subtitle="Provide the clinical context for neural processing." />
+                 <CardHeader title={t.form.title} subtitle={t.form.subtitle} />
                  <CardBody className="space-y-6 py-6">
                     <div className="grid sm:grid-cols-2 gap-4">
-                       <Input label="Facility ID" type="number" value={claimData.facility_id} onChange={(e) => updateClaimData('facility_id', e.target.value)} />
-                       <Input label="Yield Value (SAR)" type="number" value={claimData.total_amount} onChange={(e) => updateClaimData('total_amount', e.target.value)} />
+                       <Input label={t.form.facilityId} type="number" value={claimData.facility_id} onChange={(e) => updateClaimData('facility_id', e.target.value)} />
+                       <Input label={t.form.yieldValueSar} type="number" value={claimData.total_amount} onChange={(e) => updateClaimData('total_amount', e.target.value)} />
                     </div>
                     <div className="grid grid-cols-3 gap-4">
-                       <Input label="Age" type="number" value={claimData.patient_age} onChange={(e) => updateClaimData('patient_age', e.target.value)} />
-                       <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Gender</label>
-                          <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-600/20" value={claimData.patient_gender} onChange={(e) => updateClaimData('patient_gender', e.target.value)}>
-                             <option value="M">Male</option>
-                             <option value="F">Female</option>
+                       <Input label={t.form.age} type="number" value={claimData.patient_age} onChange={(e) => updateClaimData('patient_age', e.target.value)} />
+                        <div className="space-y-2">
+                          <label htmlFor="ai-analytics-gender" className="text-[10px] font-black uppercase tracking-widest text-slate-400" style={{ marginInlineStart: '0.25rem' }}>
+                            {t.form.gender}
+                          </label>
+                          <select
+                            id="ai-analytics-gender"
+                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-600/20"
+                            value={claimData.patient_gender}
+                            onChange={(e) => updateClaimData('patient_gender', e.target.value)}
+                          >
+                             <option value="M">{t.form.genderOptions.male}</option>
+                             <option value="F">{t.form.genderOptions.female}</option>
                           </select>
                        </div>
-                       <Input label="Date" type="date" value={claimData.service_date} onChange={(e) => updateClaimData('service_date', e.target.value)} />
+                       <Input label={t.form.date} type="date" value={claimData.service_date} onChange={(e) => updateClaimData('service_date', e.target.value)} />
                     </div>
-                    <Input label="Diagnosis Registry (ICD-10)" placeholder="I10, E11.9..." value={claimData.diagnosis_codes.join(', ')} onChange={(e) => updateClaimData('diagnosis_codes', e.target.value.split(','))} />
-                    <Input label="Procedure Codes (SBS)" placeholder="1101001..." value={claimData.procedure_codes.join(', ')} onChange={(e) => updateClaimData('procedure_codes', e.target.value.split(','))} />
+                    <Input label={t.form.diagnosisRegistry} placeholder={t.form.diagnosisPlaceholder} value={claimData.diagnosis_codes.join(', ')} onChange={(e) => updateClaimData('diagnosis_codes', e.target.value.split(','))} />
+                    <Input label={t.form.procedureCodes} placeholder={t.form.procedurePlaceholder} value={claimData.procedure_codes.join(', ')} onChange={(e) => updateClaimData('procedure_codes', e.target.value.split(','))} />
                  </CardBody>
               </Card>
 
               {/* Action Hub */}
               <div className="flex flex-wrap gap-4">
-                 <ActionTab active={activeTab === 'predict'} label="Predict" icon="online_prediction" onClick={() => setActiveTab('predict')} />
-                 <ActionTab active={activeTab === 'optimize'} label="Optimize" icon="savings" onClick={() => setActiveTab('optimize')} />
-                 <ActionTab active={activeTab === 'fraud'} label="Fraud" icon="shield_person" onClick={() => setActiveTab('fraud')} />
-                 <ActionTab active={activeTab === 'compliance'} label="Safety" icon="policy" onClick={() => setActiveTab('compliance')} />
-                 <ActionTab active={activeTab === 'analyze'} label="Full Audit" icon="analytics" onClick={() => setActiveTab('analyze')} />
+                 <ActionTab active={activeTab === 'predict'} label={t.tabs.predict} icon="online_prediction" onClick={() => setActiveTab('predict')} />
+                 <ActionTab active={activeTab === 'optimize'} label={t.tabs.optimize} icon="savings" onClick={() => setActiveTab('optimize')} />
+                 <ActionTab active={activeTab === 'fraud'} label={t.tabs.fraud} icon="shield_person" onClick={() => setActiveTab('fraud')} />
+                 <ActionTab active={activeTab === 'compliance'} label={t.tabs.compliance} icon="policy" onClick={() => setActiveTab('compliance')} />
+                 <ActionTab active={activeTab === 'analyze'} label={t.tabs.analyze} icon="analytics" onClick={() => setActiveTab('analyze')} />
               </div>
 
               <Button 
@@ -144,7 +154,7 @@ export function AIAnalyticsHub() {
                 loading={loading}
                 onClick={() => executeAIAction(null, activeTab)}
               >
-                 Initialize Neural Sequence
+                 {t.actions.initialize}
               </Button>
            </div>
 
@@ -154,24 +164,24 @@ export function AIAnalyticsHub() {
                  <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
                     <span className="material-symbols-outlined text-[200px] font-black">satellite_alt</span>
                  </div>
-                 <CardHeader title="Inference Terminal" subtitle="Standard output from the DeepSeek orchestration layer." />
+                 <CardHeader title={t.terminal.title} subtitle={t.terminal.subtitle} />
                  <CardBody className="flex-1 flex flex-col p-10 space-y-8">
                     {loading ? (
                       <div className="flex-1 flex flex-col items-center justify-center space-y-6">
                          <div className="size-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Processing Clinical Vectors...</p>
+                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{t.terminal.processing}</p>
                       </div>
                     ) : analysisResult ? (
                        <div className="space-y-8 animate-premium-in">
                           {/* Top Status */}
                           <div className="p-8 rounded-[38px] bg-white/5 border border-white/10 flex justify-between items-center group hover:bg-white/10 transition-colors">
                              <div className="space-y-1">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Autonomous status</p>
-                                <h4 className="text-3xl font-black text-white tracking-tighter uppercase">{analysisResult.overall_status || 'PROCESSED'}</h4>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{t.terminal.statusLabel}</p>
+                                <h4 className="text-3xl font-black text-white tracking-tighter uppercase">{analysisResult.overall_status || t.terminal.statusFallback}</h4>
                              </div>
                              {analysisResult.overall_risk_score !== undefined && (
                                 <div className="text-right">
-                                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Risk Marker</p>
+                                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{t.terminal.riskMarker}</p>
                                    <h4 className={`text-3xl font-black tracking-tighter ${analysisResult.overall_risk_score > 70 ? 'text-rose-500' : 'text-emerald-500'}`}>
                                       {analysisResult.overall_risk_score.toFixed(0)}%
                                    </h4>
@@ -180,15 +190,15 @@ export function AIAnalyticsHub() {
                           </div>
 
                           {/* Specific Result Components */}
-                          {analysisResult.prediction && <ResultModule title="Approval Analysis" data={analysisResult.prediction} icon="trending_up" />}
-                          {analysisResult.optimization && <ResultModule title="Yield Optimization" data={analysisResult.optimization} icon="savings" />}
-                          {analysisResult.fraud && <ResultModule title="Integrity Audit" data={analysisResult.fraud} icon="verified" alert={analysisResult.fraud.is_fraudulent} />}
-                          {analysisResult.compliance && <ResultModule title="Regulatory Safety" data={analysisResult.compliance} icon="gavel" />}
+                          {analysisResult.prediction && <ResultModule title={t.results.approvalAnalysis} data={analysisResult.prediction} icon="trending_up" />}
+                          {analysisResult.optimization && <ResultModule title={t.results.yieldOptimization} data={analysisResult.optimization} icon="savings" />}
+                          {analysisResult.fraud && <ResultModule title={t.results.integrityAudit} data={analysisResult.fraud} icon="verified" alert={analysisResult.fraud.is_fraudulent} />}
+                          {analysisResult.compliance && <ResultModule title={t.results.regulatorySafety} data={analysisResult.compliance} icon="gavel" />}
 
                           {/* Comprehensive Footer */}
                           {analysisResult.recommendations && (
                              <div className="p-8 rounded-[32px] bg-blue-600/10 border border-blue-600/20 space-y-4">
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-400">Strategic Protocol Recommendations</h4>
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-400">{t.terminal.recommendations}</h4>
                                 <ul className="space-y-3">
                                    {analysisResult.recommendations.map((r, i) => (
                                       <li key={i} className="flex gap-4 text-xs font-bold text-slate-300">
@@ -202,7 +212,7 @@ export function AIAnalyticsHub() {
                     ) : (
                        <div className="flex-1 flex flex-col items-center justify-center space-y-6 opacity-30">
                           <span className="material-symbols-outlined text-[80px] font-black">airwave</span>
-                          <p className="text-[10px] font-black uppercase tracking-[0.2em]">Awaiting Input Sequence</p>
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em]">{t.terminal.awaiting}</p>
                        </div>
                     )}
                  </CardBody>

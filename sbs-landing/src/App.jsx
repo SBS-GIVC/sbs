@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
 import { AICopilot, AICopilotFAB } from './components/AICopilot';
@@ -23,6 +23,8 @@ const AIHubPage = lazy(() => import('./pages/AIHubPage').then((m) => ({ default:
 const PredictiveAnalyticsPage = lazy(() => import('./pages/PredictiveAnalyticsPage').then((m) => ({ default: m.PredictiveAnalyticsPage })));
 const AIAnalyticsHub = lazy(() => import('./pages/AIAnalyticsHub').then((m) => ({ default: m.AIAnalyticsHub })));
 const IoTDashboardPage = lazy(() => import('./pages/IoTDashboardPage').then((m) => ({ default: m.IoTDashboardPage })));
+const PrivacyConsentPage = lazy(() => import('./pages/PrivacyConsentPage').then((m) => ({ default: m.PrivacyConsentPage })));
+const AdminAuditPage = lazy(() => import('./pages/AdminAuditPage').then((m) => ({ default: m.AdminAuditPage })));
 
 const VIEW_META = {
   dashboard: {
@@ -100,6 +102,14 @@ const VIEW_META = {
   'iot-dashboard': {
     en: { title: 'IoT Monitoring', subtitle: 'Real-time device monitoring and event streaming', breadcrumbs: ['Home', 'IoT', 'Dashboard'] },
     ar: { title: 'مراقبة إنترنت الأشياء', subtitle: 'مراقبة الأجهزة وبث الأحداث لحظياً', breadcrumbs: ['الرئيسية', 'إنترنت الأشياء', 'لوحة التحكم'] }
+  },
+  privacy: {
+    en: { title: 'Privacy & Consent', subtitle: 'Security and data-handling guidance for sensitive workflows', breadcrumbs: ['Home', 'System', 'Privacy'] },
+    ar: { title: 'الخصوصية والموافقة', subtitle: 'إرشادات الأمان والتعامل مع البيانات الحساسة', breadcrumbs: ['الرئيسية', 'النظام', 'الخصوصية'] }
+  },
+  'audit-log': {
+    en: { title: 'Audit Log', subtitle: 'Administrator events and configuration changes', breadcrumbs: ['Home', 'System', 'Audit'] },
+    ar: { title: 'سجل التدقيق', subtitle: 'أحداث الإدارة وتغييرات الإعدادات', breadcrumbs: ['الرئيسية', 'النظام', 'التدقيق'] }
   }
 };
 
@@ -124,6 +134,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [copilotOpen, setCopilotOpen] = useState(false);
+  const scrollContainerRef = useRef(null);
   const [lang, setLang] = useState(() => {
     const saved = typeof window !== 'undefined' ? window.localStorage.getItem('sbs_lang') : null;
     return saved === 'ar' ? 'ar' : 'en';
@@ -141,16 +152,122 @@ export default function App() {
     }
   }, [lang, isRTL]);
 
+  const resolveViewFromPathname = (pathname) => {
+    const raw = String(pathname || '/');
+    const stripped = raw.startsWith('/sbs/') ? raw.slice('/sbs/'.length) : raw.replace(/^\//, '');
+    const seg = stripped.split('/')[0].trim();
+    if (!seg) return 'dashboard';
+
+    const map = {
+      dashboard: 'dashboard',
+      eligibility: 'eligibility',
+      'prior-auth': 'prior-auth',
+      'claim-builder': 'claim-builder',
+      claims: 'claims',
+      mappings: 'mappings',
+      review: 'review',
+      error: 'error',
+      'facility-performance': 'facility_performance',
+      'facility-usage': 'facility_usage',
+      'mapping-rules': 'mapping_rules',
+      developer: 'developer',
+      settings: 'settings',
+      'code-browser': 'code-browser',
+      'unified-browser': 'unified-browser',
+      'ai-hub': 'ai-hub',
+      'ai-analytics': 'ai-analytics',
+      'predictive-analytics': 'predictive-analytics',
+      'iot-dashboard': 'iot-dashboard',
+      privacy: 'privacy',
+      'audit-log': 'audit-log'
+    };
+
+    return map[seg] || 'dashboard';
+  };
+
+  const viewToPathSegment = (view) => {
+    const v = String(view || '').trim();
+    const map = {
+      dashboard: '',
+      eligibility: 'eligibility',
+      'prior-auth': 'prior-auth',
+      'claim-builder': 'claim-builder',
+      claims: 'claims',
+      mappings: 'mappings',
+      review: 'review',
+      error: 'error',
+      facility_performance: 'facility-performance',
+      facility_usage: 'facility-usage',
+      mapping_rules: 'mapping-rules',
+      developer: 'developer',
+      settings: 'settings',
+      'code-browser': 'code-browser',
+      'unified-browser': 'unified-browser',
+      'ai-hub': 'ai-hub',
+      'ai-analytics': 'ai-analytics',
+      'predictive-analytics': 'predictive-analytics',
+      'iot-dashboard': 'iot-dashboard',
+      privacy: 'privacy',
+      'audit-log': 'audit-log',
+      iot_dashboard: 'iot-dashboard',
+      ai_hub: 'ai-hub',
+      'ai-copilot': 'ai-hub',
+      'claim-optimizer': 'ai-hub'
+    };
+    return Object.prototype.hasOwnProperty.call(map, v) ? map[v] : '';
+  };
+
+  const navigate = (view, options = {}) => {
+    const { replace = false } = options;
+    const next = String(view || 'dashboard');
+    setCurrentView(next);
+    setSidebarOpen(false);
+
+    if (typeof window === 'undefined') return;
+    const basePrefix = window.location.pathname.startsWith('/sbs') ? '/sbs' : '';
+    const seg = viewToPathSegment(next);
+    const nextPath = seg ? `${basePrefix}/${seg}` : `${basePrefix}/`;
+    const currentPath = window.location.pathname;
+    if (currentPath === nextPath) return;
+    if (replace) window.history.replaceState({ view: next }, '', nextPath);
+    else window.history.pushState({ view: next }, '', nextPath);
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const initial = resolveViewFromPathname(window.location.pathname);
+    setCurrentView(initial);
+
+    const onPopState = () => {
+      const view = resolveViewFromPathname(window.location.pathname);
+      setCurrentView(view);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     const handleNavigate = (event) => {
       const view = event?.detail?.view;
       if (!view) return;
-      setCurrentView(view);
-      setSidebarOpen(false);
+      navigate(view);
     };
 
     window.addEventListener('sbs:navigate', handleNavigate);
     return () => window.removeEventListener('sbs:navigate', handleNavigate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const handleCopilot = (event) => {
+      const detail = event?.detail || {};
+      if (detail.open === false) setCopilotOpen(false);
+      else setCopilotOpen(true);
+    };
+
+    window.addEventListener('sbs:copilot', handleCopilot);
+    return () => window.removeEventListener('sbs:copilot', handleCopilot);
   }, []);
 
   const normalizedView = (() => {
@@ -161,6 +278,7 @@ export default function App() {
   })();
 
   const { title, subtitle, breadcrumbs } = getViewMeta(normalizedView, lang);
+  const hideTopHeaderOnDesktop = ['developer', 'iot-dashboard'].includes(normalizedView);
 
   return (
     <div
@@ -178,18 +296,29 @@ export default function App() {
 
       <Sidebar
         currentView={currentView}
-        setCurrentView={(view) => {
-          setCurrentView(view);
-          setSidebarOpen(false);
-        }}
+        setCurrentView={(view) => navigate(view)}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         lang={lang}
         isRTL={isRTL}
+        onSetLanguage={(next) => setLang(next)}
       />
 
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-        {!['developer', 'iot-dashboard'].includes(normalizedView) && (
+        {hideTopHeaderOnDesktop ? (
+          <div className="md:hidden">
+            <TopHeader
+              title={title}
+              subtitle={subtitle}
+              breadcrumbs={breadcrumbs}
+              onMenuClick={() => setSidebarOpen(true)}
+              lang={lang}
+              isRTL={isRTL}
+              onSetLanguage={(next) => setLang(next)}
+              scrollContainerRef={scrollContainerRef}
+            />
+          </div>
+        ) : (
           <TopHeader
             title={title}
             subtitle={subtitle}
@@ -197,31 +326,38 @@ export default function App() {
             onMenuClick={() => setSidebarOpen(true)}
             lang={lang}
             isRTL={isRTL}
-            onToggleLanguage={() => setLang((prev) => (prev === 'en' ? 'ar' : 'en'))}
+            onSetLanguage={(next) => setLang(next)}
+            scrollContainerRef={scrollContainerRef}
           />
         )}
 
-        <main data-testid={`view-${normalizedView}`} className="flex-1 overflow-hidden relative flex flex-col">
+        <main
+          ref={scrollContainerRef}
+          data-testid={`view-${normalizedView}`}
+          className="flex-1 overflow-y-auto relative flex flex-col bg-grid scrollbar-hide"
+        >
           <Suspense fallback={<PageLoader lang={lang} />}>
-            {normalizedView === 'dashboard' && <DashboardPage />}
-            {normalizedView === 'mappings' && <MappingsPage />}
-            {normalizedView === 'review' && <MappingReviewPage />}
-            {normalizedView === 'error' && <ErrorDetailPage />}
-            {normalizedView === 'facility_performance' && <FacilityPerformanceReport />}
-            {normalizedView === 'facility_usage' && <FacilityUsagePage />}
-            {normalizedView === 'mapping_rules' && <MappingRulesConfig />}
-            {normalizedView === 'developer' && <DeveloperPortal />}
-            {normalizedView === 'claims' && <ClaimsQueuePage />}
-            {normalizedView === 'settings' && <SettingsPage />}
-            {normalizedView === 'eligibility' && <EligibilityPage />}
-            {normalizedView === 'prior-auth' && <PriorAuthPage />}
-            {normalizedView === 'claim-builder' && <ClaimBuilderPage />}
-            {normalizedView === 'code-browser' && <SBSCodeBrowser />}
-            {normalizedView === 'unified-browser' && <UnifiedCodeBrowser />}
-            {normalizedView === 'ai-hub' && <AIHubPage />}
-            {normalizedView === 'predictive-analytics' && <PredictiveAnalyticsPage />}
-            {normalizedView === 'ai-analytics' && <AIAnalyticsHub />}
-            {normalizedView === 'iot-dashboard' && <IoTDashboardPage />}
+            {normalizedView === 'dashboard' && <DashboardPage lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'mappings' && <MappingsPage lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'review' && <MappingReviewPage lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'error' && <ErrorDetailPage lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'facility_performance' && <FacilityPerformanceReport lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'facility_usage' && <FacilityUsagePage lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'mapping_rules' && <MappingRulesConfig lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'developer' && <DeveloperPortal lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'claims' && <ClaimsQueuePage lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'settings' && <SettingsPage lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'eligibility' && <EligibilityPage lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'prior-auth' && <PriorAuthPage lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'claim-builder' && <ClaimBuilderPage lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'code-browser' && <SBSCodeBrowser lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'unified-browser' && <UnifiedCodeBrowser lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'ai-hub' && <AIHubPage lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'predictive-analytics' && <PredictiveAnalyticsPage lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'ai-analytics' && <AIAnalyticsHub lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'iot-dashboard' && <IoTDashboardPage lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'privacy' && <PrivacyConsentPage lang={lang} isRTL={isRTL} />}
+            {normalizedView === 'audit-log' && <AdminAuditPage lang={lang} isRTL={isRTL} />}
           </Suspense>
         </main>
       </div>
@@ -233,7 +369,7 @@ export default function App() {
         context={{ currentPage: normalizedView, lang }}
       />
 
-      {!copilotOpen && <AICopilotFAB onClick={() => setCopilotOpen(true)} />}
+      {!copilotOpen && <AICopilotFAB onClick={() => setCopilotOpen(true)} lang={lang} />}
     </div>
   );
 }

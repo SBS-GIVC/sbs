@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useToast } from '../components/Toast';
 import { Button } from '../components/ui/Button';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
-import { SectionHeader } from '../components/ui/SectionHeader';
+import { i18n } from '../utils/i18n';
 
 /**
  * Ultra-Premium Dashboard Page
  * The Cinematic Hub of GIVC-SBS
  */
-export function DashboardPage() {
+export function DashboardPage({ lang = 'en', isRTL = false }) {
   const toast = useToast();
+  const copy = i18n[lang] || i18n.en;
+  const t = copy.pages?.dashboard || i18n.en.pages.dashboard;
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -17,23 +19,23 @@ export function DashboardPage() {
   }, []);
 
   const stats = [
-    { title: 'Relay Volume', value: '1,240', trend: '+12.5%', trendUp: true, icon: 'dataset', color: 'blue', delay: 0 },
-    { title: 'Neural Sync Rate', value: '94.2%', trend: '+2.1%', trendUp: true, icon: 'auto_fix_high', color: 'emerald', delay: 100 },
-    { title: 'Pending Triage', value: '45', trend: '-5.2%', trendUp: true, icon: 'hourglass_top', color: 'amber', delay: 200 },
-    { title: 'Network Uptime', value: '99.9%', trend: '+0.1%', trendUp: true, icon: 'verified', color: 'indigo', delay: 300 },
+    { title: t.stats.relayVolume, value: '1,240', trend: '+12.5%', trendUp: true, icon: 'dataset', color: 'blue', delay: 0 },
+    { title: t.stats.neuralSyncRate, value: '94.2%', trend: '+2.1%', trendUp: true, icon: 'auto_fix_high', color: 'emerald', delay: 100 },
+    { title: t.stats.pendingTriage, value: '45', trend: '-5.2%', trendUp: true, icon: 'hourglass_top', color: 'amber', delay: 200 },
+    { title: t.stats.networkUptime, value: '99.9%', trend: '+0.1%', trendUp: true, icon: 'verified', color: 'indigo', delay: 300 },
   ];
 
-  const handleAction = (action, view) => {
+  const handleAction = (view) => {
     if (view) {
       window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view } }));
     }
-    toast.info(`${action} Sequence Initiated`);
+    toast.info(t.toast.sequenceInitiated);
   };
 
   if (!mounted) return null;
 
   return (
-    <div className="flex-1 overflow-y-auto bg-grid scrollbar-hide">
+    <div className="flex-1">
       <main className="max-w-[1700px] mx-auto p-6 sm:p-12 space-y-12 stagger-children">
         
         {/* Cinematic Hero */}
@@ -46,38 +48,37 @@ export function DashboardPage() {
              <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(circle_at_80%_70%,rgba(99,102,241,0.15)_0,transparent_50%)]"></div>
           </div>
 
-          <div className="relative p-12 lg:p-20 flex flex-col lg:flex-row items-center justify-between gap-16">
-            <div className="max-w-3xl space-y-8 text-center lg:text-left">
+          <div className={`relative p-12 lg:p-20 flex flex-col ${isRTL ? 'lg:flex-row-reverse' : 'lg:flex-row'} items-center justify-between gap-16`}>
+            <div className={`max-w-3xl space-y-8 text-center ${isRTL ? 'lg:text-right' : 'lg:text-left'}`}>
               <div className="inline-flex items-center gap-3 px-4 py-2 rounded-2xl bg-blue-600 text-white shadow-xl shadow-blue-600/25 text-[10px] font-black uppercase tracking-[0.3em]">
                  <span className="flex size-2 bg-white rounded-full animate-pulse"></span>
-                 System Protocol 3.1 Active
+                 {t.hero.badge}
               </div>
               
               <h1 className="text-5xl sm:text-7xl font-black text-slate-900 tracking-tighter leading-[0.95] stagger-children">
-                 The Future of <br />
-                 <span className="text-blue-500 bg-clip-text">Clinical Relay</span>
+                 {t.hero.titleLine1} <br />
+                 <span className="text-blue-500 bg-clip-text">{t.hero.titleLine2}</span>
               </h1>
               
               <p className="text-lg sm:text-xl text-slate-600 font-bold leading-relaxed max-w-2xl">
-                Orchestrating the Saudi healthcare economy with adaptive AI, 
-                real-time NPHIES compliance, and autonomous revenue intelligence.
+                {t.hero.description}
               </p>
 
               <div className="flex flex-wrap gap-4 justify-center lg:justify-start pt-4">
                 <Button 
                   icon="rocket_launch" 
-                  onClick={() => handleAction('Launch Center', 'claim-builder')}
+                  onClick={() => handleAction('claim-builder')}
                   className="px-12 py-4 text-sm shadow-xl shadow-blue-600/20"
                 >
-                  New Claim Relay
+                  {t.hero.primaryCta}
                 </Button>
                 <Button 
                   variant="secondary" 
                   icon="hub" 
-                  onClick={() => handleAction('Analyze Network', 'ai-analytics')}
+                  onClick={() => handleAction('ai-analytics')}
                   className="px-10 py-4 text-sm bg-white border-slate-200 text-slate-700 hover:bg-blue-50"
                 >
-                  Neural Insights
+                  {t.hero.secondaryCta}
                 </Button>
               </div>
             </div>
@@ -86,8 +87,8 @@ export function DashboardPage() {
             <div className="hidden xl:flex flex-col gap-6 w-96 animate-float">
                  <div className="glass-card p-8 rounded-[38px] border-blue-100 bg-white/80 backdrop-blur-3xl space-y-6 select-none border">
                   <div className="flex justify-between items-center">
-                     <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">System Pulse</span>
-                     <span className="text-[10px] font-black text-emerald-500">OPTIMAL</span>
+                     <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">{t.telemetry.pulse}</span>
+                     <span className="text-[10px] font-black text-emerald-500">{t.telemetry.stateOptimal}</span>
                   </div>
                   <div className="flex items-center gap-6">
                      <div className="size-16 rounded-3xl bg-blue-600/20 flex items-center justify-center border border-blue-600/30">
@@ -95,7 +96,7 @@ export function DashboardPage() {
                      </div>
                      <div className="space-y-1">
                         <p className="text-2xl font-black text-slate-900 tracking-tighter">1.2s</p>
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Avg Relay Latency</p>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.telemetry.avgLatency}</p>
                      </div>
                   </div>
                   <div className="h-1 bg-white/5 rounded-full overflow-hidden">
@@ -117,26 +118,26 @@ export function DashboardPage() {
            {/* Real-time Operations */}
            <Card className="lg:col-span-8 animate-premium-in" style={{ animationDelay: '400ms' }}>
               <CardHeader 
-                title="Live Operations Registry" 
-                subtitle="Aggregated throughput from active clinical nodes."
-                action={<Button variant="secondary" size="sm" icon="filter_list" onClick={() => handleAction('System Filter', 'facility_usage')}>System Filter</Button>}
+                title={t.operations.title}
+                subtitle={t.operations.subtitle}
+                action={<Button variant="secondary" size="sm" icon="filter_list" onClick={() => handleAction('facility_usage')}>{t.operations.filter}</Button>}
               />
               <CardBody className="p-0 overflow-hidden">
                  <div className="overflow-x-auto">
                     <table className="w-full text-left">
                        <thead>
                           <tr className="bg-slate-50/50 dark:bg-slate-900/50">
-                             <th className="px-10 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Entity & Carrier</th>
-                             <th className="px-10 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Inference Hub</th>
-                             <th className="px-10 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Neural Marker</th>
-                             <th className="px-10 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">Relay Status</th>
+                             <th className="px-10 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.operations.table.entityCarrier}</th>
+                             <th className="px-10 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.operations.table.inferenceHub}</th>
+                             <th className="px-10 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.operations.table.neuralMarker}</th>
+                             <th className="px-10 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.operations.table.relayStatus}</th>
                           </tr>
                        </thead>
                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                          <ClaimRow carrier="Tawuniya" location="Riyadh Central" score={98} status="Authenticated" color="emerald" id="CLM-9821" />
-                          <ClaimRow carrier="Bupa Arabia" location="Jeddah Health" score={85} status="In-Review" color="amber" id="CLM-4402" />
-                          <ClaimRow carrier="Medgulf" location="Eastern Clinic" score={92} status="Authenticated" color="emerald" id="CLM-0192" />
-                          <ClaimRow carrier="Al-Rajhi" location="Dammam Heart" score={99} status="Authenticated" color="emerald" id="CLM-5521" />
+                          <ClaimRow carrier="Tawuniya" location="Riyadh Central" score={98} status={t.operations.status.authenticated} color="emerald" id="CLM-9821" />
+                          <ClaimRow carrier="Bupa Arabia" location="Jeddah Health" score={85} status={t.operations.status.inReview} color="amber" id="CLM-4402" />
+                          <ClaimRow carrier="Medgulf" location="Eastern Clinic" score={92} status={t.operations.status.authenticated} color="emerald" id="CLM-0192" />
+                          <ClaimRow carrier="Al-Rajhi" location="Dammam Heart" score={99} status={t.operations.status.authenticated} color="emerald" id="CLM-5521" />
                        </tbody>
                     </table>
                  </div>
@@ -150,28 +151,28 @@ export function DashboardPage() {
                     <span className="material-symbols-outlined text-[180px] font-black">auto_awesome</span>
                  </div>
                  <CardBody className="p-10 space-y-6">
-                    <h3 className="text-2xl font-black tracking-tight leading-tight">Neural Deployment Ready</h3>
+                    <h3 className="text-2xl font-black tracking-tight leading-tight">{t.advisor.title}</h3>
                     <p className="text-sm font-bold text-blue-100/80 leading-relaxed">
-                       Your local V3.1 inference models have reached 99.2% accuracy on staging. Ready for production synchronization.
+                       {t.advisor.body}
                     </p>
                     <Button
                       variant="secondary"
                       className="w-full bg-white text-blue-600 border-none hover:bg-blue-50 shadow-xl"
                       icon="sync"
-                      onClick={() => handleAction('Production Sync', 'settings')}
+                      onClick={() => handleAction('settings')}
                     >
-                      Sync Production Node
+                      {t.advisor.button}
                     </Button>
                  </CardBody>
               </Card>
 
               <Card>
-                 <CardHeader title="System Integrity" />
+                 <CardHeader title={t.integrity.title} />
                  <CardBody className="p-8 space-y-6">
-                    <IntegrityNode label="NPHIES Cloud Node" status="High Priority" active />
-                    <IntegrityNode label="SBS Rules Engine" status="Optimal" active />
-                    <IntegrityNode label="AI Inference Grid" status="Overload" alert />
-                    <IntegrityNode label="Local Cache Layer" status="Optimal" active />
+                    <IntegrityNode label={t.integrity.nodes.nphies} status={t.integrity.status.highPriority} active />
+                    <IntegrityNode label={t.integrity.nodes.rules} status={t.integrity.status.optimal} active />
+                    <IntegrityNode label={t.integrity.nodes.grid} status={t.integrity.status.overload} alert />
+                    <IntegrityNode label={t.integrity.nodes.cache} status={t.integrity.status.optimal} active />
                  </CardBody>
               </Card>
            </div>
@@ -179,9 +180,9 @@ export function DashboardPage() {
 
         {/* Global Utilities */}
         <section className="grid md:grid-cols-3 gap-8 animate-premium-in" style={{ animationDelay: '600ms' }}>
-           <UtilityTile icon="hub" title="Code Registry" desc="Unified access to SBS, ICD-10, and SNOMED-CT ontologies." onClick={() => handleAction('Registry Browser', 'unified-browser')} />
-           <UtilityTile icon="science" title="Simulation Lab" desc="Validate complex claim scenarios in a sandboxed relay." onClick={() => handleAction('Workflow Simulation', 'facility_performance')} />
-           <UtilityTile icon="sensors" title="Edge Monitor" desc="Real-time telemetry from clinical IoT integration nodes." onClick={() => handleAction('IoT Dashboard', 'iot_dashboard')} />
+           <UtilityTile icon="hub" title={t.utilities.codeRegistry.title} desc={t.utilities.codeRegistry.desc} onClick={() => handleAction('unified-browser')} />
+           <UtilityTile icon="science" title={t.utilities.simulationLab.title} desc={t.utilities.simulationLab.desc} onClick={() => handleAction('facility_performance')} />
+           <UtilityTile icon="sensors" title={t.utilities.edgeMonitor.title} desc={t.utilities.edgeMonitor.desc} onClick={() => handleAction('iot_dashboard')} />
         </section>
 
       </main>
@@ -262,7 +263,18 @@ function IntegrityNode({ label, status, active, alert }) {
 
 function UtilityTile({ icon, title, desc, onClick }) {
   return (
-    <Card className="group cursor-pointer hover:border-blue-600/30 transition-all hover:bg-blue-600/5" onClick={onClick}>
+    <Card
+      className="group cursor-pointer hover:border-blue-600/30 transition-all hover:bg-blue-600/5"
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+    >
        <CardBody className="p-10 space-y-6 text-center">
           <div className="size-16 mx-auto rounded-3xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
              <span className="material-symbols-outlined text-3xl font-black">{icon}</span>

@@ -3,15 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="GIVC-SBS (Global Integrated Virtual Care · Saudi Billing System) powered by BrainSAITبرينسايت · Auth: Dr. Mohamed El Fadil" />
+    <meta name="description" content="GIVC-SBS (Global Integrated Virtual Care · Saudi Billing System) powered by BrainSAIT برينسايت" />
     <meta name="keywords" content="GIVC-SBS, Saudi Billing System, SBS, healthcare, NPHIES, Saudi Arabia, medical coding" />
-    <meta name="author" content="BrainSAITبرينسايت · Auth: Dr. Mohamed El Fadil" />
-    <meta name="theme-color" content="#f8fafc" />
+    <meta name="author" content="BrainSAIT · Dr. Mohamed El Fadil" />
 
     <!-- Open Graph / Social Media -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="GIVC-SBS - Global Integrated Virtual Care · Saudi Billing System" />
-    <meta property="og:description" content="Premium Saudi Billing System platform powered by BrainSAITبرينسايت · Auth: Dr. Mohamed El Fadil" />
+    <meta property="og:description" content="Premium Saudi Billing System platform powered by BrainSAIT برينسايت" />
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
@@ -24,49 +23,40 @@
 
     <!-- Title -->
     <title>GIVC-SBS · Global Integrated Virtual Care · Saudi Billing System</title>
-    <style>
-      :root { color-scheme: light; }
-      body { background: #f8fafc; color: #0f172a; }
-      .brainsait-brand-badge {
-        position: fixed;
-        right: 12px;
-        bottom: 12px;
-        z-index: 50;
-        background: rgba(255,255,255,0.95);
-        border: 1px solid #e2e8f0;
-        border-radius: 9999px;
-        padding: 8px 12px;
-        font: 600 11px/1.2 Manrope, Inter, sans-serif;
-        color: #334155;
-        box-shadow: 0 10px 30px rgba(15,23,42,.12);
-        backdrop-filter: blur(8px);
-      }
-      .brainsait-brand-badge a {
-        color: #1d4ed8;
-        text-decoration: none;
-        font-weight: 700;
-      }
-    </style>
 
     <!-- Runtime API configuration -->
     <script>
       (function () {
+        const host = window.location.hostname;
         if (window.SBS_API_URL) return;
-        // Use same-origin by default so UI routes and API calls stay in sync
-        // across local, staging, and production deployments.
+
+        const envApiUrl = 'http://localhost:3000';
+        if (envApiUrl && envApiUrl !== 'http://localhost:3000') {
+          window.SBS_API_URL = envApiUrl.replace(/\/+$/, '');
+          return;
+        }
+
+        if (host === 'sbs.brainsait.cloud' || host === 'brainsait.cloud' || host === 'www.brainsait.cloud') {
+          window.SBS_API_URL = 'https://api.brainsait.cloud';
+          return;
+        }
+
+        if (host === 'localhost' || host === '127.0.0.1') {
+          // In local dev, use same-origin so Vite /api proxy (if configured)
+          // stays authoritative and avoids hardcoded backend ports.
+          window.SBS_API_URL = window.location.origin;
+          return;
+        }
+
         window.SBS_API_URL = window.location.origin;
       })();
     </script>
-    <script type="module" crossorigin src="./assets/main-CrAJ0RmW.js"></script>
-    <link rel="modulepreload" crossorigin href="./assets/vendor-hzXslIYo.js">
-    <link rel="modulepreload" crossorigin href="./assets/vendor-react-DS7a0TT8.js">
-    <link rel="stylesheet" crossorigin href="./assets/main-ER3JE-7r.css">
+    <script type="module" crossorigin src="./assets/main-DTZYqsTu.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/vendor-BW1Bdpst.js">
+    <link rel="modulepreload" crossorigin href="./assets/vendor-react-MVSD7VGK.js">
+    <link rel="stylesheet" crossorigin href="./assets/main-tZ5l3Hja.css">
   </head>
   <body>
     <div id="root"></div>
-    <div class="brainsait-brand-badge">
-      Powered by BrainSAITبرينسايت · Auth: Dr. Mohamed El Fadil ·
-      <a href="https://gravatar.com/fadil369" target="_blank" rel="noreferrer">Profile</a>
-    </div>
   </body>
 </html>

@@ -93,7 +93,12 @@ export function AICopilot({ isOpen, onClose, context = {}, lang = 'en' }) {
                    </div>
                 </div>
              </div>
-             <button onClick={onClose} className="size-10 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 transition-colors">
+             <button
+               type="button"
+               onClick={onClose}
+               aria-label={lang === 'ar' ? 'إغلاق المساعد الذكي' : 'Close AI Copilot'}
+               className="size-10 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 transition-colors"
+             >
                 <span className="material-symbols-outlined">close</span>
              </button>
           </div>
@@ -157,11 +162,17 @@ export function AICopilot({ isOpen, onClose, context = {}, lang = 'en' }) {
   );
 }
 
-export function AICopilotFAB({ onClick }) {
+export function AICopilotFAB({ onClick, lang = 'en' }) {
+  const ariaLabel = lang === 'ar' ? 'فتح المساعد الذكي' : 'Open AI Copilot';
   return (
-    <button onClick={onClick} className="fixed bottom-12 right-12 z-[150] size-20 rounded-[32px] bg-blue-600 text-white shadow-[0_24px_64px_-12px_rgba(37,99,235,0.6)] flex items-center justify-center group hover:scale-110 active:scale-95 transition-all animate-float">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className="fixed bottom-12 right-12 z-[150] size-20 rounded-[32px] bg-blue-600 text-white shadow-[0_24px_64px_-12px_rgba(37,99,235,0.6)] flex items-center justify-center group hover:scale-110 active:scale-95 transition-all animate-float"
+    >
        <span className="material-symbols-outlined text-4xl font-black group-hover:rotate-12 transition-transform">psychology</span>
-       <div className="absolute inset-0 rounded-[32px] border-4 border-white/20 scale-110 animate-ping opacity-20"></div>
+       <div className="pointer-events-none absolute inset-0 rounded-[32px] border-4 border-white/20 scale-110 animate-ping opacity-20"></div>
     </button>
   );
 }

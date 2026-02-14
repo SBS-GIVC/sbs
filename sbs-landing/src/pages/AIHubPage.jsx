@@ -4,48 +4,42 @@
  */
 
 import React, { useState } from 'react';
-import { AICopilot } from '../components/AICopilot';
 import { SmartClaimAnalyzer } from '../components/SmartClaimAnalyzer';
-import { Card, CardBody, CardHeader } from '../components/ui/Card';
+import { Card, CardBody } from '../components/ui/Card';
 import { SectionHeader } from '../components/ui/SectionHeader';
 import { Button } from '../components/ui/Button';
+import { i18n } from '../utils/i18n';
 
 const AI_FEATURES = [
   {
     id: 'copilot',
     icon: 'psychology',
-    title: 'GIVC-SBS Copilot',
-    description: 'Neural billing assistant trained on SBS codes and CHI/NPHIES regulatory frameworks.',
     color: 'blue',
-    stats: { label: 'Queries Handled', value: '2,450+' },
+    statsValue: '2,450+',
     badge: 'POPULAR'
   },
   {
     id: 'analyzer',
     icon: 'analytics',
-    title: 'Claim Analyzer',
-    description: 'Predictive approval modeling with risk vector assessment and code optimization.',
     color: 'indigo',
-    stats: { label: 'Claims Analyzed', value: '12,800+' },
+    statsValue: '12,800+',
     badge: 'V4.0'
   },
   {
     id: 'coder',
     icon: 'code',
-    title: 'Smart Code Mapper',
-    description: 'Autonomous mapping of legacy hospital codes to official SBS V3.1 standards.',
     color: 'emerald',
-    stats: { label: 'Codes Mapped', value: '45,000+' }
+    statsValue: '45,000+'
   }
 ];
 
-export function AIHubPage() {
-  const [copilotOpen, setCopilotOpen] = useState(false);
+export function AIHubPage({ lang = 'en', isRTL = false }) {
+  const copy = i18n[lang] || i18n.en;
+  const t = copy.pages?.aiHub || i18n.en.pages.aiHub;
   const [analyzerOpen, setAnalyzerOpen] = useState(false);
-  const appLang = typeof document !== 'undefined' && document.documentElement.lang === 'ar' ? 'ar' : 'en';
 
   return (
-    <div className="flex-1 overflow-y-auto bg-grid scrollbar-hide">
+    <div className="flex-1">
       <main className="max-w-[1400px] mx-auto p-6 sm:p-8 space-y-12 stagger-children">
         
         {/* Cinematic Hero */}
@@ -56,25 +50,34 @@ export function AIHubPage() {
            </div>
 
            <div className="relative flex flex-col lg:flex-row items-center gap-12">
-              <div className="flex-1 space-y-8 text-center lg:text-left">
+              <div className={`flex-1 space-y-8 text-center ${isRTL ? 'lg:text-right' : 'lg:text-left'}`}>
                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600/10 border border-blue-600/30 text-blue-700">
                     <span className="material-symbols-outlined text-sm font-black animate-pulse">auto_awesome</span>
-                    <span className="text-[10px] font-black uppercase tracking-widest">Next-Gen Integration Intelligence</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest">{t.hero.kicker}</span>
                  </div>
                  
                  <h1 className="text-5xl sm:text-7xl font-black tracking-tighter leading-none">
-                    The Pulse of <br/>
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600">Autonomous Billing</span>
+                    {t.hero.titleLine1} <br/>
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600">{t.hero.titleLine2}</span>
                  </h1>
 
                  <p className="text-lg font-bold text-slate-600 max-w-xl leading-relaxed">
-                    Leverage specialized neural agents trained specifically on the Saudi SBS and NPHIES ecosystems. 
-                    Guaranteed <span className="text-slate-900">99.8% normalization accuracy</span> for enterprise health systems.
+                    {t.hero.descriptionBeforeStrong}{' '}
+                    <span className="text-slate-900">{t.hero.descriptionStrong}</span>{' '}
+                    {t.hero.descriptionAfterStrong}
                  </p>
 
                  <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
-                    <Button icon="psychology" onClick={() => setCopilotOpen(true)} className="px-8 py-4">Launch Copilot</Button>
-                    <Button variant="secondary" icon="analytics" onClick={() => setAnalyzerOpen(true)} className="px-8 py-4">Start Analysis</Button>
+                    <Button
+                      icon="psychology"
+                      onClick={() => window.dispatchEvent(new CustomEvent('sbs:copilot', { detail: { open: true } }))}
+                      className="px-8 py-4"
+                    >
+                      {t.hero.launchCopilot}
+                    </Button>
+                    <Button variant="secondary" icon="analytics" onClick={() => setAnalyzerOpen(true)} className="px-8 py-4">
+                      {t.hero.startAnalysis}
+                    </Button>
                  </div>
               </div>
 
@@ -89,10 +92,27 @@ export function AIHubPage() {
 
         {/* Intelligence Grid */}
         <section className="space-y-6">
-           <SectionHeader title="Autonomous Capabilities" subtitle="Specialized AI models designed for specific healthcare integration vectors." />
+           <SectionHeader title={t.capabilities.title} subtitle={t.capabilities.subtitle} />
            <div className="grid md:grid-cols-3 gap-8">
               {AI_FEATURES.map((feature, i) => (
-                <FeatureCard key={i} feature={feature} onClick={() => feature.id === 'copilot' ? setCopilotOpen(true) : setAnalyzerOpen(true)} delay={i * 100} />
+                <FeatureCard
+                  key={feature.id}
+                  feature={{
+                    ...feature,
+                    title: t.features?.[feature.id]?.title || feature.id,
+                    description: t.features?.[feature.id]?.description || '',
+                    statsLabel: t.features?.[feature.id]?.statsLabel || '',
+                    badgeLabel: t.features?.[feature.id]?.badge || feature.badge || null
+                  }}
+                  onClick={() => {
+                    if (feature.id === 'copilot') {
+                      window.dispatchEvent(new CustomEvent('sbs:copilot', { detail: { open: true } }));
+                    } else {
+                      setAnalyzerOpen(true);
+                    }
+                  }}
+                  delay={i * 100}
+                />
               ))}
            </div>
         </section>
@@ -101,17 +121,16 @@ export function AIHubPage() {
         <section className="animate-premium-in" style={{ animationDelay: '400ms' }}>
            <Card className="bg-slate-50 dark:bg-slate-900/40 border-slate-200/50 dark:border-slate-800/50">
               <CardBody className="grid sm:grid-cols-2 lg:grid-cols-4 gap-12 p-12">
-                 <StatItem icon="trending_up" label="Accuracy Lift" value="+14.2%" color="emerald" />
-                 <StatItem icon="bolt" label="Decision Speed" value="120ms" color="blue" />
-                 <StatItem icon="security" label="Compliance" value="100%" color="indigo" />
-                 <StatItem icon="savings" label="Savings Yield" value="SAR 4.2M" color="amber" />
+                 <StatItem icon="trending_up" label={t.kpis.accuracyLift} value="+14.2%" color="emerald" />
+                 <StatItem icon="bolt" label={t.kpis.decisionSpeed} value="120ms" color="blue" />
+                 <StatItem icon="security" label={t.kpis.compliance} value="100%" color="indigo" />
+                 <StatItem icon="savings" label={t.kpis.savingsYield} value={lang === 'ar' ? '٤.٢M ر.س' : 'SAR 4.2M'} color="amber" />
               </CardBody>
            </Card>
         </section>
 
       </main>
 
-      <AICopilot isOpen={copilotOpen} onClose={() => setCopilotOpen(false)} lang={appLang} />
       <SmartClaimAnalyzer 
         isOpen={analyzerOpen} 
         onClose={() => setAnalyzerOpen(false)} 
@@ -138,17 +157,19 @@ function FeatureCard({ feature, onClick, delay }) {
   };
 
   return (
-    <div 
+    <button
+      type="button"
       onClick={onClick}
       className="glass-card p-8 rounded-[40px] border border-slate-200/50 dark:border-slate-800/50 hover:border-blue-600/30 transition-all duration-300 group cursor-pointer animate-premium-in"
       style={{ animationDelay: `${delay}ms` }}
+      aria-label={feature.title}
     >
        <div className="flex justify-between items-start mb-8">
           <div className={`size-16 rounded-[24px] flex items-center justify-center ${colors[feature.color] || colors.blue} group-hover:scale-110 transition-transform`}>
              <span className="material-symbols-outlined text-3xl font-black">{feature.icon}</span>
           </div>
-          {feature.badge && (
-            <span className="px-3 py-1 rounded-full bg-slate-900 text-white text-[10px] font-black tracking-widest uppercase border border-white/10">{feature.badge}</span>
+          {feature.badgeLabel && (
+            <span className="px-3 py-1 rounded-full bg-slate-900 text-white text-[10px] font-black tracking-widest uppercase border border-white/10">{feature.badgeLabel}</span>
           )}
        </div>
        <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-3 leading-none">{feature.title}</h3>
@@ -156,14 +177,14 @@ function FeatureCard({ feature, onClick, delay }) {
        
        <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <div>
-             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{feature.stats.label}</p>
-             <p className="text-lg font-black text-slate-900 dark:text-white">{feature.stats.value}</p>
+             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{feature.statsLabel}</p>
+             <p className="text-lg font-black text-slate-900 dark:text-white">{feature.statsValue}</p>
           </div>
           <div className="size-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all transform group-hover:translate-x-1">
              <span className="material-symbols-outlined">arrow_forward</span>
           </div>
        </div>
-    </div>
+    </button>
   );
 }
 

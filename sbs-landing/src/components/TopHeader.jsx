@@ -12,18 +12,23 @@ export function TopHeader({
   onMenuClick,
   lang = 'en',
   isRTL = false,
-  onToggleLanguage
+  onSetLanguage,
+  scrollContainerRef
 }) {
   const [scrolled, setScrolled] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const copy = i18n[lang] || i18n.en;
 
   useEffect(() => {
+    const el = scrollContainerRef?.current || window;
     const handleScroll = () => {
-      setScrolled(window.scrollY > 10);
+      const top = el === window ? window.scrollY : el.scrollTop;
+      setScrolled(top > 10);
     };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+
+    handleScroll();
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => el.removeEventListener('scroll', handleScroll);
   }, []);
 
   return (
@@ -42,9 +47,9 @@ export function TopHeader({
           type="button"
           aria-label={lang === 'ar' ? 'فتح التنقل' : 'Open navigation'}
           onClick={onMenuClick}
-          className="md:hidden size-10 rounded-xl bg-white border border-slate-200/70 flex items-center justify-center shadow-sm active:scale-90 transition-all duration-200"
+          className="md:hidden size-10 rounded-xl bg-white border border-slate-200/70 flex items-center justify-center shadow-sm active:scale-90 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
         >
-          <span className="material-symbols-outlined text-slate-600">menu</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-slate-600">menu</span>
         </button>
 
         <div className="flex flex-col">
@@ -88,7 +93,7 @@ export function TopHeader({
             relative w-full overflow-hidden rounded-xl transition-all duration-300
             ${searchFocused ? 'bg-white shadow-md ring-1 ring-blue-600/20' : 'bg-white border border-slate-200/70'}
           `}>
-            <span className={`
+            <span aria-hidden="true" className={`
               absolute ${isRTL ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 material-symbols-outlined text-[18px] transition-colors duration-300
               ${searchFocused ? 'text-blue-600' : 'text-slate-400'}
             `}>
@@ -104,29 +109,52 @@ export function TopHeader({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onToggleLanguage}
-          className="h-10 px-3 rounded-xl bg-white border border-slate-200/70 text-slate-700 hover:border-blue-300 hover:text-blue-600 transition-colors text-xs font-black tracking-wide"
-          title={lang === 'ar' ? 'تبديل اللغة' : 'Toggle language'}
+        <div
+          className="h-10 flex items-center rounded-xl bg-white border border-slate-200/70 p-1"
+          role="group"
+          aria-label={lang === 'ar' ? 'اللغة' : 'Language'}
         >
-          {copy.ui.language}
-        </button>
+          <button
+            type="button"
+            onClick={() => onSetLanguage?.('en')}
+            className={`h-8 px-3 rounded-lg text-xs font-black tracking-wide transition-colors ${
+              lang === 'en'
+                ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/20'
+                : 'text-slate-600 hover:text-blue-600'
+            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white`}
+            aria-pressed={lang === 'en'}
+          >
+            English
+          </button>
+          <button
+            type="button"
+            onClick={() => onSetLanguage?.('ar')}
+            className={`h-8 px-3 rounded-lg text-xs font-black tracking-wide transition-colors ${
+              lang === 'ar'
+                ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/20'
+                : 'text-slate-600 hover:text-blue-600'
+            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white`}
+            aria-pressed={lang === 'ar'}
+          >
+            العربية
+          </button>
+        </div>
 
         <button
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent('sbs:navigate', { detail: { view: 'claims' } }))}
-          className="size-10 rounded-xl bg-white border border-slate-200/70 text-slate-500 hover:text-blue-600 transition-colors flex items-center justify-center"
+          className="size-10 rounded-xl bg-white border border-slate-200/70 text-slate-500 hover:text-blue-600 transition-colors flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
           title={copy.ui.notifications}
+          aria-label={copy.ui.notifications}
         >
-          <span className="material-symbols-outlined text-[20px]">notifications</span>
+          <span aria-hidden="true" className="material-symbols-outlined text-[20px]">notifications</span>
         </button>
 
         <a
           href="https://gravatar.com/fadil369"
           target="_blank"
           rel="noreferrer"
-          className={`flex items-center gap-3 pl-3 pr-1.5 py-1 rounded-xl bg-white border border-slate-200/70 hover:border-blue-300 transition-all group ${isRTL ? 'flex-row-reverse' : 'flex-row'}`}
+          className={`flex items-center gap-3 pl-3 pr-1.5 py-1 rounded-xl bg-white border border-slate-200/70 hover:border-blue-300 transition-all group ${isRTL ? 'flex-row-reverse' : 'flex-row'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white`}
           title={copy.ui.profile}
         >
           <div className={`${isRTL ? 'text-left' : 'text-right'} hidden sm:block`}>
