@@ -34,6 +34,16 @@ except ImportError:
     # Fallback: healthcare endpoints will be added manually
     healthcare_app = None
 
+# Import InterSystems IRIS for Health bridge (non-blocking — errors are warnings only)
+try:
+    from iris_fhir import store_claim_in_iris, store_claim_response_in_iris, get_iris_health
+    IRIS_AVAILABLE = True
+except ImportError:
+    IRIS_AVAILABLE = False
+    def store_claim_in_iris(*args, **kwargs): return None  # type: ignore
+    def store_claim_response_in_iris(*args, **kwargs): return None  # type: ignore
+    def get_iris_health(): return {"enabled": False, "error": "iris_fhir module not found"}  # type: ignore
+
 load_dotenv()
 
 # Setup structured logging
@@ -289,6 +299,10 @@ async def submit_transaction(
         error_msg=error_msg,
     )
 
+    # Persist to InterSystems IRIS for Health (fire-and-forget; never blocks NPHIES flow)
+    store_claim_in_iris(submission.fhir_payload, txn_uuid)
+    store_claim_response_in_iris(txn_uuid, response_data, normalized_status, http_status or 0)
+
     if normalized_status == "accepted":
         message = success_message
     elif normalized_status == "rejected":
@@ -456,6 +470,7 @@ def health_check():
             "status": "healthy",
             "database": "connected",
             "nphies_endpoint": NPHIES_BASE_URL,
+            "iris_for_health": get_iris_health(),
             "terminology_validation": {
                 "enabled": terminology_catalog is not None,
                 "strict_mode": STRICT_TERMINOLOGY_VALIDATION,
@@ -468,6 +483,15 @@ def health_check():
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Database connection failed: {str(e)}"
         )
+
+
+@app.get("/iris/health")
+def iris_health_endpoint():
+    """InterSystems IRIS for Health connectivity check."""
+    result = get_iris_health()
+    if not result.get("reachable", True) and result.get("enabled", False):
+        raise HTTPException(status_code=503, detail=result)
+    return result
 
 
 @app.get("/ready")

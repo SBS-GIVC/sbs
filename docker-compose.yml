@@ -181,7 +181,35 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  # NPHIES Bridge
+  # InterSystems IRIS for Health — FHIR R4 clinical data platform
+  iris-health:
+    image: intersystems/irishealth-community:latest-cd
+    container_name: sbs-iris-health
+    environment:
+      ISC_DATA_DIRECTORY: /home/irisowner/irisdata
+    ports:
+      - "127.0.0.1:52773:52773"   # Web server / FHIR R4 REST API / Management Portal
+      - "127.0.0.1:1972:1972"     # SuperServer / Native API
+    volumes:
+      - iris_data:/home/irisowner/irisdata
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:52773/fhir/r4/metadata -o /dev/null || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+        reservations:
+          memory: 1024M
+    networks:
+      - sbs-network
+
+# NPHIES Bridge
   nphies-bridge:
     build:
       context: .
@@ -199,10 +227,19 @@ services:
       NPHIES_MAX_RETRIES: ${NPHIES_MAX_RETRIES:-3}
       ENABLE_MOCK_NPHIES: ${ENABLE_MOCK_NPHIES:-false}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      # InterSystems IRIS for Health
+      IRIS_ENABLED: ${IRIS_ENABLED:-true}
+      IRIS_HOST: iris-health
+      IRIS_PORT: 52773
+      IRIS_USERNAME: ${IRIS_USERNAME:-SuperUser}
+      IRIS_PASSWORD: ${IRIS_PASSWORD:-SYS}
+      IRIS_FHIR_BASE_URL: http://iris-health:52773/fhir/r4
     ports:
       - "127.0.0.1:8003:8003"  # Bind to localhost only
     depends_on:
       postgres:
+        condition: service_healthy
+      iris-health:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
@@ -591,6 +628,8 @@ volumes:
   n8n_data:
     driver: local
   traefik_letsencrypt:
+    driver: local
+  iris_data:
     driver: local
 
 networks:
