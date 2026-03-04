@@ -127,6 +127,8 @@ class ValidatedClaim(BaseModel):
 
 def get_facility_tier(facility_id: int) -> Optional[Dict]:
     """Get facility accreditation tier and pricing rules"""
+    conn = None
+    cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -145,18 +147,22 @@ def get_facility_tier(facility_id: int) -> Optional[Dict]:
         cursor.execute(query, (facility_id,))
         result = cursor.fetchone()
         
-        cursor.close()
-        conn.close()
-        
         return dict(result) if result else None
         
     except Exception as e:
         logger.error(f"Error fetching facility tier: {format_database_error(e)}")
         return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 def get_sbs_standard_price(sbs_code: str) -> Optional[Decimal]:
     """Get the standard price for an SBS code"""
+    conn = None
+    cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -168,26 +174,29 @@ def get_sbs_standard_price(sbs_code: str) -> Optional[Decimal]:
         
         result = cursor.fetchone()
         
-        cursor.close()
-        conn.close()
-        
         return Decimal(result['standard_price']) if result and result['standard_price'] else None
         
     except Exception as e:
         logger.error(f"Error fetching SBS price: {format_database_error(e)}")
         return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 def check_for_bundles(item_codes: List[str]) -> Optional[Dict]:
     """
-    Check if the claim items qualify for a service bundle
-    Returns bundle information if applicable
+    Check if the claim items qualify for a service bundle.
+    Returns bundle information if applicable.
     """
+    conn = None
+    cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Find bundles that contain all the provided codes
         query = """
         SELECT 
             sb.bundle_id,
@@ -208,14 +217,16 @@ def check_for_bundles(item_codes: List[str]) -> Optional[Dict]:
         cursor.execute(query, (item_codes,))
         result = cursor.fetchone()
         
-        cursor.close()
-        conn.close()
-        
         return dict(result) if result else None
         
     except Exception as e:
         logger.error(f"Error checking bundles: {format_database_error(e)}")
         return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 def apply_pricing_markup(base_price: Decimal, markup_pct: float) -> Decimal:
